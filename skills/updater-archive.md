@@ -222,7 +222,7 @@
 
 读 `chapters/` 目录，筛选当前卷的章节文件，按 `status: archived` 标记判断完成度（Step 1 ④ 写入）：
 - 未全部完成 → 更新 status.md，`current_chapter` 前移
-- 全部完成 → 更新 status.md：`last_volume_completed = true`，`current_phase = review`。输出卷完成报告：
+- 全部完成 → **只输出卷完成报告**（不写 `last_volume_completed`、不写 `current_phase`——完成位由 novel-agent 裁决，见 novel-agent THINK）：
 
 ```text
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

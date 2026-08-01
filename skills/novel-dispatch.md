@@ -21,6 +21,19 @@ novel-agent **只做三件事**：
 | anti-ai | anti-ai | `anti-ai-order.md` |
 | review | reader | `reader-review-order.md` |
 | archive | updater | `archive-order.md` |
+| finished | 无（终态） | 无——完本退出，不调度 |
+
+## 卷完成判定（novel-agent 专属，不派给子 agent）
+
+updater 归档 order 标 DONE 后，novel-agent 自己裁决（不写 order、不派发）：
+
+1. Glob `chapters/` 数当前卷 `status: archived` 的章数
+2. 对比 `volumes/volume-{N}.md#chapters_summary` 规划章节数
+3. 已归档数 < 规划数 → 卷未完成，问作者继续下一章
+4. 已归档数 == 规划数 → 卷完成：novel-agent 写 `.agent/status.md` 的 `last_volume_completed = true`
+   - Glob `volumes/` 有 volume-{N+1}（或可规划）→ 问作者是否规划卷 N+1 → 回 outline/volume-planning
+   - 无下一卷 → 问作者是否完本 → 确认 → 写 `phase: finished` → 输出完本报告（不再调度）
+5. **updater 不写 `last_volume_completed` / `current_phase`（只输出卷完成报告）**——完成位唯一写者是 novel-agent
 
 ## 写 order 文件的规则
 

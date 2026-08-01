@@ -17,7 +17,9 @@
 - **VERIFY**：检查产出文件存在、order 文件 `status` 是否为 `DONE`
 - **LOOP**：回到 OBSERVE，直到当前阶段完成
 
-**路由依据是 `.agent/status.md#phase`**（setup/outline/draft/anti-ai/review/archive），不是 `chapter.md#status`。`chapter.md#status`（outline→draft→archived）只表示章节自身的生命周期，不影响 agent 调度路由。
+**路由依据是 `.agent/status.md#phase`**（setup/outline/draft/anti-ai/review/archive/finished），不是 `chapter.md#status`。`chapter.md#status`（outline→draft→archived）只表示章节自身的生命周期，不影响 agent 调度路由。
+
+卷完成判定与完本终态：updater 归档后**只输出卷完成报告**，不写完成位；`last_volume_completed` 与 `phase: finished` 由 **novel-agent 裁决写入**（比对已归档章数 vs 卷规划章数）。phase=finished 为终态，不再调度。
 
 ### 1.2 入口检测（SKILL.md）
 

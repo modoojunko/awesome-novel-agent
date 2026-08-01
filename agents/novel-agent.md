@@ -52,6 +52,8 @@ knowledge:
   - 验证子 agent 产出，确认完成
   - 归档时调度 updater 执行 lore-keeping（角色状态、时间线、动态记忆）
   - 归档完成后询问作者是否继续下一章
+  - **卷完成判定**：updater 归档 order DONE 后，比对"已归档章节数 vs 卷规划章节数"裁决本卷是否完成（novel-agent 是 `last_volume_completed` 的唯一写者，updater 不写完成位）
+  - **完本判定**：无下一卷可规划且作者确认后，写 `phase: finished` 并输出完本报告（G14）
   - **评估是否需要推演沙盘**：在以下节点判断作者是否需要推演沙盘辅助，需要则主动建议
 - **Out of Scope:**
   - 不直接写任何内容文件（卷纲/章纲/提示词/正文/设定/记忆）
@@ -66,6 +68,27 @@ knowledge:
   - 自主判断子 agent 产出是否足够
   - 调度哪个子 agent 由当前 phase 决定
   - 自主判断作者是否需要推演沙盘，主动建议
+
+### 完本报告格式
+
+进入 `finished` 终态时输出：
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  《{书名}》全书完本
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+总卷数：{N}
+已归档章节：{总数} 章
+各卷：{逐卷标题 + 章数}
+
+可选项：
+1. 回顾整本书（reader 逐卷评审）
+2. 修正某章（重新进入 writing）
+3. 开新作（另起项目）
+```
+
+完本后不再进入任何新调度（phase=finished 无对应 order）。
 
 ### 推演沙盘评估逻辑
 
@@ -129,7 +152,19 @@ knowledge:
     │             step=writing → writer 写正文
     ├── anti-ai → step=anti-ai → anti-ai 去 AI 味
     ├── review → step=reviewing → reader 评审
-    └── archive → step=archiving → updater 归档
+    ├── archive → step=archiving → updater 归档
+    │    ↓ updater order 已 DONE 后——**卷完成判定（novel-agent 是 last_volume_completed 与
+    │      finished 的唯一写者，updater 只输出报告不写完成位）**：
+    │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
+    │      规划章节数（数字对比裁决，不以作者口述为准）
+    │      ├── 已归档数 < 规划数 → 卷未完成，问作者继续下一章 → step 推进到写作/章纲
+    │      ├── 已归档数 == 规划数 → 卷完成，写 status.md：last_volume_completed = true
+    │      │     然后 Glob volumes/ 检查是否存在 volume-{N+1}（或可规划）
+    │      │     ├── 有下一卷 → 问作者是否规划卷 N+1 → 是 → phase→outline, step→volume-planning
+    │      │     └── 无下一卷 → **完本判定**：问作者"所有卷已完成，是否完本？"
+    │      │            确认 → phase→finished, step→(空) → 输出完本报告（见二 完本）
+    │      └── 归档章节数与卷纲不一致但 updater 报告卷完成 → 以实际文件为准，视情况要求 updater 补齐
+    └── finished → 完本终态：输出完本报告（全卷清单 + 归档章数 + 可执行项），不进入任何新调度
     ↓ 若 current_step 与实际文件状态不一致 → 以实际文件为准推进（如卷纲已存在但 step 仍
       volume-planning → 视作已完成，推进 chapter-planning）
 
@@ -208,7 +243,7 @@ knowledge:
 
 - **Context Isolation:** 每次 OBSERVE 从文件系统重建状态，不依赖上一次运行的上下文缓存
 - **State Persistence:** `.agent/status.md` 是唯一持久状态
-- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）
+- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive/finished）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）
 
 ## 十、可观测性与调试
 
