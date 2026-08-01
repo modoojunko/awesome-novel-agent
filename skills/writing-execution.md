@@ -10,14 +10,14 @@ Step 2: 清理上下文（减少干扰）
 Step 3: 写作（sub-agent 执行）
 Step 4: 验证输出（文件存在 + 字数达标）
 Step 5: 叙事规则自查（7 条正面规则逐条过）
-Step 6: 保存 AI 原版快照
 ```
+
+> AI 原版快照（`.agent/{chapter}-draft-ai.md`）由 **updater 在归档时创建**（从草稿复制，updater-archive Step 1），writer 不负责保存。
 
 ## Step 1: 准备
 
 1. 确认卷号 `{N}` 和章号 `{M}`
 2. 读取 `prompts/vol-{N}-ch-{M}-prompt.md`，确认 4 层完整。字数和驱动力从任务层获取，叙事视角从输出·写作规范获取
-3. 创建 `.agent/` 目录（如不存在），记录 AI 原版快照路径：`{chapter}-draft-ai.md`
 
 ## Step 2: 清理上下文
 
@@ -97,11 +97,6 @@ sub-agent 执行写完后返回。主 Agent 检查输出文件是否存在。
 
 发现问题直接改，**不留违禁品到 anti-ai 管线**。anti-ai 的职责是扫漏网之鱼，不是替你擦屁股。
 
-## Step 6: 保存 AI 原版快照
+## Step 6: （无——快照由 updater 创建）
 
-验证通过后：
-
-1. 读取刚生成的草稿 `archives/vol-{N}-ch-{M}-{slug}.draft.md`
-2. 复制一份到 `.agent/{chapter}-draft-ai.md`
-
-此快照用于后续归档时的 diff 对比，作家修改前保留原始版本。
+AI 原版快照 `.agent/{chapter}-draft-ai.md` 不在 writer 职责内：writer 的 Write 白名单不含 `.agent/`，快照由 **updater 在归档时从草稿复制**（updater-archive Step 1 ①，作为归档 diff 基线）。writer 完成后只需把 draft.md 交给管线。

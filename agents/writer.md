@@ -7,7 +7,7 @@ tools: Read, Write, Glob, Grep, Agent
 memory: []
 skills:
   - path: skills/writing-execution.md
-    description: 正文生成 skill（写作指令 + 防 AI 味规则 + 验证 + 快照）
+    description: 正文生成 skill（写作指令 + 防 AI 味规则 + 验证）
 knowledge:
   - path: .claude/knowledge/chapter-quality-checklist.md
     description: 正文验收清单
@@ -46,7 +46,7 @@ knowledge:
   - `settings/genre-setting.md`（题材设定）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → 正文草稿
-- **Hand-off Protocol:** 写入 draft.md 后，将 `.agent/task/writing-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成，保存 AI 原版快照后调 reader
+- **Hand-off Protocol:** 写入 draft.md 后，将 `.agent/task/writing-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成。AI 原版快照由 updater 归档时创建，writer 不负责
 
 ## 四、运行时配置
 
@@ -63,7 +63,7 @@ knowledge:
 
   LOAD SKILL:
     加载 skills/writing-execution.md
-    执行全流程：Step 1(准备) → Step 2(清理上下文) → Step 3(写作) → Step 4(验证) → Step 5(叙事规则自查) → Step 6(保存快照)
+    执行全流程：Step 1(准备) → Step 2(清理上下文) → Step 3(写作) → Step 4(验证) → Step 5(叙事规则自查) → DONE（快照由 updater 归档时创建）
 
   OBSERVE:
     读什么？← 三(Input Sources): writing-order.md + prompt.md + settings/
@@ -90,7 +90,7 @@ knowledge:
     不通过？← 七(Error Handling): 补充/重写, 最多2次
 
   NOT DONE → 回到 ACT(补充/修改)
-  DONE → 覆盖 writing-order.md `status: DONE` → 三(Hand-off): novel-agent保存AI原版快照后调reader
+  DONE → 覆盖 writing-order.md `status: DONE` → 三(Hand-off): novel-agent 确认完成；AI 原版快照由 updater 归档时创建
   ```
 
 ## 五、工具与权限
@@ -148,4 +148,4 @@ knowledge:
 ## 十、可观测性与调试
 
 - **Log Level:** INFO（字数统计、场景覆盖率）
-- **Debug Artifacts:** AI 原版快照由 novel-agent 在 writer 完成后保存到 `.agent/`
+- **Debug Artifacts:** 无；AI 原版快照由 updater 归档时从草稿复制到 `.agent/{chapter}-draft-ai.md`

@@ -98,17 +98,18 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   │
 [draft]  chapter.md → prompt-crafting（6 元素组装）→ prompts/vol-{N}-ch-{M}-prompt.md
   │        → writer（写作 sub-agent 先读 writing-base 基底 + prompt）→ archives/*.draft.md
-  │        → 快照到 .agent/{chapter}-draft-ai.md（归档 diff 基线）
   │
 [anti-ai] draft → Phase 1-4 管线 → archives/*.anti-ai.md
   │
 [review] reader 深度评审（可选）
   │
 [archive] updater 归档（**幂等**，见 §1.5 关键规则）：
-  │        先查 `.agent/archiving/{chapter}.done`，存在则只补缺失项
+  │        先建快照 `.agent/{chapter}-draft-ai.md`（从 .draft.md 复制，审计基线）→ 查 `.agent/archiving/{chapter}.done`，存在则只补缺失项
+  │        判定定稿并 Write 生成 archives/*.md（中间稿 .draft.md/.anti-ai.md 保留不删）
+  │        chapter.md#status → archived
   │        character-setting 追加角色状态（按 `## vol-N-ch-M` 锚点查重）→ timeline 追加事件（查重）
-  │        AI 快照 vs 最终正文 diff → 语义合并到 anti-ai.md / writer-style.md（查重）
-  │        记忆兜底 sweep → 清理快照 → 写 {chapter}.done → 推进 status.md → order 标记 DONE
+  │        快照 vs 定稿 diff → 语义合并到 anti-ai.md / writer-style.md（查重）
+  │        写 {chapter}.done → 推进 status.md → order 标记 DONE
 ```
 
 ---
@@ -135,14 +136,14 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 │   └── vol-{N}-ch-{M}-prompt.md  # 6 元素提示词
 ├── sandbox/              # 推演沙盘记录（可选，roleplay-sandbox 产出）
 ├── archives/
-│   ├── *.draft.md        # 草稿（writer 输出）
-│   ├── *.anti-ai.md      # 去 AI 味后版本（可被作者改后定稿）
-│   └── *.md              # 定稿
+│   ├── *.draft.md        # 草稿（writer 输出，历史留档）
+│   ├── *.anti-ai.md      # 去 AI 味后版本（历史留档）
+│   └── *.md              # 定稿（updater 归档时 Write 生成；归档后正文读取一律以此为准，中间稿不删）
 ├── .agent/
 │   ├── status.md         # ★ phase 路由依据（唯一持久状态）
 │   ├── task/             # order 文件（临时，完成后 status→DONE 留存待删）
 │   ├── archiving/        # 归档 checkpoint（{chapter}.done，防重放重复）
-│   └── {chapter}-draft-ai.md  # AI 原版快照（归档后删除）
+│   └── {chapter}-draft-ai.md  # AI 原版快照（审计基线，归档后保留，靠 .done 标记区分过期）
 ├── .claude/ 或 .opencode/
 │   ├── agents/           # Agent 定义（init.py 部署）
 │   ├── knowledge/        # 反 AI 规则 / 文风偏好 / 场景方法论 / 永久记忆 / 格式规范
@@ -267,7 +268,7 @@ Step 4  验收自检 → 写入 prompts/vol-{N}-ch-{M}-prompt.md
 
 ### 6.4 归档语义合并（updater diff）
 
-归档时对比 AI 原版快照（`.agent/{chapter}-draft-ai.md`）vs 最终正文：
+归档时对比 AI 原版快照（`.agent/{chapter}-draft-ai.md`）vs 定稿（`archives/*.md`）：
 
 1. 完全相同 → 跳过
 2. 语义重复 → 合并为一条，用更好的表述
@@ -329,8 +330,8 @@ Phase 4  报告   字数变化 + 修改统计 + 前后对比
 - **`.agent/status.md#phase`** — agent 调度路由依据，唯一持久状态
 - **`chapters/*.md#status`** — 章节生命周期 `outline → draft → archived`
 - **order 文件** — `.agent/task/*-order.md`，子 agent 完成后覆盖 `status: pending → DONE`（不删除），novel-agent 以 `status: DONE` 确认完成
-- **`archives/*.md`** — 正文唯一存放处；`.draft.md` = 未定稿；`.anti-ai.md` = 去 AI 味后
-- **`.agent/{chapter}-draft-ai.md`** — AI 原版快照，归档 diff 基线，归档后删除
+- **`archives/*.md`** — 正文唯一存放处；`.draft.md` = 草稿；`.anti-ai.md` = 去 AI 味后；归档后定稿一律读 `.md`，`.draft.md`/`.anti-ai.md` 为历史留档（不删）
+- **`.agent/{chapter}-draft-ai.md`** — AI 原版快照，归档 diff 基线；归档后保留（审计留档，靠 `.agent/archiving/{chapter}.done` 标记区分过期）
 - **`.agent/archiving/{chapter}.done`** — 归档完成 checkpoint，重派时从断点继续，防 append 重放重复
 - **`.claude/memory/*.md`** — 追加写入，不覆盖
 - **novel-agent** — 不用 Bash、不写内容文件、不越权代劳、绝不访问项目外路径

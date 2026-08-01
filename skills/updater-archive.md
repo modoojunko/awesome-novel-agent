@@ -7,8 +7,8 @@
 | 检查项 | 通过条件 | 失败处理 |
 |--------|---------|---------|
 | `.agent/task/archive-order.md` | 存在, 含 vol/chapter 号 | 报错给 novel-agent |
-| `.agent/{chapter}-draft-ai.md` | 存在 | 跳过 diff, 继续其他更新 |
-| `archives/vol-{N}-ch-{M}*.md` | 存在 | 报缺少正文 |
+| `.agent/{chapter}-draft-ai.md` | 存在，或可从 `archives/*.draft.md` 创建 | 缺失 → 复制草稿创建（主路径，见 Step 1 ①） |
+| `archives/vol-{N}-ch-{M}*`（`.md`/`.anti-ai.md`/`.draft.md` 任一） | 存在 | 报缺少正文；定稿 `.md` 由 Step 1 生成 |
 | `settings/character-setting/` | 可读写 | 不存在则创建目录 |
 | `settings/timeline.md` | 可读写 | 不存在则创建文件 |
 | `.agent/status.md` | 存在 | 报错给 novel-agent |
@@ -19,6 +19,7 @@
 |--------|------|
 | 正文草稿存在？ | `archives/vol-{N}-ch-{M}-*.draft.md` 存在？缺失→**STOP**，正文尚未生成 |
 | chapter.md 完整？ | memo + emotional_design 有值？缺失→返回补章纲 |
+| chapter.md#status 为 outline？ | 归档成功后改为 archived（见 Step 1 末尾）；已是 archived → 说明重复归档，进幂等模式 |
 | `.agent/archiving/{chapter}.done` 存在？ | **存在 → 本章已归档过，进入幂等模式：跳过已完成步骤，只补缺失项**（见下"幂等规则"） |
 
 ### 幂等规则（防重放重复）
@@ -39,22 +40,22 @@
 
 ## 三、存档流程
 
-### Step 1: 正文定稿
+### Step 1: 正文定稿（定稿 = Write 生成 `archives/vol-{N}-ch-{M}-{slug}.md`；不重命名、不删除——S2 禁删）
 
-1. 如果 `.agent/{chapter}-draft-ai.md` 不存在，从当前草稿复制一份作为 AI 原版快照
-2. 判断 `archives/` 下的定稿状态（按优先级，只命中一条）：
-   - **`.anti-ai.md` 存在** → 以其为定稿，重命名为 `.md`（若已有旧 `.md` 一并覆盖）：
-     `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → `archives/vol-{N}-ch-{M}-{slug}.md`
-     然后删除 `.draft.md`
-   - **`.md` 与 `.draft.md` 并存（无 `.anti-ai.md`）**：
-     - 内容一致 → `.md` 即定稿，删除 `.draft.md`（清理残留）
-     - 内容不一致（`.draft.md` 是重写后的新稿）→ **STOP**，将 `.draft.md` vs `.md` 的差异
-       展示给作者确认用哪个：确认新稿 → 用 `.draft.md` 覆盖 `.md` 并删除 `.draft.md`；
-       确认旧稿 → 删除 `.draft.md`。不自动覆盖任何文件
-   - **仅 `.draft.md` 存在** → 重命名去掉 `-draft` 标记：
-     `archives/vol-{N}-ch-{M}-{slug}.draft.md` → `archives/vol-{N}-ch-{M}-{slug}.md`
-     <!-- 此路径下 draft.md == 最终定稿，step 1 保留的 draft-ai.md 快照与定稿内容一致，self-consistent -->
-3. 复核归档文件内容无误（确认 `archives/` 下该章仅剩一个 `.md`）
+1. **创建 AI 原版快照（主路径，updater 负责）**：若 `.agent/{chapter}-draft-ai.md` 不存在，从当前草稿
+   `archives/vol-{N}-ch-{M}-*.draft.md` 复制一份作为 AI 原版快照（diff 基线）。快照创建必须先于任何
+   diff/定稿动作。快照与保留的 `.draft.md` 职责不同：**快照 = 审计基线（此后不改）；`.draft.md` = 历史稿留档（可偏离基线）**
+2. **判定并生成定稿**：只回答"哪个是最终内容"。任何分支都保留 `.draft.md` / `.anti-ai.md`，不删不改：
+   - **`.md` 已存在**（此前归档已生成）：
+     - 与 `.draft.md` / `.anti-ai.md` 内容一致 → `.md` 即定稿，跳过（幂等）
+     - 与任一保留稿不一致（作者归档后重写过）→ **STOP**，将差异展示给作者确认：
+       用新稿 Write 覆盖 `.md`，或维持旧 `.md`。不自动覆盖
+   - **`.md` 不存在，`.anti-ai.md` 存在** → Write 其内容到定稿：`archives/vol-{N}-ch-{M}-{slug}.md`
+   - **`.md` 不存在，仅 `.draft.md`** → Write 其内容到定稿：`archives/vol-{N}-ch-{M}-{slug}.md`
+   - **正文不存在（`.md`/`.anti-ai.md`/`.draft.md` 均无）** → STOP 报错给 novel-agent
+3. **复核**：定稿 `.md` 存在且非空；中间稿保留未删。归档后所有正文读取（diff、reader 回看、跨章一致性）
+   一律以 `.md` 为权威，其他后缀为中间稿
+4. **标记章纲已归档**：用 Edit 将 `chapters/vol-{N}-ch-{M}.md` 的 `status` 字段从 `outline` 改为 `archived`（只改该字段，不碰章纲正文）。此标记是 Step 10 卷边界检测的判断依据
 
 ### Step 2: 角色状态更新 + 情绪弧线
 
@@ -219,7 +220,7 @@
 
 ### Step 10: 卷边界检测
 
-读 `chapters/` 目录，筛选当前卷的章节文件：
+读 `chapters/` 目录，筛选当前卷的章节文件，按 `status: archived` 标记判断完成度（Step 1 ④ 写入）：
 - 未全部完成 → 更新 status.md，`current_chapter` 前移
 - 全部完成 → 更新 status.md：`last_volume_completed = true`，`current_phase = review`。输出卷完成报告：
 
@@ -239,14 +240,14 @@
 ### Step 11: Status 推进 + 清理
 
 - 更新 `.agent/status.md`：phase→`archive`, current_step→`archiving`, last_archived→当前章号
-- 删除 `.agent/{chapter}-draft-ai.md`（快照，归档完成后的清理动作）
+- **保留** `.agent/{chapter}-draft-ai.md`（AI 原版快照审计留档；不删除——S2 禁删，靠 `.done` 标记区分过期）
 - 写 `.agent/archiving/{chapter}.done` 完成标记（幂等 checkpoint）
 - 将 `.agent/task/archive-order.md` 覆盖为 `status: DONE`（不删除文件）
 
 ## 四、验收清单
 
 - [ ] 写作反馈已收集（作者确认或从 diff 自动提取）
-- [ ] 正文已去 draft 标记为定稿
+- [ ] 定稿 `archives/*.md` 已 Write 生成，中间稿（`.draft.md`/`.anti-ai.md`）保留未删
 - [ ] 所有出场角色的状态 + 情绪弧线已更新
 - [ ] 生物/怪物检测已完成 + 作者确认
 - [ ] 持有物/经历已更新（如有变化）
@@ -259,6 +260,7 @@
 - [ ] 停滞检测已执行
 - [ ] 卷边界检测已执行 + 报告已输出
 - [ ] status.md 已推进
-- [ ] AI 快照已清理
+- [ ] chapter.md#status 已改为 archived
+- [ ] AI 快照已创建并保留（审计留档）
 - [ ] `.agent/archiving/{chapter}.done` 已写入
 - [ ] order 已标记 DONE
