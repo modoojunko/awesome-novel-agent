@@ -1,6 +1,6 @@
 ---
 name: awesome-novel
-description: 和 AI 协作写小说的工作流系统。7 个 agent 协作完成从设定到归档的完整写作流程。入口检测 → 初始化/迁移 → 交 novel-agent 调度。适用场景：从零写新小说、导入已有小说。
+description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成从设定到归档的完整写作流程。入口检测 → 初始化/迁移 → 交 novel-agent 调度。适用场景：从零写新小说、导入已有小说。
 ---
 
 # Novel — 小说创作工作流

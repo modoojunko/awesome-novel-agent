@@ -2,7 +2,7 @@
 
 ## OpenCode 指引
 
-本项目的小说写作流程由 7 个 agent 协作完成，定义在 `.opencode/agents/` 下。
+本项目的小说写作流程由 8 个 agent 协作完成，定义在 `.opencode/agents/` 下。
 
 **开始写作：** 在 OpenCode 中通过 `@novel-agent` 或 Task 工具调用 novel-agent 进入写作循环。
 

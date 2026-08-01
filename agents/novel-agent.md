@@ -148,7 +148,9 @@ knowledge:
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
     ├── outline: step=volume-planning → volume-planner 规划卷纲
-    │             step=chapter-planning → chapter-planner 生成章纲
+    │             step=chapter-planning → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    │               的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
+    │               → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
     ├── draft:   step=prompt-crafting → prompt-crafter 组装提示词
     │             step=writing → writer 写正文
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行

@@ -110,7 +110,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   │        判定定稿并 Write 生成 archives/*.md（中间稿 .draft.md/.anti-ai.md 保留不删）
   │        chapter.md#status → archived
   │        character-setting 追加角色状态（按 `## vol-N-ch-M` 锚点查重）→ timeline 追加事件（查重）
-  │        快照 vs 定稿 diff → 语义合并到 anti-ai.md / writer-style.md（查重）
+  │        快照 vs 定稿 diff → 语义合并到 .claude/knowledge/anti-ai.md / writer-style.md（查重）
   │        写 {chapter}.done → 推进 status.md → order 标记 DONE
 ```
 
@@ -125,8 +125,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 │   ├── world-setting.md  # 世界观
 │   ├── writing-style.md  # 写作风格
 │   ├── genre-setting.md  # 题材设定
-│   ├── anti-ai.md        # 项目级反 AI 规则
-│   ├── foreshadowing.md  # 跨卷伏笔汇总（从各章 chapter.md#hooks 提取）
+│   ├── foreshadowing.md  # 跨卷伏笔全局台账（init 生成空台账 / updater Step 8 维护，从 chapter.md#payoff_plan 汇总）
 │   ├── timeline.md       # 时间线（归档时追加）
 │   └── character-setting/
 │       └── <id>.md       # 每角色一个

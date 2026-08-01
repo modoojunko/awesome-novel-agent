@@ -177,7 +177,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `settings/`、`archives/`、`chapters/`、`volumes/`（读卷纲中的 `## 设定变更通知` 块）、`.claude/memory/`、`.claude/knowledge/`、`.agent/` | 不读 prompts/ |
-  | Write | `.agent/status.md`、`.agent/archiving/{chapter}.done`、`.agent/{chapter}-draft-ai.md`（创建 AI 原版快照）、`archives/vol-{N}-ch-{M}-{slug}.md`（定稿正文，仅本次 order 章节，Write 生成/覆盖）、`.agent/task/*-order.md`（覆盖 status 为 DONE，不删除） | 不写 `.draft.md`/`.anti-ai.md` 等中间稿、其他章节正文、卷纲、提示词 |
+  | Write | `.agent/status.md`、`.agent/archiving/{chapter}.done`、`.agent/{chapter}-draft-ai.md`（创建 AI 原版快照）、`archives/vol-{N}-ch-{M}-{slug}.md`（定稿正文，仅本次 order 章节，Write 生成/覆盖）、`settings/foreshadowing.md`（台账缺失时创建，升级/既有项目兜底）、`.agent/task/*-order.md`（覆盖 status 为 DONE，不删除） | 不写 `.draft.md`/`.anti-ai.md` 等中间稿、其他章节正文、卷纲、提示词、其他 settings/ 文件 |
   | Edit | `settings/`、`chapters/`（仅改 status 字段为 archived、移除 `## 设定变更通知` 块）、`volumes/`（仅移除 `## 设定变更通知` 块）、`.claude/memory/`、`.claude/knowledge/` | 不改章纲/卷纲正文内容 |
   | Glob | `settings/`、`archives/`、`chapters/`、`volumes/`、`.claude/memory/` | — |
 - **Permission Level:** 读写 settings/, .claude/memory/, .claude/knowledge/, .agent/；archives/ 中间稿（.draft.md/.anti-ai.md）只读，仅可 Write 本次 order 的定稿 .md

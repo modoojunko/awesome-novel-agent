@@ -69,7 +69,7 @@
 
 ## 3. 兜底清理
 
-novel-agent 在子 agent 任务完成后，调度 updater 执行记忆兜底：
+**触发时机**：novel-agent 在**卷完成后**（写 `last_volume_completed` 后）调度 updater 执行记忆兜底（memory-sweep-order）。长卷卷内若某 memory 文件已超 50 条，updater 在归档（updater-archive Step 7 记忆合并）时顺带压缩，不等到卷完成——避免卷内文件无限制增长。
 
 1. 读所有 memory 文件，检查条目格式是否正确（必填字段缺失 → 补或删）
 2. 超过 50 条的文件执行压缩
