@@ -133,8 +133,8 @@ python tools/init.py [project-path] [--genre <编号>]
 | P3 | `old/chapters/*.yaml`（archived）→ `chapters/vol-{N}-ch-{M}.md` | `templates/migration/chapter.md.template` |
 | P4 | `old/settings/world-setting.yaml` → `settings/world-setting.md` | `templates/migration/world-setting.md.template` |
 | P5 | `old/settings/writing-style.yaml` → `settings/writing-style.md` | `templates/migration/writing-style.md.template` |
-| P6 | `old/settings/anti-ai.yaml` → `settings/anti-ai.md` | `templates/migration/anti-ai.md.template` |
-| P7 | `old/settings/hooks.yaml` → `settings/foreshadowing.md` | `templates/migration/foreshadowing.md.template` |
+| P6 | `old/settings/anti-ai.yaml` → `.claude/knowledge/anti-ai.md` | `templates/migration/anti-ai.md.template`（所有 agent 读 knowledge 路径，不读 settings/anti-ai.md） |
+| P7 | `old/settings/hooks.yaml` → `settings/foreshadowing.md` | `templates/migration/foreshadowing.md.template`（也可沿用 init 生成的空台账） |
 | P8 | 无旧源 → `settings/genre-setting.md` | `templates/migration/genre-setting.md.template` |
 
 字段映射细节在 `templates/migration/migration-spec.md` 中有完整定义。
@@ -161,8 +161,8 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 - [ ] settings/world-setting.md 存在且已填充
 - [ ] settings/writing-style.md 存在且已填充
 - [ ] settings/genre-setting.md 存在
-- [ ] settings/anti-ai.md 存在
-- [ ] settings/foreshadowing.md 存在
+- [ ] `.claude/knowledge/anti-ai.md` 存在（迁移自旧 anti-ai.yaml）
+- [ ] settings/foreshadowing.md 存在（迁移自旧 hooks.yaml，或沿用 init 生成的空台账）
 - [ ] settings/character-setting/ 角色数与旧版一致
 - [ ] volumes/ 卷数与旧版一致
 - [ ] chapters/ 所有 archived 章节已迁移
@@ -235,8 +235,10 @@ novel-agent（总指挥）
   ├─ 卷纲就绪 → 调度 chapter-planner（生成章纲）
   ├─ 章纲就绪 → 调度 prompt-crafter（组装提示词）
   ├─ 提示词就绪 → 调度 writer（写正文）
-  ├─ 正文就绪 → 可选调度 reader（深度评审）
-  └─ 作者确认 → 调度 updater（归档 + lore-keeping）
+  ├─ 正文就绪 → 调度 anti-ai（去 AI 味管线）
+  ├─ 去 AI 味完成 → 可选调度 reader（深度评审）
+  ├─ 评审通过/跳过 → 调度 updater（归档 + lore-keeping）
+  └─ 归档完成 → 卷完成判定 → 下一章 / 卷 N+1 / 完本
 ```
 
 各 agent 定义在 `.opencode/agents/`（OpenCode）或 `.claude/agents/`（Claude Code），skill SOP 在 `skills/`。agent 间通过 `.agent/task/*-order.md` 文件通信。

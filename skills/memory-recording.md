@@ -29,13 +29,13 @@
 
 | agent | 写入文件 | 追加方式 |
 |-------|---------|---------|
-| volume-planner | volume-memory.md | 作者确认/修正后立即追加 |
-| chapter-planner | chapter-memory.md | 作者确认/修正后立即追加 |
-| prompt-crafter | prompt-memory.md | 作者确认/修正后立即追加 |
-| writer | writing-memory.md | 通过 reader 反馈间接触发 |
-| reader | writing-memory.md | 作者的反馈确认后立即追加 |
-| updater | 全部 | 兜底清理时写入遗漏项 |
-| novel-agent | 全部 | 调度子 agent 时同步已积累的记忆 |
+| volume-planner | volume-memory.md | 作者确认/修正后立即追加（有 `.claude/memory/` 写权限） |
+| chapter-planner | chapter-memory.md | 作者确认/修正后立即追加（有写权限） |
+| prompt-crafter | prompt-memory.md | 作者确认/修正后立即追加（有写权限） |
+| writer | writing-memory.md | **不自写**（无 `.claude/memory/` 写权限）——把反馈留给 updater 归档时从快照 diff 提取（updater-archive Step 6/7） |
+| reader | writing-memory.md | **不自写**（无写权限）——评审反馈由作者确认后，novel-agent 归档时随 updater 一起沉淀 |
+| updater | 全部 | 归档时写入遗漏项 + 记忆兜底清理 |
+| novel-agent | （不写） | 无 `.claude/memory/` 写权限，记忆沉淀全部经 updater |
 
 ### 2.2 记录时机
 

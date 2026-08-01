@@ -71,7 +71,7 @@ knowledge:
   - `volumes/vol-{N}.md` → 前章摘要（结尾画面、情绪落点、缺口）
   - `.claude/knowledge/anti-ai.md` → 反 AI 规则
   - `.claude/knowledge/writer-style.md` → 文风偏好
-  - `.claude/knowledge/genre-example/{genre}.md` → 题材提示词注入段（输出·写作规范用）
+  - `.claude/knowledge/genre-example.md` → 题材提示词注入段（输出·写作规范用；init.py 按题材合并为单一文件）
 - **Output Artifacts:**
   - `prompts/vol-{N}-ch-{M}-prompt.md` → 4 层提示词
 - **Hand-off Protocol:** 写入 prompt.md 后，将 `.agent/task/prompt-craft-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成
