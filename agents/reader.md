@@ -63,9 +63,10 @@ knowledge:
   - `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → 正文（评审门禁优先；无则 `.draft.md`）
   - `settings/genre-setting.md` → 题材类型（用以匹配读者预期）
 - **Output Artifacts:**
-  - 读者视角反馈（对话输出，不写文件）
+  - 读者视角反馈（对话输出给作者）
   - 反馈回答三个问题：(1) 读后什么感受？(2) 想不想看下一章？(3) 有没有爽到/被虐到？
-- **Hand-off Protocol:** 输出反馈后，将 `.agent/task/reader-review-order.md` 覆盖为 `status: DONE`（仅此一个文件可写）后结束；novel-agent 根据反馈决定修改或归档
+  - `.agent/review/vol-{N}-ch-{M}.md` → 评审反馈留档（同一报告骨架落盘，供 updater 归档时沉淀记忆；不分类、不判定记忆归属）
+- **Hand-off Protocol:** 输出反馈并落盘 `.agent/review/` 后，将 `.agent/task/reader-review-order.md` 覆盖为 `status: DONE`（仅这两个文件可写）后结束；novel-agent 根据反馈决定修改或归档
 
 ## 四、运行时配置
 
@@ -97,7 +98,7 @@ knowledge:
     质量 ← 六(Quality Gates): 三问全部回答 + 至少一个具体问题 + 一句话总结
 
   OUTPUT:
-    读者视角反馈(对话输出, 不写文件)
+    读者视角反馈(对话输出给作者 + 落盘 .agent/review/vol-{N}-ch-{M}.md 留档)
     格式 ← 三(Output Schema): 第一反应 → 吐槽 → 亮点 → 终局判决
     语言 ← 说人话，像在朋友群里聊读后感
 
@@ -110,7 +111,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `archives/*.anti-ai.md`（评审门禁优先文件）、`archives/*.draft.md`（门禁兜底）、`settings/genre-setting.md`；`chapters/`、`prompts/` 仅维度 D 执行追溯时按需读（对照章纲叙事目标/prompt 写作规范查根因） | 不读其他目录；chapters/prompts 不做全量预读 |
-  | Write | `.agent/task/reader-review-order.md`（仅覆盖 status 为 DONE，不写其他任何文件） | 不写其他任何文件 |
+  | Write | `.agent/task/reader-review-order.md`（仅覆盖 status 为 DONE）、`.agent/review/vol-{N}-ch-{M}.md`（评审反馈留档，仅本 chapter） | 不写其他任何文件 |
 - **Permission Level:** 只读正文/设定 + 标记 reader-review-order；其余无写入权限
 
 ## 六、行为规范与约束
@@ -154,7 +155,7 @@ knowledge:
 ## 九、上下文与状态管理
 
 - **Context Isolation:** 每次独立调用，不保留状态
-- **State Persistence:** 无（不写文件）
+- **State Persistence:** 无自有状态；仅落盘 `.agent/review/vol-{N}-ch-{M}.md` 评审留档（供 updater 归档沉淀）
 
 ## 十、可观测性与调试
 

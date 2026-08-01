@@ -33,7 +33,7 @@
 | chapter-planner | chapter-memory.md | 作者确认/修正后立即追加（有写权限） |
 | prompt-crafter | prompt-memory.md | 作者确认/修正后立即追加（有写权限） |
 | writer | writing-memory.md | **不自写**（无 `.claude/memory/` 写权限）——把反馈留给 updater 归档时从快照 diff 提取（updater-archive Step 6/7） |
-| reader | writing-memory.md | **不自写**（无写权限）——评审反馈由作者确认后，novel-agent 归档时随 updater 一起沉淀 |
+| reader | writing-memory.md | **不自写**——评审反馈留档到 `.agent/review/vol-{N}-ch-{M}.md`，updater 归档时读取并随三类记忆沉淀 |
 | updater | 全部 | 归档时写入遗漏项 + 记忆兜底清理 |
 | novel-agent | （不写） | 无 `.claude/memory/` 写权限，记忆沉淀全部经 updater |
 

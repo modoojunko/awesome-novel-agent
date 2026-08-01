@@ -193,6 +193,9 @@ knowledge:
   VERIFY:
     检查 order 的 `status` 是否为 `DONE`（子 agent 干完活了）
     规则：order 存在且 status=DONE → 完成；status=pending → 等待；order 不存在 → 子 agent 意外中断，进重试
+    **设定变更任务（setting-update-order）额外校验**：DONE 后 re-Grep 源文件（卷纲/章纲）的
+      `## 设定变更通知` 头，确认 updater 已消费移除；未移除 → 视为产出不完整，重新派单，
+      计入 §七 重试/断路器（连续 3 次 → STOP 进人工）
     完成标准？← 八(Definition of Done)
     质量门？← 六(Quality Gates): 子agent产出验证
     不通过？← 七(Error Handling): 重试/报错
