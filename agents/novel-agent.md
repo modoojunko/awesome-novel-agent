@@ -3,6 +3,7 @@ name: novel-agent
 description: 项目入口 agent，负责检测进度、调度子 agent 完成任务
 role: 总指挥
 react: true
+tools: Read, Write, Glob, Grep, Agent
 memory: []            # 不自带记忆——lore-keeping 交给 updater
 skills:
   - path: skills/novel-dispatch.md
@@ -94,7 +95,7 @@ knowledge:
 - **Output Artifacts:**
   - `.agent/task/{task}-order.md` → 任务指令（给子 agent，含完成任务所需的上下文）
   - `.agent/status.md` → 更新进度标记（由 updater 在归档时写入，novel-agent 在调度间隙更新）
-- **Hand-off Protocol:** 写 order 文件后通过 Agent 工具调用目标 agent；目标 agent 完成后清理 order 文件；novel-agent 检测到 order 清理即确认完成
+- **Hand-off Protocol:** 写 order 文件（`status: pending`）后通过 Agent 工具调用目标 agent；目标 agent 完成后将 order 覆盖为 `status: DONE`（不删除文件）；novel-agent 检测到 order 标记 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -140,7 +141,8 @@ knowledge:
     交接？← 三(Hand-off Protocol): 写order + 调用子agent
 
   VERIFY:
-    检查 order 是否已清理（子 agent 干完活了）
+    检查 order 的 `status` 是否为 `DONE`（子 agent 干完活了）
+    规则：order 存在且 status=DONE → 完成；status=pending → 等待；order 不存在 → 子 agent 意外中断，进重试
     完成标准？← 八(Definition of Done)
     质量门？← 六(Quality Gates): 子agent产出验证
     不通过？← 七(Error Handling): 重试/报错
@@ -182,13 +184,16 @@ knowledge:
   - 子 agent 调用失败 → 重试 1 次
   - 子 agent 产出不完整 → 重新 dispatch
 - **Retry Policy:** 子 agent 任务最多重试 2 次，超过则报错给作者
+  - **归档重派前先看 checkpoint：** 若 `.agent/archiving/{chapter}.done` 存在 → 从断点继续（updater 幂等补缺），不整章重跑
+  - **非归档任务：** 若 order 文件不存在（子 agent 意外中断）→ 重新写 order 重派；若 order 仍 `status: pending` → 重试
+  - 连续 3 次失败/降级 → STOP 并进人工，不无限重试（断路器）
 - **Fallback Logic:** 如果某个子 agent 反复无法完成任务，询问作者是否手动介入
 
 ## 八、验收标准与产出
 
 - **Definition of Done:**
   - 当前阶段对应的子 agent 任务已完成（产出文件存在、格式正确）
-  - 如果是归档阶段：updater 已执行完毕且清理了 order 文件
+  - 如果是归档阶段：updater 已执行完毕且 order 已标记 `status: DONE`
   - `.agent/status.md` 已更新到最新进度
 - **Success Metrics:** 每个阶段按顺序推进，无遗漏节点
 
@@ -202,4 +207,4 @@ knowledge:
 
 - **Log Level:** INFO（调度记录 + 状态转换）
 - **Metrics:** 每个阶段的耗时、子 agent 调用次数、重试次数
-- **Debug Artifacts:** order 文件保留完整任务上下文（清理前可读）
+- **Debug Artifacts:** order 文件保留完整任务上下文（标记 DONE 后可读）

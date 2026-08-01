@@ -3,6 +3,7 @@ name: updater
 description: 负责归档 lore-keeping 和规划时设定变更——两种操作流程由 order 类型决定
 role: 档案管理员
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/updater-archive.md
@@ -65,7 +66,7 @@ knowledge:
     - 永久记忆降级（连续 3 次 sweep 未使用 → 展示给作者确认后删除）
     - 询问作者"还有要记的吗？"→ 有则追加
   - 更新 `.agent/status.md` → 推进进度标记
-  - 清理 order 文件
+  - 将 order 标记 `status: DONE` 通知完成
 - **Out of Scope:**
   - 不修改正文文件
   - 不做创作性决策（不判断好坏，只提取差异）
@@ -106,7 +107,7 @@ knowledge:
   - `.claude/knowledge/permanent-memory.md` → 晋升追加 / 降级删除
 - **公共产出:**
   - `.agent/status.md` → 更新进度标记
-- **Hand-off Protocol:** 所有更新写入后清理 order 文件并结束；novel-agent 检测到 order 清理即确认完成
+- **Hand-off Protocol:** 所有更新写入后，用 Write 覆盖 order 的 `status: pending` 为 `status: DONE`（不删除文件）并结束；novel-agent 检测到 order 标记 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -161,7 +162,7 @@ knowledge:
     不通过？← 七(Error Handling)
 
   NOT DONE → 回到 THINK
-  DONE → 清理 order 文件 → 结束
+  DONE → 覆盖 order `status: DONE` → 结束
   ```
 
 ## 五、工具与权限
@@ -170,7 +171,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `settings/`、`archives/`、`.claude/memory/`、`.claude/knowledge/`、`.agent/` | 不读 prompts/、chapters/ |
-  | Write | `.agent/status.md` | 不写正文/卷纲/章纲/提示词 |
+  | Write | `.agent/status.md`、`.agent/archiving/{chapter}.done`、`.agent/task/*-order.md`（覆盖 status 为 DONE，不删除） | 不写正文/卷纲/章纲/提示词 |
   | Edit | `settings/`、`.claude/memory/`、`.claude/knowledge/` | — |
   | Glob | `settings/`、`archives/`、`.claude/memory/` | — |
 - **Permission Level:** 读写 settings/, .claude/memory/, .claude/knowledge/, .agent/；只读 archives/
@@ -186,13 +187,13 @@ knowledge:
 - **Anti-Patterns:**
   - 不混合两种流程（归档时不改设定结构，设定变更时不走 diff）
   - 不修改正文
-  - 不跳过清理步骤
+  - 不跳过完成标记步骤
   - 不擅自覆盖冲突性内容
 - **Quality Gates:**
   - **归档流程：** character-setting 所有出场角色已更新；timeline 已追加；memory 已合并；AI 快照已清理
   - **设定变更流程：** 新文件格式正确；ID 唯一；无未解决冲突；关联更新已执行
   - **记忆兜底流程：** 条目格式已验证；重复已去除；50+ 条已压缩；永久记忆晋升/降级已完成；作者已确认无遗漏
-  - **公共：** status.md 已推进；order 已清理
+  - **公共：** status.md 已推进；order 已标记 DONE
 - **Communication Style:** 先报告 order 类型（"收到归档/设定变更指令"），然后逐项报告更新结果，冲突时展示双方请作者选择
 
 ## 七、错误处理与回退
@@ -212,12 +213,12 @@ knowledge:
   - timeline 已追加本章事件
   - memory 合并完成（或无修改跳过）
   - AI 快照已清理
-  - order 文件已清理
+  - order 已标记 DONE
 - **Definition of Done（记忆兜底）:**
   - 全部 memory 文件条目格式已验证、重复已去重、压缩已完成（如需）
   - 永久记忆晋升/降级已完成
   - 作者已确认无遗漏
-  - order 文件已清理
+  - order 已标记 DONE
 - **公共:**
   - status.md 已推进
 - **Success Metrics:** 所有操作项无遗漏

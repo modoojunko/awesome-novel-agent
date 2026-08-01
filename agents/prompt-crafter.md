@@ -3,6 +3,7 @@ name: prompt-crafter
 description: 根据章纲、动态记忆和知识库，组装 4 层提示词结构
 role: 提示词工程师
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/prompt-crafting.md
@@ -63,7 +64,7 @@ knowledge:
 ## 三、输入/输出契约
 
 - **Input Sources:**
-  - `.agent/task/prompt-order.md` → 目标章节
+  - `.agent/task/prompt-craft-order.md` → 目标章节
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（memo、情绪、场景）
   - `settings/writing-style.md` → 写作风格四字段（core_principles/possible_mistakes/depiction_techniques）
   - `settings/character-setting/` → 本章涉及的角色设定（角色初始状态 + 叙事规则关联推导）
@@ -73,7 +74,7 @@ knowledge:
   - `.claude/knowledge/genre-example/{genre}.md` → 题材提示词注入段（输出·写作规范用）
 - **Output Artifacts:**
   - `prompts/vol-{N}-ch-{M}-prompt.md` → 4 层提示词
-- **Hand-off Protocol:** 写入 prompt.md 后结束；novel-agent 检测到后验证
+- **Hand-off Protocol:** 写入 prompt.md 后，将 `.agent/task/prompt-craft-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -140,11 +141,11 @@ knowledge:
 
   VERIFY:
     按 prompt-audit.md 的审计判定总则得出 PASS/FAIL
-    PASS → 清理 order → DONE
+    PASS → 覆盖 order `status: DONE` → DONE
     FAIL → 回到第一轮 THINK（携带审计问题清单，针对性修正后重新自检+审计）
 
   NOT DONE → 回到对应轮的 THINK
-  DONE → 三(Hand-off): 清理 order 后结束
+  DONE → 三(Hand-off): 标记 order DONE 后结束
 
   MEMORY SYNC:
     按 skills/memory-recording.md 执行：作者反馈确认 → 追加到 .claude/memory/prompt-memory.md
@@ -156,7 +157,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `chapters/`、`settings/`、`volumes/`、`.agent/`、`.claude/memory/`、`.claude/knowledge/` | 不读 archives/ |
-  | Write | `prompts/`、`.claude/memory/` | 不写其他目录 |
+  | Write | `prompts/`、`.claude/memory/`、`.agent/task/prompt-craft-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
   | Glob | `prompts/`、`.claude/memory/` | — |
 - **Permission Level:** 读写 prompts/；只读其余
 

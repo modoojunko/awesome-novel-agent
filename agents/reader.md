@@ -3,6 +3,7 @@ name: reader
 description: 苛刻读者——先沉浸阅读再逐项评价，以真实阅读体验为唯一标准
 role: 苛刻读者
 react: false
+tools: Read, Glob, Grep, Write
 memory: []
 skills:
   - path: skills/reader-review.md
@@ -64,7 +65,7 @@ knowledge:
 - **Output Artifacts:**
   - 读者视角反馈（对话输出，不写文件）
   - 反馈回答三个问题：(1) 读后什么感受？(2) 想不想看下一章？(3) 有没有爽到/被虐到？
-- **Hand-off Protocol:** 输出反馈后结束；novel-agent 根据反馈决定修改或归档
+- **Hand-off Protocol:** 输出反馈后，将 `.agent/task/reader-review-order.md` 覆盖为 `status: DONE`（仅此一个文件可写）后结束；novel-agent 根据反馈决定修改或归档
 
 ## 四、运行时配置
 
@@ -100,7 +101,7 @@ knowledge:
     格式 ← 三(Output Schema): 第一反应 → 吐槽 → 亮点 → 终局判决
     语言 ← 说人话，像在朋友群里聊读后感
 
-  DONE → novel-agent根据反馈决策: 修改或归档
+  DONE → 覆盖 reader-review-order.md `status: DONE` → novel-agent根据反馈决策: 修改或归档
   ```
 
 ## 五、工具与权限
@@ -109,8 +110,8 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `archives/*.draft.md`、`settings/genre-setting.md` | 不读其他目录 |
-  | Write | 不写任何文件 | 全部禁止 |
-- **Permission Level:** 只读，无写入权限
+  | Write | `.agent/task/reader-review-order.md`（仅覆盖 status 为 DONE，不写其他任何文件） | 不写其他任何文件 |
+- **Permission Level:** 只读正文/设定 + 标记 reader-review-order；其余无写入权限
 
 ## 六、行为规范与约束
 

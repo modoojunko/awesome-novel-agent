@@ -59,31 +59,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "安装到: $DEST"
 export NOVEL_SKILL_HOME="$DEST"
 
-# 将 NOVEL_SKILL_HOME 写入 profile 文件，支持 bash/zsh/fish
-# 先清理旧的 NOVEL_SKILL_HOME 行，避免重装产生重复
-for profile_file in "$HOME/.profile" "$HOME/.bashrc" "$HOME/.zshrc"; do
-    [ -f "$profile_file" ] || continue
-    # 用临时文件清理旧行再写新行
-    tmpfile=$(mktemp)
-    grep -v "export NOVEL_SKILL_HOME" "$profile_file" > "$tmpfile" 2>/dev/null || true
-    echo "export NOVEL_SKILL_HOME=\"$DEST\"" >> "$tmpfile"
-    chmod 644 "$tmpfile"
-    mv "$tmpfile" "$profile_file"
-    echo "已更新 NOVEL_SKILL_HOME=$DEST 到 $profile_file"
-done
-
-# fish shell 支持（如果存在）
-if command -v fish &>/dev/null; then
-    fish_conf="$HOME/.config/fish/config.fish"
-    if [ -f "$fish_conf" ]; then
-        tmpfile=$(mktemp)
-        grep -v "set -gx NOVEL_SKILL_HOME" "$fish_conf" > "$tmpfile" 2>/dev/null || true
-        echo "set -gx NOVEL_SKILL_HOME \"$DEST\"" >> "$tmpfile"
-        chmod 644 "$tmpfile"
-        mv "$tmpfile" "$fish_conf"
-        echo "已更新 NOVEL_SKILL_HOME=$DEST 到 $fish_conf"
-    fi
-fi
+# 注意：NOVEL_SKILL_HOME 只在本脚本会话内生效，不再写入 ~/.profile / ~/.bashrc 等。
+# 持久化会遮蔽仓库来源（init.py 以 __file__ 解析技能根，env 优先会导致新项目部署安装版旧提示词）。
 
 # 安全检查：DEST 必须是以 $HOME 开头的 skills/awesome-novel 路径
 CANONICAL_DEST="$(cd "$(dirname "$DEST")" 2>/dev/null && pwd)/$(basename "$DEST")"

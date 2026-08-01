@@ -14,7 +14,7 @@ description: 和 AI 协作写小说的工作流系统。7 个 agent 协作完成
 - `@volume-planner`、`@chapter-planner` 等 — 加载子 agent
 - **Task 工具** — novel-agent 通过 Task 工具调用子 agent
 
-**调度机制：** novel-agent 写 order 文件到 `.agent/task/` → Task 工具调用子 agent → 子 agent 读取 order 执行 → 清理 order 后退回。
+**调度机制：** novel-agent 写 order 文件到 `.agent/task/`（`status: pending`）→ Task 工具调用子 agent → 子 agent 读取 order 执行 → 完成后将 order 覆盖为 `status: DONE` 后退回。
 
 ## 检测流程 — 严格按此执行，禁止跳过
 
@@ -76,8 +76,8 @@ python tools/init.py [project-path] [--genre <编号>]
 2. 讨论完毕后，novel-agent **写 order 文件** `.agent/task/setting-update-order.md`
 3. novel-agent 通过 **Agent 工具调用 updater**
 4. **updater 读取 order**，写入 `settings/world-setting.md`、`settings/genre-setting.md`、`settings/character-setting/*.md` 等设定文件
-5. updater 清理 order 文件并结束
-6. **novel-agent 确认 order 已清理**，推进 phase → outline，进入卷纲规划
+5. updater 将 order 覆盖为 `status: DONE` 并结束
+6. **novel-agent 确认 order 标记 DONE**，推进 phase → outline，进入卷纲规划
 
 **权限规则：** novel-agent 不得直接写 `settings/` 下的文件，设定写入必须通过 updater 的 setting-update 模式完成。
 
@@ -242,7 +242,7 @@ novel-agent（总指挥）
 
 **可选工具：** 剧情推演沙盘（`skills/roleplay-sandbox.md`）是独立的交互式工具，不在 agent 调度链中。作者卡剧情时主动调用，产出推演记录（`sandbox/`）供编写章纲时参考。
 
-**调度规则：** novel-agent 是唯一调度者，只写 order 文件 + 调用子 agent。所有内容创作（卷纲/章纲/提示词/正文）、设定维护、归档更新均由子 agent 完成，novel-agent 不得越权代劳。子 agent 完成任务后清理 order 文件，novel-agent 检测到清理即确认完成。
+**调度规则：** novel-agent 是唯一调度者，只写 order 文件 + 调用子 agent。所有内容创作（卷纲/章纲/提示词/正文）、设定维护、归档更新均由子 agent 完成，novel-agent 不得越权代劳。子 agent 完成任务后把 order 覆盖为 `status: DONE`（不删除文件），novel-agent 检测到 DONE 即确认完成。
 
 **重要：novel-agent 是顶层入口，通过 `@novel-agent` 加载进主 agent，禁止通过 Agent 工具将 novel-agent 作为 subagent 调度。** 主 agent 加载 novel-agent 定义后即扮演总指挥角色，拥有完整的 Agent 工具权限来调度子 agent。如果 novel-agent 被作为 subagent 派出，它将失去 Agent 工具调用能力，导致调度链断裂。
 

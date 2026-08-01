@@ -18,8 +18,10 @@ Step 4: 验收自检
 3. **chapter.md** → 提取 memo, emotional_design, outline（场景分解）, payoff_plan
 4. **角色设定文件** → 读取涉及的角色，提取本章相关状态
 5. **genre-example** → 取对应题材的提示词注入段（输出·写作规范用）
-6. **反 AI 规则文件**（`anti-ai/common-rules.md` + `anti-ai/{genre}.md`）→ 疲劳词阈值、句式规则、元叙事禁止、题材反 AI 等注入输出·写作规范
+6. **反 AI 规则文件**（`.claude/knowledge/anti-ai.md`）→ 疲劳词阈值、句式规则、元叙事禁止、题材反 AI 等注入输出·写作规范
 **注意：前情上下文只读卷纲中的前章摘要，不读上一章全文。**
+
+**占位符守卫：** 若 `settings/writing-style.md` / `settings/genre-setting.md` 仍含未替换的 `{...}` 占位符（如 `{role}`、`{genre_id}`，即初始化后设定阶段未执行），**禁止把占位符原样注入 prompt**。改为从 `.claude/knowledge/genre-example.md` 提取对应题材的「叙事者角色/文风蓝图/类型禁忌/题材配置」作为默认风格注入，并在完成报告标注 `[设定未填写，已用 genre-example 默认兜底]`，提示 novel-agent 补做设定。
 
 ## Step 1.5: 全局冲突裁定预加载
 

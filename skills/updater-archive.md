@@ -19,20 +19,42 @@
 |--------|------|
 | 正文草稿存在？ | `archives/vol-{N}-ch-{M}-*.draft.md` 存在？缺失→**STOP**，正文尚未生成 |
 | chapter.md 完整？ | memo + emotional_design 有值？缺失→返回补章纲 |
+| `.agent/archiving/{chapter}.done` 存在？ | **存在 → 本章已归档过，进入幂等模式：跳过已完成步骤，只补缺失项**（见下"幂等规则"） |
+
+### 幂等规则（防重放重复）
+
+归档所有步骤都是**追加型**操作。如果本章曾归档到一半被中断，重派时必须先查重，不能整段重放：
+
+| 追加目标 | 查重锚点 | 命中则 |
+|---------|---------|--------|
+| 角色状态 `settings/character-setting/{id}.md` | 已含 `## vol-{N}-ch-{M} 状态变更` | 跳过该角色 |
+| 剧情履历 | 已含 `#### 第 {N} 卷第 {M} 章` | 跳过 |
+| 情绪弧线 | 已含 `#### 第 {N} 卷第 {M} 章` | 跳过 |
+| timeline `settings/timeline.md` | 已含 `vol-{N}-ch-{M}` 行 | 跳过 |
+| 生物检测 world-setting | 已含该生物 | 跳过 |
+| 记忆合并 writing-memory / chapter-memory | 已含同"原文+结论"条目 | 跳过 |
+| 反 AI 规则 / 文风偏好 | 已含 `[writer-preference]` 同规则 | 跳过 |
+
+全部步骤完成后写 `.agent/archiving/{chapter}.done`；已存在则说明归档完整，直接标记 order DONE。
 
 ## 三、存档流程
 
 ### Step 1: 正文定稿
 
 1. 如果 `.agent/{chapter}-draft-ai.md` 不存在，从当前草稿复制一份作为 AI 原版快照
-2. 判断 `archives/` 下是否有去 AI 味版本：
-   - **`.anti-ai.md` 存在** → 以其为定稿，重命名为 `.md`：
+2. 判断 `archives/` 下的定稿状态（按优先级，只命中一条）：
+   - **`.anti-ai.md` 存在** → 以其为定稿，重命名为 `.md`（若已有旧 `.md` 一并覆盖）：
      `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → `archives/vol-{N}-ch-{M}-{slug}.md`
      然后删除 `.draft.md`
+   - **`.md` 与 `.draft.md` 并存（无 `.anti-ai.md`）**：
+     - 内容一致 → `.md` 即定稿，删除 `.draft.md`（清理残留）
+     - 内容不一致（`.draft.md` 是重写后的新稿）→ **STOP**，将 `.draft.md` vs `.md` 的差异
+       展示给作者确认用哪个：确认新稿 → 用 `.draft.md` 覆盖 `.md` 并删除 `.draft.md`；
+       确认旧稿 → 删除 `.draft.md`。不自动覆盖任何文件
    - **仅 `.draft.md` 存在** → 重命名去掉 `-draft` 标记：
      `archives/vol-{N}-ch-{M}-{slug}.draft.md` → `archives/vol-{N}-ch-{M}-{slug}.md`
      <!-- 此路径下 draft.md == 最终定稿，step 1 保留的 draft-ai.md 快照与定稿内容一致，self-consistent -->
-3. 复核归档文件内容无误
+3. 复核归档文件内容无误（确认 `archives/` 下该章仅剩一个 `.md`）
 
 ### Step 2: 角色状态更新 + 情绪弧线
 
@@ -217,8 +239,9 @@
 ### Step 11: Status 推进 + 清理
 
 - 更新 `.agent/status.md`：phase→`archive`, last_archived→当前章号
-- 删除 `.agent/{chapter}-draft-ai.md`
-- 删除 `.agent/task/archive-order.md`
+- 删除 `.agent/{chapter}-draft-ai.md`（快照，归档完成后的清理动作）
+- 写 `.agent/archiving/{chapter}.done` 完成标记（幂等 checkpoint）
+- 将 `.agent/task/archive-order.md` 覆盖为 `status: DONE`（不删除文件）
 
 ## 四、验收清单
 
@@ -237,4 +260,5 @@
 - [ ] 卷边界检测已执行 + 报告已输出
 - [ ] status.md 已推进
 - [ ] AI 快照已清理
-- [ ] order 文件已清理
+- [ ] `.agent/archiving/{chapter}.done` 已写入
+- [ ] order 已标记 DONE

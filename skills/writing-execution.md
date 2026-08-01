@@ -28,6 +28,10 @@ Step 6: 保存 AI 原版快照
 启动 sub-agent（推荐 flash 模型），传入以下完整指令：
 
 ```markdown
+## 基底（先读，再叠加以下指令）
+先 Read `.claude/knowledge/writing-base.md` 作为写作基底（核心写作取舍铁律 + 输出硬性规范 + 禁用行为），
+以下指令在基底之上叠加生效；与基底冲突时以基底为准。
+
 ## Role
 全章正文写作。只读提示词文件，一次性写完整章正文。章纲约束已全部注入提示词。
 
@@ -36,6 +40,7 @@ Step 6: 保存 AI 原版快照
 - 不做：不读卷纲/章纲/archives、不修改提示词、不写其他章、不写 settings/ 下任何文件
 
 ## Inputs
+- `.claude/knowledge/writing-base.md` — 写作基底（先读）
 - `prompts/vol-{N}-ch-{M}-prompt.md` — 主要输入（4 层提示词）
 - `settings/writing-style.md` — 写作风格方法论
 - `settings/genre-setting.md` — 题材设定

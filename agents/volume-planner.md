@@ -3,6 +3,7 @@ name: volume-planner
 description: 根据主线拆纲和世界观，规划每一卷的核心冲突、节奏分布和章节目标
 role: 叙事架构师
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/volume-arc.md
@@ -84,7 +85,7 @@ knowledge:
   - `settings/genre-setting.md` → 题材节奏预期
 - **Output Artifacts:**
   - `volumes/volume-{N}.md` → 卷纲（核心冲突、每章方向、情绪曲线）
-- **Hand-off Protocol:** 写入 volume-{N}.md 后结束；novel-agent 检测到文件变化即确认完成
+- **Hand-off Protocol:** 写入 volume-{N}.md 后，将 `.agent/task/volume-plan-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -193,7 +194,7 @@ knowledge:
     按 skills/volume-writing.md §8 验收：三维验收 + 快速嗅探
     不通过 → 回到 STEP 2 修正对应维度
 
-  DONE → 三(Hand-off): volumes/volume-{N}.md 写入完成
+  DONE → 覆盖 volume-plan-order.md `status: DONE` → 三(Hand-off): volumes/volume-{N}.md 写入完成
 
   MEMORY SYNC:
     按 skills/memory-recording.md 执行：作者反馈确认 → 追加到 .claude/memory/volume-memory.md
@@ -205,7 +206,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `settings/`、`story.md`、`.claude/memory/`、`.claude/knowledge/`、`knowledge/` | 不读 prompts/ |
-  | Write | `volumes/`、`.claude/memory/` | 不写其他目录 |
+  | Write | `volumes/`、`.claude/memory/`、`.agent/task/volume-plan-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
   | Glob | `settings/`、`volumes/` | — |
 - **Permission Level:** 读写 volumes/；只读其余
 
