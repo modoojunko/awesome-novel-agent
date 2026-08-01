@@ -115,7 +115,7 @@ novel-agent（总指挥 — 顶层入口，由 @novel-agent 加载）
   └─ archive 阶段 → 调度 updater（归档 + lore-keeping）
 ```
 
-novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其职，完成后清理任务标记。
+novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其职，完成后把 order 标记为 `status: DONE` 通知完成。
 
 ### 一次性设定
 
@@ -187,7 +187,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 | **⑤ 审阅** | reader（可选） | （由 novel-agent 调度）10 维 60+ 细项深度评审，对照章纲/设定/前文逐条诊断 |
 | **⑥ 归档** | updater | （由 novel-agent 调度）你确认后归档定稿，自动更新角色状态、追加情绪弧线、合并文风偏好、检测钩子健康和卷边界 |
 
-**调度规则：** `@novel-agent` 是顶层入口，由主 AI 加载后扮演总指挥角色。novel-agent 通过 Agent 工具调度子 agent，不直接代劳写作任务。子 agent 完成后清理任务标记，novel-agent 检测到后自动推进下一阶段。
+**调度规则：** `@novel-agent` 是顶层入口，由主 AI 加载后扮演总指挥角色。novel-agent 通过 Agent 工具调度子 agent，不直接代劳写作任务。子 agent 完成后把 order 覆盖为 `status: DONE`（不删除文件），novel-agent 检测到后自动推进下一阶段。
 
 第一章写完后，Agent 会问"下一章继续吗？"
 

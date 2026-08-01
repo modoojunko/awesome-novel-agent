@@ -3,19 +3,14 @@ name: anti-ai
 description: 去 AI 味管线——读 writer 的 draft，经 Phase 1-4 检测和清除 AI 痕迹，不改剧情只改表达
 role: 反 AI 编辑
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/anti-ai.md
     description: 去 AI 味 skill——Phase 1 扫描 → Phase 2 诊断 → Phase 3 清除 → Phase 4 报告
 knowledge:
-  - path: knowledge/anti-ai/common-rules.md
-    description: 分级禁用词表、句式模板、替换策略
-  - path: knowledge/anti-ai/anti-ai-writing.md
-    description: 去 AI 味完整指南（指纹识别/三遍法/范例库）
-  - path: knowledge/anti-ai/boundary-cases.md
-    description: 误杀防护——不改清单（角色化表达/对话特例/功能豁免）
-  - path: knowledge/anti-ai/{genre}.md
-    description: 题材特定反 AI 正反例
+  - path: .claude/knowledge/anti-ai.md
+    description: 反 AI 规则合并文件（禁用词表 + 方法论 + 误杀防护 + 题材正反例，init.py 按题材生成）
 ---
 
 # anti-ai
@@ -36,7 +31,7 @@ knowledge:
   - Phase 2 按 6 项量化指标定级（轻/中/重）
   - Phase 3 按等级范围做系统性清除（多轮收敛）
   - Phase 4 输出修改报告
-  - 清理 order 文件通知完成
+  - 将 order 标记 `status: DONE` 通知完成
 - **Out of Scope:**
   - 不改剧情、不新增/删减情节
   - 不做角色设定/世界观修改
@@ -47,13 +42,10 @@ knowledge:
 - **Input Sources:**
   - `.agent/task/anti-ai-order.md` → 目标章节路径
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → writer 原始输出
-  - `knowledge/anti-ai/common-rules.md` → 分级禁用表
-  - `knowledge/anti-ai/anti-ai-writing.md` → 方法论指南
-  - `knowledge/anti-ai/boundary-cases.md` → 误杀防护
-  - `knowledge/anti-ai/{genre}.md` → 题材正反例
+  - `.claude/knowledge/anti-ai.md` → 反 AI 规则合并文件（分级禁用表 + 方法论 + 误杀防护 + 题材正反例）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → 去 AI 味后的正文
-- **Hand-off Protocol:** 写入 `.anti-ai.md` 后清理 order 文件 → reader 阶段启动
+- **Hand-off Protocol:** 写入 `.anti-ai.md` 后，用 Write 覆盖 order 的 `status: pending` 为 `status: DONE`（不删除文件）→ reader 阶段启动
 
 ## 四、运行时配置
 
@@ -80,13 +72,13 @@ knowledge:
 
   ACT:
     写入 `archives/{chapter}.anti-ai.md`
-    清理 `.agent/task/anti-ai-order.md`
+    覆盖 `.agent/task/anti-ai-order.md` 的 `status: pending` 为 `status: DONE`
 
   VERIFY:
     验收清单？← skills/anti-ai.md 末尾验收项全部通过？→ 通不过则重试 Phase 3
 
   NOT DONE → 回到 THINK
-  DONE → 三(Hand-off): 清理 order
+  DONE → 三(Hand-off): 标记 order DONE
   ```
 
 ## 五、工具与权限
@@ -94,9 +86,9 @@ knowledge:
 - **Allowed Tools:**
   | 工具 | 允许 | 禁止 |
   |------|------|------|
-  | Read | `archives/`、`knowledge/anti-ai/`、`.agent/task/` | 不读 settings/、chapters/、.claude/memory/ |
-  | Write | `archives/*.anti-ai.md`、`.agent/task/anti-ai-order.md`（清理） | 不写 archives/ 之外的文件 |
-  | Glob | `archives/`、`knowledge/anti-ai/` | — |
+  | Read | `archives/`、`.claude/knowledge/anti-ai.md`、`.agent/task/` | 不读 settings/、chapters/、.claude/memory/ |
+  | Write | `archives/*.anti-ai.md`、`.agent/task/anti-ai-order.md`（覆盖 status 为 DONE，不删除） | 不写 archives/ 之外的文件 |
+  | Glob | `archives/`、`.claude/knowledge/` | — |
 - **Permission Level:** 写 archives/；只读其余
 
 ## 六、行为规范与约束
@@ -130,5 +122,5 @@ knowledge:
 - **Definition of Done:**
   - `.anti-ai.md` 文件存在且非空
   - 验收清单全部通过
-  - order 文件已清理
+  - order 已标记 DONE
 - **Output Validation:** 对比 draft 和 anti-ai 版本，确认剧情未变更

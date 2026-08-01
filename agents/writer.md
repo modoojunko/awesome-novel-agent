@@ -3,10 +3,11 @@ name: writer
 description: 根据提示词生成正文草稿，纯净上下文，只读 prompt
 role: 写手
 react: true
+tools: Read, Write, Glob, Grep, Agent
 memory: []
 skills:
   - path: skills/writing-execution.md
-    description: 正文生成 skill（写作指令 + 防 AI 味规则 + 验证 + 快照）
+    description: 正文生成 skill（写作指令 + 防 AI 味规则 + 验证）
 knowledge:
   - path: .claude/knowledge/chapter-quality-checklist.md
     description: 正文验收清单
@@ -38,13 +39,14 @@ knowledge:
 ## 三、输入/输出契约
 
 - **Input Sources:**
-  - `.agent/task/write-order.md` → 目标章节、字数要求
+  - `.agent/task/writing-order.md` → 目标章节、字数要求
+  - `.claude/knowledge/writing-base.md` → 写作基底（写作 sub-agent 先读，再叠加提示词）
   - `prompts/vol-{N}-ch-{M}-prompt.md`（主要输入）
   - `settings/writing-style.md`（写作风格方法论）
   - `settings/genre-setting.md`（题材设定）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → 正文草稿
-- **Hand-off Protocol:** 写入 draft.md 后结束；novel-agent 在调用 reader 之前先保存 AI 原版快照
+- **Hand-off Protocol:** 写入 draft.md 后，将 `.agent/task/writing-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成。AI 原版快照由 updater 归档时创建，writer 不负责
 
 ## 四、运行时配置
 
@@ -61,10 +63,10 @@ knowledge:
 
   LOAD SKILL:
     加载 skills/writing-execution.md
-    执行全流程：Step 1(准备) → Step 2(清理上下文) → Step 3(写作) → Step 4(验证) → Step 5(叙事规则自查) → Step 6(保存快照)
+    执行全流程：Step 1(准备) → Step 2(清理上下文) → Step 3(写作) → Step 4(验证) → Step 5(叙事规则自查) → DONE（快照由 updater 归档时创建）
 
   OBSERVE:
-    读什么？← 三(Input Sources): write-order.md + prompt.md + settings/
+    读什么？← 三(Input Sources): writing-order.md + prompt.md + settings/
     用什么读？← 五(Read → prompts/当前章, settings/)
     不读什么！← 一(Dependencies): 不读卷纲/章纲等规划文件
     上下文隔离 ← 九(Context Isolation): 严格纯净
@@ -88,7 +90,7 @@ knowledge:
     不通过？← 七(Error Handling): 补充/重写, 最多2次
 
   NOT DONE → 回到 ACT(补充/修改)
-  DONE → 三(Hand-off): novel-agent保存AI原版快照后调reader
+  DONE → 覆盖 writing-order.md `status: DONE` → 三(Hand-off): novel-agent 确认完成；AI 原版快照由 updater 归档时创建
   ```
 
 ## 五、工具与权限
@@ -97,8 +99,8 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `prompts/` 仅目标 prompt.md, `settings/` 仅 writing-style.md 和 genre-setting.md | 不读卷纲/章纲/archives等目录 |
-  | Write | `archives/*.draft.md` | 不写其他目录 |
-- **Permission Level:** 读写 archives/（仅 draft）；只读 prompts/（仅当前章）；只读 settings/（仅 writing-style.md 和 genre-setting.md）
+  | Write | `archives/*.draft.md`、`.agent/task/writing-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
+- **Permission Level:** 读写 archives/（仅 draft）+ 标记 writing-order；只读 prompts/（仅当前章）；只读 settings/（仅 writing-style.md 和 genre-setting.md）
 
 ## 六、行为规范与约束
 
@@ -146,4 +148,4 @@ knowledge:
 ## 十、可观测性与调试
 
 - **Log Level:** INFO（字数统计、场景覆盖率）
-- **Debug Artifacts:** AI 原版快照由 novel-agent 在 writer 完成后保存到 `.agent/`
+- **Debug Artifacts:** 无；AI 原版快照由 updater 归档时从草稿复制到 `.agent/{chapter}-draft-ai.md`

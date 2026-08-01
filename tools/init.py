@@ -12,6 +12,7 @@ awesome-novel-skill 项目初始化工具
 
 import sys
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -23,22 +24,45 @@ for s in (sys.stdin, sys.stdout, sys.stderr):
         pass
 
 
+# 与 knowledge/genre-example/index.md 题材注册表保持一致（index 为权威来源）。
+# 注：部分题材 ID 复用同一个 corpus 文件（如 urban-* → urban.md），无同名文件属正常。
 GENRES = [
     "xianxia", "xuanhuan", "urban", "urban-romance", "urban-daily",
-    "urban-farming", "urban-brained", "western-fantasy", "ancient-politics",
-    "historical", "anti-japanese-war", "scifi-apocalypse", "war-god",
-    "suspense-crime", "suspense-paranormal", "anime-derivative",
-    "derivative", "fanqie",
+    "urban-farming", "urban-brained", "urban-cultivation", "urban-high-martial",
+    "war-god", "western-fantasy", "ancient-politics", "historical",
+    "historical-ancient", "historical-brained", "anti-japanese-war",
+    "scifi-apocalypse", "suspense-crime", "suspense-paranormal", "suspense-brained",
+    "game-sports", "anime-derivative", "derivative", "male-derivative",
 ]
 
-SKILL_HOME = Path(os.environ.get("NOVEL_SKILL_HOME", Path(__file__).parent.parent))
+def resolve_skill_home() -> Path:
+    """解析技能仓库根目录。
+
+    init.py 永远位于技能根 tools/ 下，__file__ 推导即正确来源：
+      - 在仓库跑 tools/init.py  → 仓库
+      - 在安装版跑 tools/init.py → 安装版
+    不能用 NOVEL_SKILL_HOME 优先——install.sh 会把它持久化到 profile，
+    指向陈旧/已删除的安装副本，遮蔽仓库真实来源（曾导致新项目部署旧提示词）。
+    环境变量仅作异常兜底（__file__ 解析异常时）。
+    """
+    by_file = Path(__file__).resolve().parent.parent
+    if (by_file / "agents").is_dir() and (by_file / "tools").is_dir():
+        return by_file
+    env_home = os.environ.get("NOVEL_SKILL_HOME")
+    if env_home:
+        cand = Path(env_home)
+        if (cand / "agents").is_dir() and (cand / "tools").is_dir():
+            return cand
+    return by_file
+
+
+SKILL_HOME = resolve_skill_home()
 
 SOURCE_AGENTS = SKILL_HOME / "agents"
 SOURCE_KNOWLEDGE = SKILL_HOME / "knowledge"
 SOURCE_TEMPLATES = SKILL_HOME / "templates"
 SOURCE_MEMORY = SKILL_HOME / "memory"  # no-op since anti-ai/writer-style moved to knowledge/
 SOURCE_ANTI_AI = SKILL_HOME / "knowledge" / "anti-ai"
-SOURCE_WRITER_STYLE = SKILL_HOME / "memory" / "writer-style"  # optional
 SOURCE_GENRE_EXAMPLE = SKILL_HOME / "knowledge" / "genre-example"
 SOURCE_FORMAT_SPECS = SKILL_HOME / "knowledge" / "format-specs"
 
@@ -89,6 +113,9 @@ def main():
 
     # Step 5: 按题材继承知识
     deploy_knowledge(project_path, genre)
+
+    # Step 5.5: 按题材预填 settings 默认值（待设定阶段确认）
+    seed_settings_from_genre(project_path, genre)
 
     # Step 6: 生成 MEMORY.md 索引
     write_memory_index(project_path)
@@ -151,6 +178,74 @@ def create_skeleton(project_path: Path):
         print("  ✅ 已拷贝项目模板")
 
 
+# Claude Code tools 白名单 → OpenCode permission 映射
+# OpenCode 语法见 https://github.com/anomalyco/opencode (agents.mdx 权限表)。
+# OpenCode 默认所有权限为 ask（弹窗），此处明确 allow 需要的 + deny 不需要的。
+_OPENCODE_TOOL_TO_PERM = {
+    "Read": "read",
+    "Write": "edit",   # OpenCode 的 edit 覆盖 write/edit/apply_patch
+    "Edit": "edit",
+    "Glob": "glob",
+    "Grep": "grep",
+    "Agent": "task",   # Claude Code Agent 工具 ↔ OpenCode task
+}
+# 白名单外，OpenCode 下显式 deny 的权限键（避免默认 ask 弹窗）
+_OPENCODE_DENY_KEYS = ["bash", "webfetch", "websearch", "list", "lsp", "skill"]
+
+
+def _convert_to_opencode(text: str) -> str:
+    """把 Claude Code 语法 agent frontmatter 转成 OpenCode 语法。
+
+    关键差异：
+    - Claude Code 用 `tools: Read, Write, ...` 逗号串（白名单，缺省=继承全部）
+    - OpenCode 用 `permission:` map（allow/ask/deny，默认 ask）
+    仅处理 `tools:` 字段 → `permission:`；其余字段（name/description/role 等）原样保留
+    （OpenCode 忽略未知字段，同 Claude Code 忽略 role/react 等自定义字段一致）。
+    """
+    if not text.startswith("---"):
+        return text
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    fm = parts[1]
+    if "tools:" not in fm:
+        return text
+    try:
+        import yaml
+        data = yaml.safe_load(fm)
+    except Exception:
+        return text
+
+    tools_line = None
+    new_lines = []
+    for ln in fm.splitlines():
+        if ln.strip().startswith("tools:"):
+            tools_line = ln
+            continue
+        new_lines.append(ln)
+
+    allowed = []
+    if tools_line:
+        val = tools_line.split(":", 1)[1].strip()
+        allowed = [t.strip() for t in val.split(",") if t.strip()]
+
+    perm = {}
+    for key in _OPENCODE_DENY_KEYS:
+        perm[key] = "deny"
+    for tool in allowed:
+        p = _OPENCODE_TOOL_TO_PERM.get(tool)
+        if p:
+            perm[p] = "allow"
+    if not perm:
+        perm = {"*": "deny"}
+
+    perm_text = "permission:\n" + "".join(
+        f"  {k}: {v}\n" for k, v in sorted(perm.items())
+    )
+    new_fm = "\n".join(new_lines).rstrip() + "\n" + perm_text
+    return "---" + new_fm + "---" + parts[2]
+
+
 def deploy_agents(project_path: Path):
     """根据当前平台复制 agent 定义到对应目录"""
     if not SOURCE_AGENTS.exists():
@@ -167,7 +262,10 @@ def deploy_agents(project_path: Path):
             rel_path = item.relative_to(SOURCE_AGENTS)
             dest = target / rel_path
             dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(item, dest)
+            content = item.read_text(encoding="utf-8")
+            if is_opencode:
+                content = _convert_to_opencode(content)
+            dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
 
 
@@ -193,16 +291,19 @@ def deploy_knowledge(project_path: Path, genre: str):
         shutil.copy2(genre_example_src, knowledge_dir / "genre-example.md")
         count += 1
 
-    # 反 AI 规则：通用 + 题材
+    # 反 AI 规则：通用 + 题材 + 方法论 + 误杀防护（合并为单个 anti-ai.md）
+    # 注：common-rules / anti-ai-writing / boundary-cases 是 anti-ai agent 的三个必需输入，
+    #     统一合并进 .claude/knowledge/anti-ai.md，避免部署后多个失效路径。
     anti_ai_content = []
     anti_ai_content.append("# 反 AI 规则\n\n[community-defaults]\n")
-    common_rules = SOURCE_ANTI_AI / "common-rules.md"
-    if common_rules.exists():
-        anti_ai_content.append(common_rules.read_text(encoding="utf-8"))
+    for fname in ("common-rules.md", "anti-ai-writing.md", "boundary-cases.md"):
+        f = SOURCE_ANTI_AI / fname
+        if f.exists():
+            anti_ai_content.append(f"\n---\n\n{f.read_text(encoding='utf-8')}")
 
     genre_rules = SOURCE_ANTI_AI / f"{genre}.md"
     if genre_rules.exists():
-        anti_ai_content.append(f"\n[community-defaults] 题材: {genre}\n")
+        anti_ai_content.append(f"\n---\n\n[community-defaults] 题材: {genre}\n")
         anti_ai_content.append(genre_rules.read_text(encoding="utf-8"))
 
     if anti_ai_content:
@@ -212,20 +313,17 @@ def deploy_knowledge(project_path: Path, genre: str):
         count += 1
         print(f"  ✅ 已继承反 AI 规则 (通用 + {genre})")
 
-    # 文风偏好
-    style_dir = SOURCE_WRITER_STYLE / genre
-    if style_dir.exists():
-        style_content = []
-        for sf in style_dir.glob("*.md"):
-            style_content.append(sf.read_text(encoding="utf-8"))
-        if style_content:
-            (knowledge_dir / "writer-style.md").write_text(
-                f"# 文风偏好\n\n[community-defaults] 题材: {genre}\n\n"
-                + "\n".join(style_content),
-                encoding="utf-8",
-            )
-            count += 1
-            print(f"  ✅ 已继承文风偏好 ({genre})")
+    # 文风偏好占位文件（保证文件存在；内容由 updater 归档 diff 时按作者修改追加）
+    # 注：memory/ 已删除（迁移到 knowledge/），无社区默认文风，此处只落占位，
+    #     writer-style.md 由 updater 首次归档时填充。
+    style_placeholder = knowledge_dir / "writer-style.md"
+    if not style_placeholder.exists():
+        style_placeholder.write_text(
+            f"# 文风偏好\n\n> 作家个人文风偏好。由 updater 在归档 diff 时追加，标注 [writer-preference]。\n\n"
+            f"> [community-defaults] 题材: {genre}\n\n---\n\n",
+            encoding="utf-8",
+        )
+        count += 1
 
     # 永久记忆占位文件（空，后续由 updater 晋升填充）
     permanent_memory = knowledge_dir / "permanent-memory.md"
@@ -252,15 +350,133 @@ def deploy_knowledge(project_path: Path, genre: str):
     print(f"  ✅ 已继承 {count} 个知识文件")
 
 
+def _md_section(text: str, title: str) -> str:
+    """提取 markdown 某标题（任意 ## 或 ### 级别）到下一同级/更高级标题之间的正文。
+
+    title 传纯标题名（不含 # 号），如 "叙事者角色" 或 "满足类型"。
+    匹配规则：标题行 = 若干 # + 空格 + 标题名，可带尾随 #。
+    """
+    m = re.search(r"^(#{1,6})\s+%s\s*#*\s*$" % re.escape(title), text, re.M)
+    if not m:
+        return ""
+    level = len(m.group(1))
+    body = []
+    for ln in text[m.end():].splitlines():
+        h = re.match(r"^(#{1,6})\s+", ln.strip())
+        if h and len(h.group(1)) <= level:
+            break
+        body.append(ln)
+    return "\n".join(body).strip()
+
+
+def _md_bullets(sec: str) -> list:
+    """从 markdown 段落提取 `- xxx` 列表项内容。"""
+    return [
+        ln.strip().lstrip("- ").strip()
+        for ln in sec.splitlines()
+        if ln.strip().startswith("- ")
+    ]
+
+
+def seed_settings_from_genre(project_path: Path, genre: str):
+    """按题材预填 settings/genre-setting.md + writing-style.md 的默认值。
+
+    genre-example/{genre}.md 由 deploy_knowledge 已拷贝为 .claude/knowledge/genre-example.md。
+    此处从其中提取叙事者角色/文风蓝图/类型禁忌/题材配置，替换 settings/ 下的占位符，
+    避免 writer/prompt-crafter 在设定阶段未执行时把 `{placeholder}` 原样注入提示词。
+    产出标注 [auto-seeded]，设定阶段由 updater 与作者确认调整。
+    """
+    ex = project_path / ".claude" / "knowledge" / "genre-example.md"
+    if not ex.exists():
+        return
+    text = ex.read_text(encoding="utf-8")
+    if "placeholder" in text.lower() or len(text.strip()) < 100:
+        print(f"  ⚠️  genre-example/{genre}.md 为空模板，settings 保留占位符（请在设定阶段填写）")
+        return
+
+    # 题材显示名：优先标题行 "# 类型档案：X"，fallback 到 **label:**
+    label = genre
+    title_m = re.match(r"^#\s+类型档案[:：]\s*(.+)$", text, re.M)
+    if title_m:
+        label = title_m.group(1).strip()
+    else:
+        lm = re.search(r"\*\*label:\*\*\s*(\S+)", text)
+        if lm:
+            label = lm.group(1)
+
+    sat = _md_bullets(_md_section(text, "满足类型"))
+    rhythm = _md_section(text, "节奏规则") or "- 待设定"
+    clich = _md_bullets(_md_section(text, "反套路"))
+    taboo = _md_bullets(_md_section(text, "类型禁忌"))
+
+    # genre-setting.md
+    genre_out = [
+        "# 题材设定",
+        "",
+        f"> [auto-seeded] init.py 从 genre-example/{genre}.md 生成，设定阶段请与作者确认调整。",
+        "",
+        f"## 选定类型",
+        "",
+        f"{genre} — {label}",
+        "",
+        "## 满足类型",
+        "",
+    ]
+    genre_out += [f"- {s}" for s in sat] or ["- （待设定）"]
+    genre_out += ["", "## 节奏规则", "", rhythm, "", "## 避免套路", ""]
+    genre_out += [f"- {c}" for c in clich] or ["- （待设定）"]
+    genre_out += ["", "## 类型禁忌", ""]
+    genre_out += [f"- {t}" for t in taboo] or ["- （待设定）"]
+    (project_path / "settings" / "genre-setting.md").write_text(
+        "\n".join(genre_out) + "\n", encoding="utf-8"
+    )
+
+    # writing-style.md：叙事者角色 + 文风蓝图作为核心信条，禁忌作为易犯错误
+    role = _md_section(text, "叙事者角色") or "（待设定）"
+    blueprint = _md_section(text, "文风蓝图") or "（待设定）"
+    style_out = [
+        "# 写作风格",
+        "",
+        f"> [auto-seeded] init.py 从 genre-example/{genre}.md 生成，设定阶段请与作者逐项确认。",
+        "",
+        "## role（叙事身份）",
+        "",
+        role,
+        "",
+        "## core_principles（不可违背的写作信条）",
+        "",
+        blueprint,
+        "",
+        "## possible_mistakes（AI 易犯错误）",
+        "",
+    ]
+    style_out += [f"- {t}" for t in taboo] or ["- （待设定）"]
+    style_out += [
+        "",
+        "## depiction_techniques（描写层次和手法）",
+        "",
+        blueprint if blueprint and blueprint != "（待设定）" else "（设定阶段填写）",
+        "",
+    ]
+    (project_path / "settings" / "writing-style.md").write_text(
+        "\n".join(style_out) + "\n", encoding="utf-8"
+    )
+    print(f"  ✅ 已按题材预填 settings/genre-setting.md + writing-style.md 默认值（{genre}）")
+
+
 def write_status(project_path: Path):
     """初始化 .agent/status.md"""
     status = """# 项目状态
 
 - **skill_version:** 4.0
 - **phase:** setup
+- **current_step:** setting        # volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving
+# phase 取值：setup / outline / draft / anti-ai / review / archive / finished
+# last_volume_completed 与 phase: finished 由 novel-agent 写（卷完成判定），updater 不写完成位
 - **current_volume:**
 - **current_chapter:**
 - **last_archived:**
+- **last_quality_gap:**        # 最近一次字数降级记录（由 novel-agent 从 writing-order 同步）
 - **next_task:** 填写基础设定（世界观/角色/写作风格）
 """
     (project_path / ".agent" / "status.md").write_text(status, encoding="utf-8")

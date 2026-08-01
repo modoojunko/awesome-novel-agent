@@ -3,6 +3,7 @@ name: chapter-planner
 description: 四步流程：获取参考材料 → 讨论定稿 → 生成章纲 → 验收
 role: 章纲规划师
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/chapter-reference.md
@@ -78,7 +79,7 @@ knowledge:
   - `chapters/` 前 3 章 → 衔接
 - **Output Artifacts:**
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（memo、情绪设计、场景列表、hooks）
-- **Hand-off Protocol:** 写入 chapters/vol-{N}-ch-{M}.md 后结束
+- **Hand-off Protocol:** 写入 chapters/vol-{N}-ch-{M}.md 后，将 `.agent/task/chapter-plan-order.md` 覆盖为 `status: DONE`（不删除文件）后结束
 
 ## 四、运行时配置
 
@@ -167,7 +168,7 @@ knowledge:
     按 chapter-verify.md 逐项检查
     全部通过 → DONE；否 → 回到上一出问题的步骤
 
-  DONE → 三(Hand-off): 写入 chapters/vol-{N}-ch-{M}.md
+  DONE → 覆盖 chapter-plan-order.md `status: DONE` → 三(Hand-off): 写入 chapters/vol-{N}-ch-{M}.md
 
   MEMORY SYNC:
     按 skills/memory-recording.md 执行：作者反馈确认 → 追加到 .claude/memory/chapter-memory.md
@@ -179,7 +180,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `settings/`、`volumes/`、`chapters/`、`.claude/memory/`、`knowledge/`、`story.md` | 不读 prompts/、archives/ |
-  | Write | `chapters/`、`.claude/memory/` | 不写其他目录 |
+  | Write | `chapters/`、`.claude/memory/`、`.agent/task/chapter-plan-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
   | Glob | `chapters/`、`settings/character-setting/` | — |
 - **Permission Level:** 读写 chapters/；只读其余
 

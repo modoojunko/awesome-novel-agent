@@ -3,6 +3,7 @@ name: novel-agent
 description: 项目入口 agent，负责检测进度、调度子 agent 完成任务
 role: 总指挥
 react: true
+tools: Read, Write, Glob, Grep, Agent
 memory: []            # 不自带记忆——lore-keeping 交给 updater
 skills:
   - path: skills/novel-dispatch.md
@@ -51,6 +52,9 @@ knowledge:
   - 验证子 agent 产出，确认完成
   - 归档时调度 updater 执行 lore-keeping（角色状态、时间线、动态记忆）
   - 归档完成后询问作者是否继续下一章
+  - **卷完成判定**：updater 归档 order DONE 后，比对"已归档章节数 vs 卷规划章节数"裁决本卷是否完成（novel-agent 是 `last_volume_completed` 的唯一写者，updater 不写完成位）
+  - **扫描设定变更通知**：每章开始规划前 Grep `volumes/` + `chapters/` 的 `## 设定变更通知` 头，发现即派 setting-update-order 让 updater 消费（执行后移除源文件中的块，防重复）
+  - **完本判定**：无下一卷可规划且作者确认后，写 `phase: finished` 并输出完本报告（G14）
   - **评估是否需要推演沙盘**：在以下节点判断作者是否需要推演沙盘辅助，需要则主动建议
 - **Out of Scope:**
   - 不直接写任何内容文件（卷纲/章纲/提示词/正文/设定/记忆）
@@ -65,6 +69,27 @@ knowledge:
   - 自主判断子 agent 产出是否足够
   - 调度哪个子 agent 由当前 phase 决定
   - 自主判断作者是否需要推演沙盘，主动建议
+
+### 完本报告格式
+
+进入 `finished` 终态时输出：
+
+```text
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  《{书名}》全书完本
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+总卷数：{N}
+已归档章节：{总数} 章
+各卷：{逐卷标题 + 章数}
+
+可选项：
+1. 回顾整本书（reader 逐卷评审）
+2. 修正某章（重新进入 writing）
+3. 开新作（另起项目）
+```
+
+完本后不再进入任何新调度（phase=finished 无对应 order）。
 
 ### 推演沙盘评估逻辑
 
@@ -94,7 +119,7 @@ knowledge:
 - **Output Artifacts:**
   - `.agent/task/{task}-order.md` → 任务指令（给子 agent，含完成任务所需的上下文）
   - `.agent/status.md` → 更新进度标记（由 updater 在归档时写入，novel-agent 在调度间隙更新）
-- **Hand-off Protocol:** 写 order 文件后通过 Agent 工具调用目标 agent；目标 agent 完成后清理 order 文件；novel-agent 检测到 order 清理即确认完成
+- **Hand-off Protocol:** 写 order 文件（`status: pending`）后通过 Agent 工具调用目标 agent；目标 agent 完成后将 order 覆盖为 `status: DONE`（不删除文件）；novel-agent 检测到 order 标记 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -111,25 +136,51 @@ knowledge:
   System Prompt ← 一(身份+人格) + 二(职责+OOS) + 六(规范) + 八(验收标准)
 
   OBSERVE:
-    读什么？← 三(Input Sources): status.md + 子agent产出文件
+    读什么？← 三(Input Sources): status.md（phase + current_step）+ 子agent产出文件
     用什么读？← 五(工具): Read, Glob, Grep
     状态从哪重建？← 九(Context Isolation): 每次从文件系统重建
+    实际文件裁决 ← Glob 枚举 volumes/、chapters/、prompts/、archives/ 实际存在的文件，
+      与 status.md 的 current_step 交叉核对——**以文件系统实际状态为准，不单靠 phase/step 猜**
+      （phase 只有 6 个值，outline/draft 各有两个子 agent，表达不了中间态）
 
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
-    当前phase？
+    当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── outline → sub: volume-planner 负责卷纲, chapter-planner 负责章纲
-    ├── draft → sub: prompt-crafter 负责提示词, writer 负责正文
-    ├── anti-ai → sub: anti-ai 负责去 AI 味
-    ├── review → sub: reader 负责评审
-    └── archive → sub: updater 负责归档
+    ├── outline: step=volume-planning → volume-planner 规划卷纲
+    │             step=chapter-planning → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    │               的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
+    │               → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
+    ├── draft:   step=prompt-crafting → prompt-crafter 组装提示词
+    │             step=writing → writer 写正文
+    │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
+    │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
+    ├── anti-ai → step=anti-ai → anti-ai 去 AI 味
+    ├── review → step=reviewing → reader 评审
+    ├── archive → step=archiving → updater 归档
+    │    ↓ updater order 已 DONE 后——**卷完成判定（novel-agent 是 last_volume_completed 与
+    │      finished 的唯一写者，updater 只输出报告不写完成位）**：
+    │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
+    │      规划章节数（数字对比裁决，不以作者口述为准）
+    │      ├── 已归档数 < 规划数 → 卷未完成，**先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    │      │     的 `## 设定变更通知` 头；有 → 写 setting-update-order（inputs 指向源文件）→ 调
+    │      │     updater 消费；无 → 直接问作者继续下一章 → step 推进到写作/章纲）
+    │      ├── 已归档数 == 规划数 → 卷完成，写 status.md：last_volume_completed = true
+    │      │     → 触发记忆兜底：写 memory-sweep-order.md → 调 updater（完成后继续）
+    │      │     然后 Glob volumes/ 检查是否存在 volume-{N+1}（或可规划）
+    │      │     ├── 有下一卷 → 问作者是否规划卷 N+1 → 是 → phase→outline, step→volume-planning
+    │      │     └── 无下一卷 → **完本判定**：问作者"所有卷已完成，是否完本？"
+    │      │            确认 → phase→finished, step→(空) → 输出完本报告（见二 完本）
+    │      └── 归档章节数与卷纲不一致但 updater 报告卷完成 → 以实际文件为准，视情况要求 updater 补齐
+    └── finished → 完本终态：输出完本报告（全卷清单 + 归档章数 + 可执行项），不进入任何新调度
+    ↓ 若 current_step 与实际文件状态不一致 → 以实际文件为准推进（如卷纲已存在但 step 仍
+      volume-planning → 视作已完成，推进 chapter-planning）
 
     判断："这件事该谁做？"
-    └── 是自己的事（写 order / 验证产出 / 推进 phase）→ 自己做
+    └── 是自己的事（写 order / 验证产出 / 推进 phase/step）→ 自己做
     └── 是子 agent 的事（写卷纲/章纲/提示词/正文/评审/归档/改设定）→ **必须 dispatch，禁止直接做**
 
-    决策依据？← 二(Decision Rights) + 九(Shared Context Keys: phase)
+    决策依据？← 二(Decision Rights) + 九(Shared Context Keys: phase + current_step)
     约束条件？← 六(Principles)
     优先级？← 一(Purpose): 按顺序推进阶段，不跨阶段跳转
 
@@ -140,7 +191,11 @@ knowledge:
     交接？← 三(Hand-off Protocol): 写order + 调用子agent
 
   VERIFY:
-    检查 order 是否已清理（子 agent 干完活了）
+    检查 order 的 `status` 是否为 `DONE`（子 agent 干完活了）
+    规则：order 存在且 status=DONE → 完成；status=pending → 等待；order 不存在 → 子 agent 意外中断，进重试
+    **设定变更任务（setting-update-order）额外校验**：DONE 后 re-Grep 源文件（卷纲/章纲）的
+      `## 设定变更通知` 头，确认 updater 已消费移除；未移除 → 视为产出不完整，重新派单，
+      计入 §七 重试/断路器（连续 3 次 → STOP 进人工）
     完成标准？← 八(Definition of Done)
     质量门？← 六(Quality Gates): 子agent产出验证
     不通过？← 七(Error Handling): 重试/报错
@@ -182,13 +237,16 @@ knowledge:
   - 子 agent 调用失败 → 重试 1 次
   - 子 agent 产出不完整 → 重新 dispatch
 - **Retry Policy:** 子 agent 任务最多重试 2 次，超过则报错给作者
+  - **归档重派前先看 checkpoint：** 若 `.agent/archiving/{chapter}.done` 存在 → 从断点继续（updater 幂等补缺），不整章重跑
+  - **非归档任务：** 若 order 文件不存在（子 agent 意外中断）→ 重新写 order 重派；若 order 仍 `status: pending` → 重试
+  - 连续 3 次失败/降级 → STOP 并进人工，不无限重试（断路器）
 - **Fallback Logic:** 如果某个子 agent 反复无法完成任务，询问作者是否手动介入
 
 ## 八、验收标准与产出
 
 - **Definition of Done:**
   - 当前阶段对应的子 agent 任务已完成（产出文件存在、格式正确）
-  - 如果是归档阶段：updater 已执行完毕且清理了 order 文件
+  - 如果是归档阶段：updater 已执行完毕且 order 已标记 `status: DONE`
   - `.agent/status.md` 已更新到最新进度
 - **Success Metrics:** 每个阶段按顺序推进，无遗漏节点
 
@@ -196,10 +254,10 @@ knowledge:
 
 - **Context Isolation:** 每次 OBSERVE 从文件系统重建状态，不依赖上一次运行的上下文缓存
 - **State Persistence:** `.agent/status.md` 是唯一持久状态
-- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive）
+- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive/finished）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）
 
 ## 十、可观测性与调试
 
 - **Log Level:** INFO（调度记录 + 状态转换）
 - **Metrics:** 每个阶段的耗时、子 agent 调用次数、重试次数
-- **Debug Artifacts:** order 文件保留完整任务上下文（清理前可读）
+- **Debug Artifacts:** order 文件保留完整任务上下文（标记 DONE 后可读）

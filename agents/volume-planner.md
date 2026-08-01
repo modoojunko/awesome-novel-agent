@@ -3,6 +3,7 @@ name: volume-planner
 description: 根据主线拆纲和世界观，规划每一卷的核心冲突、节奏分布和章节目标
 role: 叙事架构师
 react: true
+tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/volume-arc.md
@@ -84,7 +85,7 @@ knowledge:
   - `settings/genre-setting.md` → 题材节奏预期
 - **Output Artifacts:**
   - `volumes/volume-{N}.md` → 卷纲（核心冲突、每章方向、情绪曲线）
-- **Hand-off Protocol:** 写入 volume-{N}.md 后结束；novel-agent 检测到文件变化即确认完成
+- **Hand-off Protocol:** 写入 volume-{N}.md 后，将 `.agent/task/volume-plan-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成
 
 ## 四、运行时配置
 
@@ -115,7 +116,10 @@ knowledge:
 
   REF — 加载参考信息（首次进入时执行）：
     ① 读钩子与伏笔：Read settings/foreshadowing.md（全局伏笔状态）
-    ② 读角色状态：Read settings/character-setting/ 下所有角色文件
+    ② 读角色状态：从 story.md 卷划分 + volume-plan-order.md 确定本卷相关角色集合（主角/卷入本卷冲突的角色）；
+       对每个相关角色 Read `settings/character-setting/{id}.md`，只读「基本信息」+「状态历史」最近一次
+       `## vol-*-ch-* 状态变更` 与最近一次剧情履历，不读全文、不读无关角色；
+       首卷或尚无归档章节时，角色文件只有初始设定——按初始状态规划
     ③ 读前卷衔接（卷 N+1）：Read 前卷 volume-{N-1}.md + 前卷末章 chapters/
     ④ 读剧情手法库：从 knowledge 中提取以下技法的核心要点：
        · 冲突升级：价值错位 / 环境压力 / 目标置换 / 连锁反应
@@ -193,7 +197,7 @@ knowledge:
     按 skills/volume-writing.md §8 验收：三维验收 + 快速嗅探
     不通过 → 回到 STEP 2 修正对应维度
 
-  DONE → 三(Hand-off): volumes/volume-{N}.md 写入完成
+  DONE → 覆盖 volume-plan-order.md `status: DONE` → 三(Hand-off): volumes/volume-{N}.md 写入完成
 
   MEMORY SYNC:
     按 skills/memory-recording.md 执行：作者反馈确认 → 追加到 .claude/memory/volume-memory.md
@@ -205,7 +209,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `settings/`、`story.md`、`.claude/memory/`、`.claude/knowledge/`、`knowledge/` | 不读 prompts/ |
-  | Write | `volumes/`、`.claude/memory/` | 不写其他目录 |
+  | Write | `volumes/`、`.claude/memory/`、`.agent/task/volume-plan-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
   | Glob | `settings/`、`volumes/` | — |
 - **Permission Level:** 读写 volumes/；只读其余
 

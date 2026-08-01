@@ -1,9 +1,9 @@
 ---
-name: novel-base
-description: 写作子代理基底——永久加载，不可篡改。novel-agent 动笔前先加载此基底，再读取 9 层章节提示词，二者叠加执行
+name: writing-base
+description: 写作基底规范——永久加载，不可篡改。写作 sub-agent 动笔前先加载此基底，再叠加章节提示词执行
 ---
 
-# novel-agent 写作子代理基底
+# 写作基底规范
 
 ## 身份定位
 
