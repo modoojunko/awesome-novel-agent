@@ -112,25 +112,32 @@ knowledge:
   System Prompt ← 一(身份+人格) + 二(职责+OOS) + 六(规范) + 八(验收标准)
 
   OBSERVE:
-    读什么？← 三(Input Sources): status.md + 子agent产出文件
+    读什么？← 三(Input Sources): status.md（phase + current_step）+ 子agent产出文件
     用什么读？← 五(工具): Read, Glob, Grep
     状态从哪重建？← 九(Context Isolation): 每次从文件系统重建
+    实际文件裁决 ← Glob 枚举 volumes/、chapters/、prompts/、archives/ 实际存在的文件，
+      与 status.md 的 current_step 交叉核对——**以文件系统实际状态为准，不单靠 phase/step 猜**
+      （phase 只有 6 个值，outline/draft 各有两个子 agent，表达不了中间态）
 
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
-    当前phase？
+    当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── outline → sub: volume-planner 负责卷纲, chapter-planner 负责章纲
-    ├── draft → sub: prompt-crafter 负责提示词, writer 负责正文
-    ├── anti-ai → sub: anti-ai 负责去 AI 味
-    ├── review → sub: reader 负责评审
-    └── archive → sub: updater 负责归档
+    ├── outline: step=volume-planning → volume-planner 规划卷纲
+    │             step=chapter-planning → chapter-planner 生成章纲
+    ├── draft:   step=prompt-crafting → prompt-crafter 组装提示词
+    │             step=writing → writer 写正文
+    ├── anti-ai → step=anti-ai → anti-ai 去 AI 味
+    ├── review → step=reviewing → reader 评审
+    └── archive → step=archiving → updater 归档
+    ↓ 若 current_step 与实际文件状态不一致 → 以实际文件为准推进（如卷纲已存在但 step 仍
+      volume-planning → 视作已完成，推进 chapter-planning）
 
     判断："这件事该谁做？"
-    └── 是自己的事（写 order / 验证产出 / 推进 phase）→ 自己做
+    └── 是自己的事（写 order / 验证产出 / 推进 phase/step）→ 自己做
     └── 是子 agent 的事（写卷纲/章纲/提示词/正文/评审/归档/改设定）→ **必须 dispatch，禁止直接做**
 
-    决策依据？← 二(Decision Rights) + 九(Shared Context Keys: phase)
+    决策依据？← 二(Decision Rights) + 九(Shared Context Keys: phase + current_step)
     约束条件？← 六(Principles)
     优先级？← 一(Purpose): 按顺序推进阶段，不跨阶段跳转
 
@@ -201,7 +208,7 @@ knowledge:
 
 - **Context Isolation:** 每次 OBSERVE 从文件系统重建状态，不依赖上一次运行的上下文缓存
 - **State Persistence:** `.agent/status.md` 是唯一持久状态
-- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive）
+- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）
 
 ## 十、可观测性与调试
 

@@ -116,7 +116,8 @@ knowledge:
 
   REF — 加载参考信息（首次进入时执行）：
     ① 读钩子与伏笔：Read settings/foreshadowing.md（全局伏笔状态）
-    ② 读角色状态：Read settings/character-setting/ 下所有角色文件
+    ② 读角色状态：优先 Read `.agent/role-summary.md`（角色状态摘要，updater 归档时维护）；
+       仅当某角色需深入设定（性格/动机/能力边界）时才 Read 对应 `settings/character-setting/{id}.md`，不读全部
     ③ 读前卷衔接（卷 N+1）：Read 前卷 volume-{N-1}.md + 前卷末章 chapters/
     ④ 读剧情手法库：从 knowledge 中提取以下技法的核心要点：
        · 冲突升级：价值错位 / 环境压力 / 目标置换 / 连锁反应

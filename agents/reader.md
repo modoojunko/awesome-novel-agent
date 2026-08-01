@@ -25,7 +25,7 @@ knowledge:
     description: 检查是否仍有 AI 味
   - path: .claude/knowledge/chapter-quality-checklist.md
     description: 验收清单
-  - path: .claude/knowledge/genre-example/
+  - path: .claude/knowledge/genre-example.md
     description: 本题材读者预期（从 settings/genre-setting.md 确定题材后加载对应文件）
   - path: .claude/knowledge/scene-craft/index.md
     description: 场景写作方法论索引（维度 10 检查时对照注入的方法论）

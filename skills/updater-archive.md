@@ -89,6 +89,25 @@
    - **表达方式:** 身体反应/行为/对话/环境互动
    ```
 
+6. 更新 `.agent/role-summary.md`（角色状态摘要视图——供 volume-planner / chapter-planner 快速读取，
+   避免每次读全部角色文件撑爆上下文）：
+
+   ```markdown
+   # 角色状态摘要（updater 归档时维护）
+
+   ## {角色ID}
+   - **位置:** {当前位置}
+   - **状态:** {当前状态一句话}
+   - **关键关系:** {关系变化，无则空}
+   - **最近章节:** vol-{N}-ch-{M}
+   ```
+
+   **维护规则：**
+   - 每个出场角色**覆盖**其摘要节（保留最近一次），不追加历史——历史在 character-setting/{id}.md 里
+   - 新角色首次出现 → 新增节
+   - 文件不存在 → 创建
+   - 幂等：同一章重派归档时，摘要按最近状态覆盖，天然幂等
+
 ### Step 2.5: 生物/怪物检测
 
 1. 读正文，提取本章出现或提及的动物、怪物、生物
@@ -238,7 +257,7 @@
 
 ### Step 11: Status 推进 + 清理
 
-- 更新 `.agent/status.md`：phase→`archive`, last_archived→当前章号
+- 更新 `.agent/status.md`：phase→`archive`, current_step→`archiving`, last_archived→当前章号
 - 删除 `.agent/{chapter}-draft-ai.md`（快照，归档完成后的清理动作）
 - 写 `.agent/archiving/{chapter}.done` 完成标记（幂等 checkpoint）
 - 将 `.agent/task/archive-order.md` 覆盖为 `status: DONE`（不删除文件）
