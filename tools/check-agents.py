@@ -98,8 +98,17 @@ def check_file(path: Path) -> list:
             # 占位符（如 {genre}）→ 跳过，init.py 会替换或属于合并产物
             if "{" in rel:
                 continue
-            # 部署后路径 → 白名单模式，不要求文件存在
+            # 部署后路径 → 白名单模式，不要求文件存在，但 settings/*.md 必须有对应模板
             if _is_deployed(rel):
+                if rel.startswith("settings/") and rel.endswith(".md"):
+                    # 每角色的动态文件（character-setting/）不校验模板
+                    if not rel.startswith("settings/character-setting/"):
+                        tpl = ROOT / "templates" / rel
+                        if not tpl.exists():
+                            errors.append(
+                                f"{path.name}: 引用 settings/ 路径 {rel}，但 templates/settings/ 无对应模板"
+                                f"（新项目 init.py 不会生成它 → 运行时必缺）"
+                            )
                 continue
             target = ROOT / rel
             if not target.exists():

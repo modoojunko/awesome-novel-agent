@@ -95,6 +95,7 @@ knowledge:
   - `settings/timeline.md` → 追加本章关键事件
   - `.claude/knowledge/anti-ai.md` → 追加语义合并后的反 AI 规则
   - `.claude/knowledge/writer-style.md` → 追加语义合并后的文风偏好
+  - `settings/foreshadowing.md` → 追加/更新跨卷伏笔台账（从 chapter.md#payoff_plan 汇总）
   - `.agent/{chapter}-draft-ai.md` → 归档 diff 基线；归档后保留（审计留档）
   - `archives/vol-{N}-ch-{M}-{slug}.md` → 定稿正文（Write 自中间稿，内容不做编辑）
 - **Output Artifacts（设定变更流程）:**
