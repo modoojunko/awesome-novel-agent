@@ -11,16 +11,35 @@
 
 ## 二、Order 解析
 
-`setting-update-order.md` 结构：
+`setting-update-order.md` 遵循统一 order 模板（`templates/.agent/task/order-template.md`），`inputs`/`outputs` 为列表。变更规格有两种载体，按 `inputs` 内容区分：
 
-```yaml
-type: character | world | timeline | genre | style | memory
-action: create | modify | delete
-target: settings/character-setting/{id}.md  # 或其他文件路径
-content: |
-  # 要写入/追加的内容（结构化）
-reason: 作者/卷纲/章纲要求
+```markdown
+# setting-update-order
+
+status: pending
+
+inputs:
+  - 源文件路径（含 `## 设定变更通知` 块，见下「载体 1」）
+  # 或
+  - content: |                    # 初始设定（setup 阶段，作者对话直接给 spec，见「载体 2」）
+      type: character | world | timeline | genre | style | memory
+      action: create | modify | delete
+      target: settings/character-setting/{id}.md
+      content: |
+        # 要写入/追加的内容（结构化）
+      reason: 作者要求
+
+outputs:
+  - 目标设定文件路径
 ```
+
+### 载体 1：源文件通知块（规划期变更）
+
+`inputs` 指向卷纲/章纲文件，updater 读取其中的 `## 设定变更通知` 块提取变更 spec（块结构见 updater-archive 消费约定）。**执行完变更后，updater 负责从源文件删除该通知块**（Edit 移除，防重复消费）。
+
+### 载体 2：content 内联 spec（初始设定 / 无源文件可指）
+
+`inputs` 里带 `content:` 字段直接给出 type/action/target/reason（setup 阶段作者对话内容），updater 直接按 spec 执行，无源文件可清理。
 
 ## 三、设定更新流程
 
@@ -93,4 +112,5 @@ reason: 作者/卷纲/章纲要求
 - [ ] 新创建的文件格式正确
 - [ ] 无未解决的冲突（所有冲突已展示给作者）
 - [ ] 有关联更新（如新角色→关系同步）已执行
+- [ ] 载体 1（源文件通知块）：源文件中的 `## 设定变更通知` 块已移除
 - [ ] order 已标记 DONE

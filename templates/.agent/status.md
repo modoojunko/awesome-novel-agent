@@ -8,4 +8,5 @@
 - **current_volume:**
 - **current_chapter:**
 - **last_archived:**
+- **last_quality_gap:**        # 最近一次字数降级记录（由 novel-agent 从 writing-order 同步）
 - **next_task:** 填写基础设定

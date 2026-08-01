@@ -58,6 +58,7 @@ knowledge:
     - 追加时间线事件（按时间序插入、关联角色标记）
     - 直接修改记忆（作者指定的规则直接追加）
     - 删除设定（引用链检查、作者确认）
+    - **消费通知块**：若变更规格来自源文件（卷纲/章纲）的 `## 设定变更通知` 块，执行完变更后用 Edit **移除源文件中的通知块**（防重复消费）
   - **记忆兜底流程**（memory-sweep-order.md → 加载 memory-recording）：
     - 读所有 memory 文件，检查条目格式（必填字段缺失 → 补或删）
     - 条目查重（相同结论+相同场景 → 去重）
@@ -80,7 +81,8 @@ knowledge:
 
 - **Input Sources:**
   - `.agent/task/archive-order.md` → 归档指令（目标卷号、章号、各文件路径）
-  - `.agent/task/setting-update-order.md` → 设定变更指令（操作类型、目标文件、变更内容）
+  - `.agent/task/setting-update-order.md` → 设定变更指令（inputs 指向源文件通知块或 content 内联 spec）
+  - `.agent/task/memory-sweep-order.md` → 记忆兜底指令（inputs 指向 `.claude/memory/`）
   - `.agent/{chapter}-draft-ai.md` → AI 原版快照（归档 diff 基线）
   - `archives/vol-{N}-ch-{M}-{slug}.md` → 定稿正文（diff 基线对比对象；内容 Write 自 `.anti-ai.md` 或 `.draft.md` 的复制）
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（status→archived 标记 + 章纲兑现核对）
@@ -143,7 +145,8 @@ knowledge:
     │          正文 vs AI 快照差异提取什么模式？→ 语义合并到 knowledge
     │
     ├── setting-update-order.md → 加载 skill(updater-setting)，走设定变更
-    │   THINK: order 指定了什么操作？（create/modify/delete）
+    │   THINK: 变更规格在哪？（inputs 指向含 `## 设定变更通知` 块的源文件 → 读块取 spec，
+    │          且执行后移除源文件中的块；inputs 带 content: 内联 spec → 直接按 spec 执行）
     │           目标文件是什么？是否需要一致性检查？是否需要同步关联？
     │
     └── memory-sweep-order.md → 加载 skill(memory-recording)，走记忆兜底
@@ -172,10 +175,10 @@ knowledge:
 - **Allowed Tools:**
   | 工具 | 允许 | 禁止 |
   |------|------|------|
-  | Read | `settings/`、`archives/`、`chapters/`、`.claude/memory/`、`.claude/knowledge/`、`.agent/` | 不读 prompts/ |
+  | Read | `settings/`、`archives/`、`chapters/`、`volumes/`（读卷纲中的 `## 设定变更通知` 块）、`.claude/memory/`、`.claude/knowledge/`、`.agent/` | 不读 prompts/ |
   | Write | `.agent/status.md`、`.agent/archiving/{chapter}.done`、`.agent/{chapter}-draft-ai.md`（创建 AI 原版快照）、`archives/vol-{N}-ch-{M}-{slug}.md`（定稿正文，仅本次 order 章节，Write 生成/覆盖）、`.agent/task/*-order.md`（覆盖 status 为 DONE，不删除） | 不写 `.draft.md`/`.anti-ai.md` 等中间稿、其他章节正文、卷纲、提示词 |
-  | Edit | `settings/`、`chapters/`（仅改 status 字段为 archived）、`.claude/memory/`、`.claude/knowledge/` | 不改章纲正文内容 |
-  | Glob | `settings/`、`archives/`、`chapters/`、`.claude/memory/` | — |
+  | Edit | `settings/`、`chapters/`（仅改 status 字段为 archived、移除 `## 设定变更通知` 块）、`volumes/`（仅移除 `## 设定变更通知` 块）、`.claude/memory/`、`.claude/knowledge/` | 不改章纲/卷纲正文内容 |
+  | Glob | `settings/`、`archives/`、`chapters/`、`volumes/`、`.claude/memory/` | — |
 - **Permission Level:** 读写 settings/, .claude/memory/, .claude/knowledge/, .agent/；archives/ 中间稿（.draft.md/.anti-ai.md）只读，仅可 Write 本次 order 的定稿 .md
 
 ## 六、行为规范与约束

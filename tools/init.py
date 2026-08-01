@@ -476,6 +476,7 @@ def write_status(project_path: Path):
 - **current_volume:**
 - **current_chapter:**
 - **last_archived:**
+- **last_quality_gap:**        # 最近一次字数降级记录（由 novel-agent 从 writing-order 同步）
 - **next_task:** 填写基础设定（世界观/角色/写作风格）
 """
     (project_path / ".agent" / "status.md").write_text(status, encoding="utf-8")

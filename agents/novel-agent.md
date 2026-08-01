@@ -53,6 +53,7 @@ knowledge:
   - 归档时调度 updater 执行 lore-keeping（角色状态、时间线、动态记忆）
   - 归档完成后询问作者是否继续下一章
   - **卷完成判定**：updater 归档 order DONE 后，比对"已归档章节数 vs 卷规划章节数"裁决本卷是否完成（novel-agent 是 `last_volume_completed` 的唯一写者，updater 不写完成位）
+  - **扫描设定变更通知**：每章开始规划前 Grep `volumes/` + `chapters/` 的 `## 设定变更通知` 头，发现即派 setting-update-order 让 updater 消费（执行后移除源文件中的块，防重复）
   - **完本判定**：无下一卷可规划且作者确认后，写 `phase: finished` 并输出完本报告（G14）
   - **评估是否需要推演沙盘**：在以下节点判断作者是否需要推演沙盘辅助，需要则主动建议
 - **Out of Scope:**
@@ -150,6 +151,8 @@ knowledge:
     │             step=chapter-planning → chapter-planner 生成章纲
     ├── draft:   step=prompt-crafting → prompt-crafter 组装提示词
     │             step=writing → writer 写正文
+    │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
+    │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
     ├── anti-ai → step=anti-ai → anti-ai 去 AI 味
     ├── review → step=reviewing → reader 评审
     ├── archive → step=archiving → updater 归档
@@ -157,8 +160,11 @@ knowledge:
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
     │      规划章节数（数字对比裁决，不以作者口述为准）
-    │      ├── 已归档数 < 规划数 → 卷未完成，问作者继续下一章 → step 推进到写作/章纲
+    │      ├── 已归档数 < 规划数 → 卷未完成，**先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    │      │     的 `## 设定变更通知` 头；有 → 写 setting-update-order（inputs 指向源文件）→ 调
+    │      │     updater 消费；无 → 直接问作者继续下一章 → step 推进到写作/章纲）
     │      ├── 已归档数 == 规划数 → 卷完成，写 status.md：last_volume_completed = true
+    │      │     → 触发记忆兜底：写 memory-sweep-order.md → 调 updater（完成后继续）
     │      │     然后 Glob volumes/ 检查是否存在 volume-{N+1}（或可规划）
     │      │     ├── 有下一卷 → 问作者是否规划卷 N+1 → 是 → phase→outline, step→volume-planning
     │      │     └── 无下一卷 → **完本判定**：问作者"所有卷已完成，是否完本？"
