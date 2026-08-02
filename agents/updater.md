@@ -10,6 +10,8 @@ skills:
     description: 归档 lore-keeping skill
   - path: skills/updater-setting.md
     description: 设定变更 skill
+  - path: skills/updater-rollback.md
+    description: 回滚 skill（撤销某章归档时对设定的追加，回到该章编写前）
   - path: skills/memory-recording.md
     description: 写作记忆兜底（格式验证 + 条目查重 + 自动压缩）
 knowledge:

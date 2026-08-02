@@ -21,6 +21,7 @@ novel-agent **只做三件事**：
 | anti-ai | anti-ai | `anti-ai-order.md` |
 | review | reader | `reader-review-order.md` |
 | archive | updater | `archive-order.md` |
+| rewrite（归档后重写某章） | updater | `rollback-order.md`（撤销该章归档追加，status 回 outline，重新规划编写） |
 | finished | 无（终态） | 无——完本退出，不调度 |
 | （卷完成后触发） | updater | `memory-sweep-order.md`（记忆兜底：格式验证/查重/压缩/永久记忆升降级） |
 
