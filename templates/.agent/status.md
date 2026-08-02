@@ -13,8 +13,9 @@
 
 ## 当前章节进度
 
-# 写新章节流程的阶段级断点信号（由 novel-agent 每 dispatch 前更新）。
-# 中断后重启动，novel-agent 用「产出文件存在性」从最近的断点续跑，不整章重来。
-- **章节状态:** setting            # chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving / 全部完成
-- **writing_order_id:**           # writer 执行的 order 唯一 ID，用于检测 writer 是否中断
-- **writing_partial:**            # 中断时 writer 的部分草稿路径（archives/*.draft.partial.md），无则空
+# 写新章节流程的阶段级断点信号。章节状态 = **最近已完成的阶段**（子 agent order DONE 后才推进）。
+# 中断后重启动，novel-agent 读本节判断断点：判断用严格大于 `>`——状态 > 某阶段才算完成可跳步，
+# 等值 = 该阶段未完成需重派。当前正在进行的阶段由 current_step 表达，不入本节。
+# 章节状态初始值 = chapter-planning 之前（新章节开始重置）。
+- **章节状态:** chapter-planning    # volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving / 全部完成
+- **writing_order_id:**           # writer 执行的 order 唯一 ID，作审计参考；partial 位置以 writing-order.md 的 partial_path 为准

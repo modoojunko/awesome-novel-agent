@@ -99,8 +99,8 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | `prompts/` 仅目标 prompt.md, `settings/` 仅 writing-style.md 和 genre-setting.md | 不读卷纲/章纲/archives等目录 |
-  | Write | `archives/*.draft.md`、`.agent/task/writing-order.md`（覆盖 status 为 DONE，不删除） | 不写其他目录 |
-- **Permission Level:** 读写 archives/（仅 draft）+ 标记 writing-order；只读 prompts/（仅当前章）；只读 settings/（仅 writing-style.md 和 genre-setting.md）
+  | Write | `archives/*.draft.md`、`archives/*.draft.partial.md`、`.agent/task/writing-order.md`（覆盖 status 为 DONE + 写 `partial_path:`，不删除） | 不写其他目录 |
+- **Permission Level:** 读写 archives/（draft + partial）+ 标记 writing-order；只读 prompts/（仅当前章）；只读 settings/（仅 writing-style.md 和 genre-setting.md）
 
 ## 六、行为规范与约束
 

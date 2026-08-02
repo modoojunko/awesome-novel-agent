@@ -68,24 +68,26 @@ outputs:
 
 **状态记录是唯一断点源，重启动时直接读 status.md 的 `## 当前章节进度` 段，不做 Glob 全量扫描（省 token）。**
 
-| 阶段 | 章节状态值 | 判断 |
+**`章节状态` = 最近已完成的阶段**（子 agent order DONE 后才推进，dispatch 前不改）。判断用**严格大于 `>`**：状态 > 某阶段 = 已完成可跳过；**等值 = 该阶段未完成，需重派**。
+
+| 阶段 | 已完成信号 | 判断 |
 |------|-----------|------|
-| volume-planning | `章节状态: volume-planning` | 状态 ≥ 该值 → 跳过（已完成） |
-| chapter-planning | `章节状态: chapter-planning` | 同上 |
-| prompt-crafting | `章节状态: prompt-crafting` | 同上 |
-| writing | `章节状态: writing` | 同上 |
-| anti-ai | `章节状态: anti-ai` | 同上 |
-| reviewing | `章节状态: reviewing` | 同上 |
-| archiving | `章节状态: archiving` | 同上 |
+| volume-planning | `章节状态 > volume-planning` | 成立 → 跳过 |
+| chapter-planning | `章节状态 > chapter-planning` | 成立 → 跳过 |
+| prompt-crafting | `章节状态 > prompt-crafting` | 成立 → 跳过 |
+| writing | `章节状态 > writing` | 成立 → 跳过 |
+| anti-ai | `章节状态 > anti-ai` | 成立 → 跳过 |
+| reviewing | `章节状态 > reviewing` | 成立 → 跳过 |
+| archiving | `章节状态 > archiving` 或 `.done` 存在 | 成立 → 跳过 |
 
-**状态更新规则（机械指令）**：每次 dispatch 前，先把 `章节状态` 更新为当前阶段，再写 order，再调子 agent。顺序不可颠倒，防止状态滞后。
+**状态更新规则（机械指令）**：某阶段子 agent order 标 DONE 后，才把 `章节状态` 更新为该阶段（= 已完成）。dispatch 进行中不改（当前阶段由 current_step 表达）。新章节开始重置状态。
 
-**校正兜底（仅状态与实际冲突时）**：若 `章节状态` 与产出文件明显冲突（如状态=writing 但 `.draft.md` 已存在），才 Glob 校验单文件并推进状态——不常态扫描。
+**校正兜底（仅状态与实际明显冲突时）**：状态滞后（如状态=writing 但 `.draft.md` 已存在 → 实际完成）→ Glob 校验单文件并推进状态；状态超前（等值但产出缺失 → 实际未完成）→ 重派该阶段。不常态扫描。
 
-**writer 中断恢复（唯一长输出阶段）**：状态=writing 且 `writing_partial` 字段有值 →
+**writer 中断恢复（唯一长输出阶段）**：读 `writing-order.md` 的 `partial_path:` 字段——有值且 `.draft.md` 不存在 →
 重派 writer，order 带 `resume_from: {partial 路径}`，从 partial 已写到的段落续写，不整章重写。
 
-**归档幂等**：`.agent/archiving/{chapter}.done` 存在 → updater 幂等补缺，不整章重跑。
+**归档幂等**：`.agent/archiving/{chapter}.done` 存在 → 归档已完成，直接推进章节状态=全部完成，不重派。
 
 ## 禁止事项
 

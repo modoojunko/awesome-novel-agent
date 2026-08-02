@@ -139,38 +139,45 @@ knowledge:
     读什么？← 三(Input Sources): status.md（phase + current_step）+ 子agent产出文件
     用什么读？← 五(工具): Read, Glob, Grep
     状态从哪重建？← 九(Context Isolation): 每次从文件系统重建
-    实际文件裁决 ← 读 status.md 的 phase + current_step + **章节状态**（唯一断点源）。
-      中断后重启动，先读 status.md 的 `## 当前章节进度` 段——`章节状态` 字段记录当前章
-      写到的最大阶段，直接判断该从哪继续，**不做 Glob 全量扫描**（省 token）。
-      状态与实际文件的校正兜底：仅当 `章节状态` 与实际产出明显冲突时（如状态=writing 但
-      .draft.md 已存在），才 Glob 校验单文件并推进状态——不常态扫描。
-      writer 中断专项：状态=writing 且 `writing_partial` 字段有值 → writer 中途崩溃，
-      从 partial 续写（见 skills/writing-execution.md 的 partial 机制）
-    状态更新规则 ← **写 order 前必须先更新 status.md 章节状态**（机械指令，防止状态滞后）：
-      dispatch 某阶段 → 先把 `章节状态` 更新为该阶段 → 再写 order → 再调子 agent
+    实际文件裁决 ← 读 status.md 的 phase + current_step + **章节状态**（断点源）。
+      中断后重启动，读 status.md 的 `## 当前章节进度` 段——`章节状态` = **最近已完成的阶段**。
+      判断跳步用**严格大于 `>`**：`章节状态 > 某阶段` 才算已完成可跳步；**等值 = 该阶段
+      尚未完成**（可能是 dispatch 了没做完、或中断），需重派或查断点。
+      **不做 Glob 全量扫描**（省 token）。校正兜底：仅当 `章节状态` 与实际产出明显冲突时
+      （如状态=writing 但 .draft.md 已存在 → 实际完成了但状态滞后），才 Glob 校验单文件
+      并推进状态——不常态扫描。
+      writer 中断专项：读 `writing-order.md` 的 `partial_path:` 字段——有值且 `.draft.md`
+      不存在 → writer 中途崩溃，从 partial 续写（见 skills/writing-execution.md 的 partial 机制）
+    状态更新规则 ← **子 agent DONE 后才推进章节状态**（机械指令，防止状态超前）：
+      某阶段子 agent order 标 DONE → 再把 `章节状态` 更新为该阶段（= 已完成）→ 进下一阶段。
+      注意：dispatch 前**不**改章节状态（dispatch 进行中的状态由 `current_step` 表达）。
 
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── outline: step=volume-planning → **读状态：章节状态 ≥ volume-planning？→ 跳步**；
-    │            无 → 先更新章节状态=volume-planning → volume-planner 规划卷纲 → 完成后推进章节状态
-    │             step=chapter-planning → **读状态：章节状态 ≥ chapter-planning？→ 跳步**；
-    │             无 → 先更新章节状态=chapter-planning → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    ├── **新章节开始**：进入新一章规划前，把 `章节状态` 重置为初始值（`chapter-planning` 之前的状态），防止上一章的"全部完成"跨章误跳
+    ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
+    │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
+    │             step=chapter-planning → **读状态：章节状态 > chapter-planning？→ 已跳过该步**；
+    │             否则 → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
     │              的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
     │              → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
-    │              → 完成后推进章节状态
-    ├── draft:   step=prompt-crafting → **读状态：章节状态 ≥ prompt-crafting？→ 跳步**；
-    │             无 → 先更新章节状态=prompt-crafting → prompt-crafter 组装提示词 → 完成后推进章节状态
-    │             step=writing → **读状态：章节状态 ≥ writing？→ 跳步**；
-    │             无 → 先更新章节状态=writing → writer 写正文；
-    │             若 status.md 的 `writing_partial` 有值 → writer 中断恢复，order 带 resume_from 续写
+    │              → order DONE 后推进章节状态=chapter-planning
+    ├── draft:   step=prompt-crafting → **读状态：章节状态 > prompt-crafting？→ 已跳过该步**；
+    │             否则 → prompt-crafter 组装提示词 → order DONE 后推进章节状态=prompt-crafting
+    │             step=writing → **读状态：章节状态 > writing？→ 已跳过该步**；
+    │             否则 → writer 写正文；**先读 writing-order.md 的 `partial_path:`**——
+    │               有值且 `.draft.md` 不存在 → writer 中断恢复，order 带 resume_from 续写；
+    │               无 → 全新写
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
-    │                  → 推进章节状态
-    ├── anti-ai → step=anti-ai → **读状态：章节状态 ≥ anti-ai？→ 跳步**；无 → 先更新章节状态=anti-ai → anti-ai 去 AI 味 → 推进章节状态
-    ├── review → step=reviewing → **读状态：章节状态 ≥ reviewing？→ 跳步**；无 → 先更新章节状态=reviewing → reader 评审 → 推进章节状态
-    ├── archive → step=archiving → **读状态：章节状态 ≥ archiving？→ 跳步**；无 → 先更新章节状态=archiving → updater 归档 → 章节状态=全部完成
+    │                  → 推进章节状态=writing
+    ├── anti-ai → step=anti-ai → **读状态：章节状态 > anti-ai？→ 已跳过该步**；否则 → anti-ai 去 AI 味 → order DONE 后推进章节状态=anti-ai
+    ├── review → step=reviewing → **读状态：章节状态 > reviewing？→ 已跳过该步**；否则 → reader 评审 → order DONE 后推进章节状态=reviewing
+    ├── archive → step=archiving → **读状态：章节状态 > archiving？→ 已跳过该步**；
+    │            否则 → **先查 .done：`.agent/archiving/vol-{N}-ch-{M}.done` 存在？→ 归档已完成，直接推进章节状态=全部完成**；
+    │             无 .done → updater 归档 → 章节状态=全部完成
     │    ↓ updater order 已 DONE 后——**卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
@@ -250,10 +257,10 @@ knowledge:
   - 子 agent 调用失败 → 重试 1 次
   - 子 agent 产出不完整 → 重新 dispatch
 - **Retry Policy:** 子 agent 任务最多重试 2 次，超过则报错给作者
-  - **归档重派前先看 checkpoint：** 若 `.agent/archiving/{chapter}.done` 存在 → 从断点继续（updater 幂等补缺），不整章重跑
+  - **归档 checkpoint 优先：** archiving 分支先查 `.agent/archiving/{chapter}.done`——存在 → 归档已完成，直接推进章节状态=全部完成；不存在 → 重派 updater（幂等补缺，不整章重跑）
   - **非归档任务：** 若 order 文件不存在（子 agent 意外中断）→ 重新写 order 重派；若 order 仍 `status: pending` → 重试
-  - **writer 中断恢复（唯一长输出阶段）：** 重派前检查 `archives/*.draft.partial.md`——存在 → order 带 `resume_from: {partial 路径}`，writer 从 partial 续写不重头；不存在 → 全新写
-  - **其他阶段断点跳过：** 产出文件已存在（见 THINK 断点信号）→ 视为已完成，不重派不重跑
+  - **writer 中断恢复（唯一长输出阶段）：** 重派前读 `writing-order.md` 的 `partial_path:` 字段——有值且 `.draft.md` 不存在 → order 带 `resume_from: {partial 路径}`，writer 从 partial 续写不重头；无值 → 全新写
+  - **其他阶段断点跳过：** `章节状态 > 该阶段`（见 THINK 严格大于判断）→ 视为已完成，不重派不重跑
   - 连续 3 次失败/降级 → STOP 并进人工，不无限重试（断路器）
 - **Fallback Logic:** 如果某个子 agent 反复无法完成任务，询问作者是否手动介入
 
