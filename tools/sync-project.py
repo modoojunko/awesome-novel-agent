@@ -274,14 +274,28 @@ def sync_knowledge(project_path: Path) -> int:
         print("  [!] knowledge 源目录不存在，跳过")
         return 0
     count = 0
+
+    # 平铺到 .claude/knowledge/ 根的目录（部署约定与 init.py 的 deploy_knowledge 一致）。
+    # format-specs 的文件 agent/skill 都以平铺路径引用（.claude/knowledge/*.md），
+    # 若保留子目录会导致引用断链。
+    FLAT_SUBDIRS = {"format-specs"}
+
+    # knowledge/*.md 平铺
     for f in KNOWLEDGE_DIR.glob("*.md"):
         if _sync_file(f, target / f.name):
             count += 1
     for subdir in KNOWLEDGE_DIR.iterdir():
         if subdir.is_dir() and not subdir.name.startswith("."):
-            sub_target = target / subdir.name
-            sub_target.mkdir(parents=True, exist_ok=True)
-            count += _sync_dir(subdir, sub_target, "*.md")
+            if subdir.name in FLAT_SUBDIRS:
+                # 平铺到 .claude/knowledge/ 根（与 init.py 一致）
+                for f in sorted(subdir.glob("*.md")):
+                    if _sync_file(f, target / f.name):
+                        count += 1
+            else:
+                # 保留子目录结构（plot-craft / scene-craft 等）
+                sub_target = target / subdir.name
+                sub_target.mkdir(parents=True, exist_ok=True)
+                count += _sync_dir(subdir, sub_target, "*.md")
     if count > 0:
         print(f"  [OK] 知识库: {count} 个文件已更新")
     else:
