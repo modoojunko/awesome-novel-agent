@@ -13,12 +13,16 @@ Step 4: 验收自检
 
 ## Step 1: 读取输入源
 
+> 8 类文件（含写作记忆/永久记忆）。
+
 1. **writing-style.md** → 提取四字段（core_principles, possible_mistakes, depiction_techniques）+ genre + model
 2. **volume.md** → 提取前一章的章名、结尾画面、情绪落点
 3. **chapter.md** → 提取 memo, emotional_design, outline（场景分解）, payoff_plan
 4. **角色设定文件** → 读取涉及的角色，提取本章相关状态
 5. **genre-example** → 取对应题材的提示词注入段（输出·写作规范用）
 6. **反 AI 规则文件**（`.claude/knowledge/anti-ai.md`）→ 疲劳词阈值、句式规则、元叙事禁止、题材反 AI 等注入输出·写作规范
+7. **写作记忆**（`.claude/memory/writing-memory.md`）→ 提取本章相关的作者文风/节奏/描写/对话偏好，注入背景信息·作者偏好记忆
+8. **永久记忆**（`.claude/knowledge/permanent-memory.md`）→ 提取高频沉淀的作者规则，与写作记忆合并去重后注入
 **注意：前情上下文只读卷纲中的前章摘要，不读上一章全文。**
 
 **占位符守卫：** 若 `settings/writing-style.md` / `settings/genre-setting.md` 仍含未替换的 `{...}` 占位符（如 `{role}`、`{genre_id}`，即初始化后设定阶段未执行），**禁止把占位符原样注入 prompt**。改为从 `.claude/knowledge/genre-example.md` 提取对应题材的「叙事者角色/文风蓝图/类型禁忌/题材配置」作为默认风格注入，并在完成报告标注 `[设定未填写，已用 genre-example 默认兜底]`，提示 novel-agent 补做设定。
@@ -93,6 +97,21 @@ Step 4: 验收自检
 - 上章结尾画面、情绪残留、读者信息缺口
 
 上章为 ch-1 时：固定填写"无前置章节，开篇直接切入角色当下行动"，禁用大段世界背景介绍。
+
+#### 作者偏好记忆
+
+从 `.claude/memory/writing-memory.md` + `.claude/knowledge/permanent-memory.md` 提取与本章写作相关的条目注入：
+- 只注入**可操作**的作者偏好（文风/节奏/描写/对话），过滤场景不匹配或表述模糊的条目
+- 每条以「原文 → 结论」形式保留，让 writer 知道这是作者的明确要求，不是泛泛建议
+- 写作记忆与永久记忆去重（永久记忆是被高频晋升的，重复条目只保留永久版）
+- 若记忆文件为空或无可匹配条目 → 本子节标注"（无）"，不硬凑
+
+注入示例：
+```
+作者偏好记忆：
+- 「对话太啰嗦了 → 对话要短、要碎，能用半句说完不用整句」适用于本章对话场景
+- 「动作描写不够细 → 关键动作写清过程，不写'他打开门'，写'他拧门把、门轴响了一声'」适用于本章动作场景
+```
 
 #### 角色初始状态
 
