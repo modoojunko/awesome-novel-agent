@@ -9,7 +9,7 @@ skills:
   - path: skills/prompt-crafting.md
     description: 4 层提示词组装 skill（填充规则 + 冲突检测 + 验收自检）
   - path: skills/prompt-audit.md
-    description: Prompt 独立审计 skill（对照 scene-craft 知识库逐项验证 输出·写作规范 的完整性、可溯源性和可执行性）
+    description: Prompt 独立审计 skill（9 维度验证：技法覆盖/溯源/可执行/转化/一致性/去AI/冲突裁定/规则去重/优先级重排，FAIL 打回）
   - path: skills/memory-recording.md
     description: 写作记忆记录 skill（捕获作者反馈 → 追加到 prompt-memory.md）
 knowledge:
@@ -124,7 +124,7 @@ knowledge:
 
   LOAD SKILL:
     加载 skills/prompt-audit.md
-    执行全流程：维度 A(技法覆盖率) → B(知识点溯源) → C(可执行性) → D(四步转化完整性) → E(层间一致性)
+    执行全流程：维度 A(技法覆盖率) → B(知识点溯源) → C(可执行性) → D(四步转化完整性) → E(层间一致性) → F(去AI校验) → G(冲突裁定) → H(规则去重) → I(规则重排)
     （审计仅检查已写入 prompt.md 的内容，不重新读取 scene-craft 源文件）
 
   OBSERVE:
@@ -132,8 +132,9 @@ knowledge:
     工具：五(Read)
 
   THINK:
-    逐项评估五个审计维度
+    逐项评估九个审计维度
     检查 prompt 输出·写作规范 中注入的技法是否完整、是否经过四步转化、是否可执行
+    特别核验：H(规则去重)——同一语义是否只出现一次；I(规则重排)——不可违反规则是否按优先级降序
     约束：核心原则——你不是 prompt-crafter，不维护不解释，只找问题
 
   ACT:
