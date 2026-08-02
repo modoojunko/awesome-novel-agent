@@ -7,6 +7,8 @@
 **输入：** `rollback-order.md`（含 volume N / chapter M）
 **输出：** 回滚完成报告（每类设定删了几条 + 涉及文件清单），order 标 `status: DONE`
 
+**触发方式（#81-7 /undo）：** 作者在归档后交互点直接说「重写第X章」即可——novel-agent 识别后派本 order。无需专门命令，自然语言触发。
+
 ## 核心原则
 
 - **反推删除，不做快照**：归档是"追加"（timeline 加行、foreshadowing 加钩子、角色状态加块），回滚就是"删掉追加的"。每个目标文件都有章节锚点可查。

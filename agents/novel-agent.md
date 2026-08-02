@@ -181,7 +181,8 @@ knowledge:
     │            否则 → **先查 .done：`.agent/archiving/vol-{N}-ch-{M}.done` 存在？→ 归档已完成，直接推进章节状态=全部完成**；
     │             无 .done → updater 归档 → 章节状态=全部完成
     │    ↓ updater order 已 DONE 后——**先问作者是否重写某章**：
-    │      "本章已归档。是否需要重写本卷某章（会回滚该章设定、重新编写）？还是继续下一章？"
+    │      "本章已归档。需要重写本卷某章吗？直接说『重写第X章』就会回滚该章设定、
+    │      重新编写（不用新命令）。或者继续下一章？"
     │      ├── 作者要重写某章（如 ch-K）→ 写 rollback-order.md（含 volume/章号 K）→ 调 updater
     │      │     执行回滚（撤销该章归档追加，status 回 outline）→ order DONE 后：
     │      │     Glob chapters/ 数当前卷 archived 章数（重写目标章已回 outline，计数减少）
