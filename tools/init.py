@@ -59,6 +59,7 @@ def resolve_skill_home() -> Path:
 SKILL_HOME = resolve_skill_home()
 
 SOURCE_AGENTS = SKILL_HOME / "agents"
+SOURCE_SKILLS = SKILL_HOME / "skills"
 SOURCE_KNOWLEDGE = SKILL_HOME / "knowledge"
 SOURCE_TEMPLATES = SKILL_HOME / "templates"
 SOURCE_MEMORY = SKILL_HOME / "memory"  # no-op since anti-ai/writer-style moved to knowledge/
@@ -107,6 +108,9 @@ def main():
 
     # Step 3: 部署 agent 定义
     deploy_agents(project_path)
+
+    # Step 3.5: 部署 Reasonix skills（与 .claude/ 并存，DeepSeek 前缀缓存优化）
+    deploy_reasonix(project_path)
 
     # Step 4: 按题材继承记忆
     deploy_memory(project_path, genre)
@@ -267,6 +271,169 @@ def deploy_agents(project_path: Path):
                 content = _convert_to_opencode(content)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
+
+
+def deploy_reasonix(project_path: Path):
+    """部署 Reasonix skill 到 <project>/.reasonix/skills/（与 .claude/ 并存）。
+
+    Reasonix 是 DeepSeek 前缀缓存优化 agent（#81-8 成本痛点），把多 agent 写作框架
+    以 skill 形式部署进项目，作者可用 `reasonix code <project>` 跑写作流程。
+
+    映射策略：
+    - 7 个执行 agent → runAs: subagent skill（专属 SOP 内联进 body，自包含）
+    - novel-agent → runAs: inline skill（调度者，body 含 novel-dispatch）
+    - 共享 memory-recording → 独立 inline skill（subagent 用 read_skill 加载）
+    - roleplay-sandbox → 作者直调 inline skill
+    """
+    if not SOURCE_AGENTS.is_dir():
+        print("  ⚠️  agents 源目录不存在，跳过 Reasonix 部署")
+        return
+    target = project_path / ".reasonix" / "skills"
+    target.mkdir(parents=True, exist_ok=True)
+
+    # 7 个执行 agent → subagent skill（专属 SOP 内联进 body）
+    exec_agents = {
+        "writer": ["writing-execution"],
+        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
+        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
+        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
+        "anti-ai": ["anti-ai"],
+        "reader": ["reader-review"],
+        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
+    }
+    for agent_name, sops in exec_agents.items():
+        agent_file = SOURCE_AGENTS / f"{agent_name}.md"
+        if not agent_file.exists():
+            continue
+        sop_files = [SOURCE_SKILLS / f"{s}.md" for s in sops]
+        body = _convert_to_reasonix(agent_file.read_text(encoding="utf-8"),
+                                    run_as="subagent", inline_sops=sop_files)
+        skill_dir = target / agent_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    # novel-agent → inline 调度者（body 含 novel-dispatch）
+    novel_file = SOURCE_AGENTS / "novel-agent.md"
+    if novel_file.exists():
+        body = _convert_to_reasonix(novel_file.read_text(encoding="utf-8"),
+                                    run_as="inline",
+                                    inline_sops=[SOURCE_SKILLS / "novel-dispatch.md"])
+        skill_dir = target / "novel-agent"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    # 共享 memory-recording → 独立 inline skill
+    _deploy_inline_skill(target, SOURCE_SKILLS / "memory-recording.md")
+
+    # roleplay-sandbox → 作者直调 inline skill
+    _deploy_inline_skill(target, SOURCE_SKILLS / "roleplay-sandbox.md")
+
+    print(f"  ✅ 已部署 Reasonix skills (.reasonix/skills/)")
+
+
+def _deploy_inline_skill(target: Path, skill_file: Path):
+    """把纯正文 SOP 部署为 Reasonix inline skill。"""
+    if not skill_file.exists():
+        return
+    name = skill_file.stem  # 如 memory-recording
+    body = _convert_inline_skill(skill_file.read_text(encoding="utf-8"), name)
+    skill_dir = target / name
+    skill_dir.mkdir(parents=True, exist_ok=True)
+    (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+
+# Claude Code 工具名 → Reasonix 工具名映射（allowed-tools 白名单用）
+_REASONIX_TOOL_MAP = {
+    "Read": "read_file",
+    "Write": "write_file",
+    "Edit": "edit_file",
+    "Glob": "glob",
+    "Grep": "grep",
+}
+
+
+def _convert_to_reasonix(text: str, run_as: str = "subagent", inline_sops=None) -> str:
+    """Claude Code agent frontmatter → Reasonix skill frontmatter。
+
+    - frontmatter: 保留 name/description，tools→allowed-tools（Claude Code 名映射为
+      Reasonix 名，Agent 丢弃——Reasonix 调度靠 run_skill），role/react/memory/knowledge 丢弃；
+      需要加载共享 SOP 的 agent 补 read_skill
+    - body: agent 身份段 + 内联的专属 SOP 全文（标注来源）
+    - runAs: 写入 frontmatter（subagent=隔离执行 / inline=折叠进回合）
+    """
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    try:
+        import yaml
+        data = yaml.safe_load(parts[1])
+    except Exception:
+        return text
+    if not isinstance(data, dict):
+        return text
+
+    name = str(data.get("name", "unknown")).strip()
+    desc = str(data.get("description", "")).strip().replace('"', "'")
+    tools_raw = str(data.get("tools", "") or "")
+    allowed = []
+    for t in tools_raw.split(","):
+        t = t.strip()
+        if not t or t == "Agent":
+            continue
+        mapped = _REASONIX_TOOL_MAP.get(t, t)  # 已知名映射，未知名原样保留
+        if mapped not in allowed:
+            allowed.append(mapped)
+    # 需要加载共享 SOP（memory-recording）的 agent 补 read_skill
+    if name in ("volume-planner", "chapter-planner", "prompt-crafter", "updater"):
+        if "read_skill" not in allowed:
+            allowed.append("read_skill")
+
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc}\"\n"
+        f"runAs: {run_as}\n"
+        f"allowed-tools: [{', '.join(allowed)}]\n"
+        f"---\n"
+    )
+
+    agent_body = parts[2].strip()
+    # novel-agent 是调度者：Reasonix 里没有 Agent 工具，调度靠 run_skill，
+    # 需要在 body 里显式说明（原 body 里"通过 Agent 工具调用"不适用）
+    if name == "novel-agent":
+        agent_body += (
+            "\n\n## Reasonix 调度适配（本环境无 Agent 工具）\n"
+            "在 Reasonix 环境调度子 agent 用 `run_skill` 工具：\n"
+            "- `run_skill(name=\"<子agent名>\", arguments=\"{order 内容}\")` 调单个子 agent\n"
+            "- 子 agent 名即 .reasonix/skills/ 下的 skill 名（writer / volume-planner / "
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
+            "- 子 agent 是 subagent 类型，run_skill 的 arguments 会作为它唯一的 task 输入\n"
+            "- 并发调度只读子 agent 可用 `parallel_tasks`；order 文件协议（status: DONE）不变\n"
+        )
+    sop_sections = []
+    for sop in (inline_sops or []):
+        if sop and sop.exists():
+            sop_sections.append(
+                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
+            )
+    return fm + "\n" + agent_body + "\n".join(sop_sections)
+
+
+def _convert_inline_skill(text: str, name: str) -> str:
+    """纯正文 SOP → Reasonix inline skill（加 name/description/runAs frontmatter）。"""
+    desc = ""
+    for ln in text.split("\n"):
+        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
+            desc = ln.strip().lstrip("# ").strip()
+            break
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc or name}（由 awesome-novel 自动生成的 inline skill）\"\n"
+        f"runAs: inline\n"
+        f"---\n"
+    )
+    return fm + "\n" + text.strip()
 
 
 def deploy_memory(project_path: Path, genre: str):
