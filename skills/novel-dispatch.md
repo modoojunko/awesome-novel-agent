@@ -66,19 +66,23 @@ outputs:
 
 ## 断点续跑语义
 
-**重启动时，以产出文件存在性为准判断各阶段是否完成，已完成阶段跳过不重派：**
+**状态记录是唯一断点源，重启动时直接读 status.md 的 `## 当前章节进度` 段，不做 Glob 全量扫描（省 token）。**
 
-| 阶段 | 产出文件（存在 = 已完成） |
-|------|--------------------------|
-| volume-planning | `volumes/volume-{N}.md` |
-| chapter-planning | `chapters/vol-{N}-ch-{M}.md` |
-| prompt-crafting | `prompts/vol-{N}-ch-{M}-prompt.md` |
-| writing | `archives/vol-{N}-ch-{M}-*.draft.md` |
-| anti-ai | `archives/vol-{N}-ch-{M}-*.anti-ai.md` |
-| reviewing | `.agent/review/vol-{N}-ch-{M}.md` |
-| archiving | `.agent/archiving/vol-{N}-ch-{M}.done` |
+| 阶段 | 章节状态值 | 判断 |
+|------|-----------|------|
+| volume-planning | `章节状态: volume-planning` | 状态 ≥ 该值 → 跳过（已完成） |
+| chapter-planning | `章节状态: chapter-planning` | 同上 |
+| prompt-crafting | `章节状态: prompt-crafting` | 同上 |
+| writing | `章节状态: writing` | 同上 |
+| anti-ai | `章节状态: anti-ai` | 同上 |
+| reviewing | `章节状态: reviewing` | 同上 |
+| archiving | `章节状态: archiving` | 同上 |
 
-**writer 中断恢复（唯一长输出阶段）**：`.draft.md` 缺失但 `archives/*.draft.partial.md` 存在 →
+**状态更新规则（机械指令）**：每次 dispatch 前，先把 `章节状态` 更新为当前阶段，再写 order，再调子 agent。顺序不可颠倒，防止状态滞后。
+
+**校正兜底（仅状态与实际冲突时）**：若 `章节状态` 与产出文件明显冲突（如状态=writing 但 `.draft.md` 已存在），才 Glob 校验单文件并推进状态——不常态扫描。
+
+**writer 中断恢复（唯一长输出阶段）**：状态=writing 且 `writing_partial` 字段有值 →
 重派 writer，order 带 `resume_from: {partial 路径}`，从 partial 已写到的段落续写，不整章重写。
 
 **归档幂等**：`.agent/archiving/{chapter}.done` 存在 → updater 幂等补缺，不整章重跑。

@@ -139,42 +139,38 @@ knowledge:
     读什么？← 三(Input Sources): status.md（phase + current_step）+ 子agent产出文件
     用什么读？← 五(工具): Read, Glob, Grep
     状态从哪重建？← 九(Context Isolation): 每次从文件系统重建
-    实际文件裁决 ← Glob 枚举 volumes/、chapters/、prompts/、archives/ 实际存在的文件，
-      与 status.md 的 current_step 交叉核对——**以文件系统实际状态为准，不单靠 phase/step 猜**
-      （phase 只有 6 个值，outline/draft 各有两个子 agent，表达不了中间态）
-    断点信号 ← **阶段级产出文件存在性检查**（中断恢复的核心）：对当前章每个阶段，
-      检查其产出文件是否已存在——存在则已完成的阶段跳步，缺失才重新 dispatch。
-      产出文件 → 阶段映射：
-        volumes/volume-{N}.md → volume-planning 完成
-        chapters/vol-{N}-ch-{M}.md → chapter-planning 完成
-        prompts/vol-{N}-ch-{M}-prompt.md → prompt-crafting 完成
-        archives/vol-{N}-ch-{M}-*.draft.md → writing 完成（writer 是唯一长输出，draft 存在即完成）
-        archives/vol-{N}-ch-{M}-*.anti-ai.md → anti-ai 完成
-        .agent/review/vol-{N}-ch-{M}.md → reviewing 完成
-        .agent/archiving/vol-{N}-ch-{M}.done → archiving 完成
-      writer 中断专项：`.draft.md` 缺失但 `archives/*.draft.partial.md` 存在 →
-        writer 中途崩溃，从 partial 续写（见 skills/writing-execution.md 的 partial 机制）
+    实际文件裁决 ← 读 status.md 的 phase + current_step + **章节状态**（唯一断点源）。
+      中断后重启动，先读 status.md 的 `## 当前章节进度` 段——`章节状态` 字段记录当前章
+      写到的最大阶段，直接判断该从哪继续，**不做 Glob 全量扫描**（省 token）。
+      状态与实际文件的校正兜底：仅当 `章节状态` 与实际产出明显冲突时（如状态=writing 但
+      .draft.md 已存在），才 Glob 校验单文件并推进状态——不常态扫描。
+      writer 中断专项：状态=writing 且 `writing_partial` 字段有值 → writer 中途崩溃，
+      从 partial 续写（见 skills/writing-execution.md 的 partial 机制）
+    状态更新规则 ← **写 order 前必须先更新 status.md 章节状态**（机械指令，防止状态滞后）：
+      dispatch 某阶段 → 先把 `章节状态` 更新为该阶段 → 再写 order → 再调子 agent
 
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── outline: step=volume-planning → **断点跳过：volumes/volume-{N}.md 已存在？→ 跳步**；
-    │            无 → volume-planner 规划卷纲
-    │             step=chapter-planning → **断点跳过：chapters/vol-{N}-ch-{M}.md 已存在？→ 跳步**；
-    │             无 → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    ├── outline: step=volume-planning → **读状态：章节状态 ≥ volume-planning？→ 跳步**；
+    │            无 → 先更新章节状态=volume-planning → volume-planner 规划卷纲 → 完成后推进章节状态
+    │             step=chapter-planning → **读状态：章节状态 ≥ chapter-planning？→ 跳步**；
+    │             无 → 先更新章节状态=chapter-planning → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
     │              的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
     │              → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
-    ├── draft:   step=prompt-crafting → **断点跳过：prompts/vol-{N}-ch-{M}-prompt.md 已存在？→ 跳步**；
-    │             无 → prompt-crafter 组装提示词
-    │             step=writing → **断点跳过：archives/vol-{N}-ch-{M}-*.draft.md 已存在？→ 跳步**；
-    │             无但 archives/*.draft.partial.md 存在 → writer 中断恢复，order 带 resume_from 续写；
-    │             两者皆无 → writer 全新写正文
+    │              → 完成后推进章节状态
+    ├── draft:   step=prompt-crafting → **读状态：章节状态 ≥ prompt-crafting？→ 跳步**；
+    │             无 → 先更新章节状态=prompt-crafting → prompt-crafter 组装提示词 → 完成后推进章节状态
+    │             step=writing → **读状态：章节状态 ≥ writing？→ 跳步**；
+    │             无 → 先更新章节状态=writing → writer 写正文；
+    │             若 status.md 的 `writing_partial` 有值 → writer 中断恢复，order 带 resume_from 续写
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
-    ├── anti-ai → step=anti-ai → **断点跳过：archives/vol-{N}-ch-{M}-*.anti-ai.md 已存在？→ 跳步**；无 → anti-ai 去 AI 味
-    ├── review → step=reviewing → **断点跳过：.agent/review/vol-{N}-ch-{M}.md 已存在？→ 跳步**；无 → reader 评审
-    ├── archive → step=archiving → **断点跳过：.agent/archiving/vol-{N}-ch-{M}.done 已存在？→ 跳步**；无 → updater 归档
+    │                  → 推进章节状态
+    ├── anti-ai → step=anti-ai → **读状态：章节状态 ≥ anti-ai？→ 跳步**；无 → 先更新章节状态=anti-ai → anti-ai 去 AI 味 → 推进章节状态
+    ├── review → step=reviewing → **读状态：章节状态 ≥ reviewing？→ 跳步**；无 → 先更新章节状态=reviewing → reader 评审 → 推进章节状态
+    ├── archive → step=archiving → **读状态：章节状态 ≥ archiving？→ 跳步**；无 → 先更新章节状态=archiving → updater 归档 → 章节状态=全部完成
     │    ↓ updater order 已 DONE 后——**卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
@@ -273,7 +269,7 @@ knowledge:
 
 - **Context Isolation:** 每次 OBSERVE 从文件系统重建状态，不依赖上一次运行的上下文缓存
 - **State Persistence:** `.agent/status.md` 是唯一持久状态
-- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive/finished）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）
+- **Shared Context Keys:** `current_volume`、`current_chapter`、`phase`（setup/outline/draft/anti-ai/review/archive/finished）、`current_step`（setting / volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving）、**`章节状态`**（`## 当前章节进度` 段的断点信号，唯一断点源，不 Glob 扫文件）
 
 ## 十、可观测性与调试
 
