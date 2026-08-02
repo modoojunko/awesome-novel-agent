@@ -56,14 +56,20 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 - 结尾停在最后一段 ends_with 指定的画面或状态
 - 正文不含解释、说明、引导语（不写"他感到""他意识到"）
 - 字数不低于提示词任务层目标字数的 80%
-- **每写完一个叙事段落，把该段追加写入 `.draft.partial.md`（覆盖式，保留最新进度）**——这是中断 checkpoint。全部段落写完后再写完整 `.draft.md`
+- **每写完一个叙事段落，立即做两件事（不等全部写完）**：
+  1. 把该段追加写入 `.draft.partial.md`（覆盖式，保留最新进度）
+  2. 在 `writing-order.md` 的 `partial_path:` 字段写入该 partial 路径（覆盖更新）
+  → 这是中断 checkpoint。**即使中途被掐断，order 里也留有最新 partial 指针**，novel-agent 重启后能定位续写。全部段落写完后再写完整 `.draft.md` 并清掉 `partial_path:`
 
 ## 续写（仅 resume_from 存在时）
 若本 order 带 `resume_from: {partial 路径}`：
-1. 先读 partial 文件，数清已写完的段落数（设为 K）
+1. 读 partial 文件（允许，见 Inputs），数清已写完的段落数（设为 K）
 2. 从提示词第 K+1 个叙事段落继续写，**不重写** K 段之前的内容
 3. partial 里已有的内容保留，新写的段落追加其后
 4. 若 partial 为空或读不到 → 按全新写处理并报告
+
+## Inputs（续写时追加）
+- `archives/vol-{N}-ch-{M}-{slug}.draft.partial.md` — resume_from 指向的 partial 文件（仅续写时读，数 K 段用）
 
 ## 禁止（违规即重写）
 - 不自行添加提示词中未出现的角色名、细节、描写
@@ -76,14 +82,13 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 
 sub-agent 执行写完后返回。主 Agent 检查输出文件是否存在。
 
-### Step 3.5: partial 记录（中断恢复的权威信号）
+### Step 3.5: partial 记录校验（中断恢复的权威信号）
 
-sub-agent 返回后（无论完整写完还是中途崩溃），主 Agent 做：
+partial_path 由**写作 sub-agent 每段写完同步写入 order**（见上文写作规则），主 Agent 返回后只做**校验兜底**：
 
-1. **检查 partial 文件**：`archives/vol-{N}-ch-{M}-{slug}.draft.partial.md` 是否存在
-2. **写 order**：若 partial 存在 → 在 `writing-order.md` 追加一行 `partial_path: {partial 文件路径}`（writer 有 order 写权限）；partial 不存在 → 清掉或留空
-   - 这行是 novel-agent 重启动时判断"writer 写到哪"的权威依据
-3. **续写场景**：若本次是 resume_from 续写且写完 → 清掉 `partial_path:`（partial 已完成使命，novel-agent 不会再触发续写）
+1. **校验 order**：读 `writing-order.md` 的 `partial_path:`——sub-agent 若已正常写入则无需改动
+2. **兜底补写**：若 partial 文件存在但 order 里 `partial_path:` 缺失（sub-agent 异常未写）→ 主 Agent 补写该行
+3. **完成清理**：完整 `.draft.md` 写完 → 清掉 `partial_path:`（断点已完成，novel-agent 不再触发续写）
 
 > 为什么 partial_path 记在 order 而不是 status.md：writer 没有 status.md 写权限（最小权限设计），但 order 是 writer 唯一可写的调度文件。novel-agent 重启动读 order 即可知 partial 位置。
 

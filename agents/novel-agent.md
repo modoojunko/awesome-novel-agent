@@ -156,7 +156,7 @@ knowledge:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── **新章节开始**：进入新一章规划前，把 `章节状态` 重置为初始值（`chapter-planning` 之前的状态），防止上一章的"全部完成"跨章误跳
+    ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
     │             step=chapter-planning → **读状态：章节状态 > chapter-planning？→ 已跳过该步**；
@@ -167,8 +167,10 @@ knowledge:
     ├── draft:   step=prompt-crafting → **读状态：章节状态 > prompt-crafting？→ 已跳过该步**；
     │             否则 → prompt-crafter 组装提示词 → order DONE 后推进章节状态=prompt-crafting
     │             step=writing → **读状态：章节状态 > writing？→ 已跳过该步**；
-    │             否则 → writer 写正文；**先读 writing-order.md 的 `partial_path:`**——
-    │               有值且 `.draft.md` 不存在 → writer 中断恢复，order 带 resume_from 续写；
+    │             否则 → **先查 `.draft.md`：`archives/vol-{N}-ch-{M}-*.draft.md` 已存在？→ 写作已完成，
+    │               视作已推进 → 直接进 anti-ai**（不重派，防止覆盖成品稿）
+    │             无 `.draft.md` → writer 写正文；**先读 writing-order.md 的 `partial_path:`**——
+    │               有值 → writer 中断恢复，order 带 resume_from 续写；
     │               无 → 全新写
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
@@ -188,7 +190,7 @@ knowledge:
     │      ├── 已归档数 == 规划数 → 卷完成，写 status.md：last_volume_completed = true
     │      │     → 触发记忆兜底：写 memory-sweep-order.md → 调 updater（完成后继续）
     │      │     然后 Glob volumes/ 检查是否存在 volume-{N+1}（或可规划）
-    │      │     ├── 有下一卷 → 问作者是否规划卷 N+1 → 是 → phase→outline, step→volume-planning
+    │      │     ├── 有下一卷 → 问作者是否规划卷 N+1 → 是 → 重置章节状态为空 → phase→outline, step→volume-planning
     │      │     └── 无下一卷 → **完本判定**：问作者"所有卷已完成，是否完本？"
     │      │            确认 → phase→finished, step→(空) → 输出完本报告（见二 完本）
     │      └── 归档章节数与卷纲不一致但 updater 报告卷完成 → 以实际文件为准，视情况要求 updater 补齐
