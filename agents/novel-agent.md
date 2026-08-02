@@ -142,22 +142,39 @@ knowledge:
     实际文件裁决 ← Glob 枚举 volumes/、chapters/、prompts/、archives/ 实际存在的文件，
       与 status.md 的 current_step 交叉核对——**以文件系统实际状态为准，不单靠 phase/step 猜**
       （phase 只有 6 个值，outline/draft 各有两个子 agent，表达不了中间态）
+    断点信号 ← **阶段级产出文件存在性检查**（中断恢复的核心）：对当前章每个阶段，
+      检查其产出文件是否已存在——存在则已完成的阶段跳步，缺失才重新 dispatch。
+      产出文件 → 阶段映射：
+        volumes/volume-{N}.md → volume-planning 完成
+        chapters/vol-{N}-ch-{M}.md → chapter-planning 完成
+        prompts/vol-{N}-ch-{M}-prompt.md → prompt-crafting 完成
+        archives/vol-{N}-ch-{M}-*.draft.md → writing 完成（writer 是唯一长输出，draft 存在即完成）
+        archives/vol-{N}-ch-{M}-*.anti-ai.md → anti-ai 完成
+        .agent/review/vol-{N}-ch-{M}.md → reviewing 完成
+        .agent/archiving/vol-{N}-ch-{M}.done → archiving 完成
+      writer 中断专项：`.draft.md` 缺失但 `archives/*.draft.partial.md` 存在 →
+        writer 中途崩溃，从 partial 续写（见 skills/writing-execution.md 的 partial 机制）
 
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    ├── outline: step=volume-planning → volume-planner 规划卷纲
-    │             step=chapter-planning → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
-    │               的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
-    │               → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
-    ├── draft:   step=prompt-crafting → prompt-crafter 组装提示词
-    │             step=writing → writer 写正文
+    ├── outline: step=volume-planning → **断点跳过：volumes/volume-{N}.md 已存在？→ 跳步**；
+    │            无 → volume-planner 规划卷纲
+    │             step=chapter-planning → **断点跳过：chapters/vol-{N}-ch-{M}.md 已存在？→ 跳步**；
+    │             无 → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
+    │              的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
+    │              → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
+    ├── draft:   step=prompt-crafting → **断点跳过：prompts/vol-{N}-ch-{M}-prompt.md 已存在？→ 跳步**；
+    │             无 → prompt-crafter 组装提示词
+    │             step=writing → **断点跳过：archives/vol-{N}-ch-{M}-*.draft.md 已存在？→ 跳步**；
+    │             无但 archives/*.draft.partial.md 存在 → writer 中断恢复，order 带 resume_from 续写；
+    │             两者皆无 → writer 全新写正文
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
-    ├── anti-ai → step=anti-ai → anti-ai 去 AI 味
-    ├── review → step=reviewing → reader 评审
-    ├── archive → step=archiving → updater 归档
+    ├── anti-ai → step=anti-ai → **断点跳过：archives/vol-{N}-ch-{M}-*.anti-ai.md 已存在？→ 跳步**；无 → anti-ai 去 AI 味
+    ├── review → step=reviewing → **断点跳过：.agent/review/vol-{N}-ch-{M}.md 已存在？→ 跳步**；无 → reader 评审
+    ├── archive → step=archiving → **断点跳过：.agent/archiving/vol-{N}-ch-{M}.done 已存在？→ 跳步**；无 → updater 归档
     │    ↓ updater order 已 DONE 后——**卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
@@ -239,6 +256,8 @@ knowledge:
 - **Retry Policy:** 子 agent 任务最多重试 2 次，超过则报错给作者
   - **归档重派前先看 checkpoint：** 若 `.agent/archiving/{chapter}.done` 存在 → 从断点继续（updater 幂等补缺），不整章重跑
   - **非归档任务：** 若 order 文件不存在（子 agent 意外中断）→ 重新写 order 重派；若 order 仍 `status: pending` → 重试
+  - **writer 中断恢复（唯一长输出阶段）：** 重派前检查 `archives/*.draft.partial.md`——存在 → order 带 `resume_from: {partial 路径}`，writer 从 partial 续写不重头；不存在 → 全新写
+  - **其他阶段断点跳过：** 产出文件已存在（见 THINK 断点信号）→ 视为已完成，不重派不重跑
   - 连续 3 次失败/降级 → STOP 并进人工，不无限重试（断路器）
 - **Fallback Logic:** 如果某个子 agent 反复无法完成任务，询问作者是否手动介入
 

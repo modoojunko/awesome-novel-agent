@@ -64,6 +64,25 @@ outputs:
 - 对应产出文件存在且非空
 - 如果超过 2 次重试仍失败，问作者是否手动介入
 
+## 断点续跑语义
+
+**重启动时，以产出文件存在性为准判断各阶段是否完成，已完成阶段跳过不重派：**
+
+| 阶段 | 产出文件（存在 = 已完成） |
+|------|--------------------------|
+| volume-planning | `volumes/volume-{N}.md` |
+| chapter-planning | `chapters/vol-{N}-ch-{M}.md` |
+| prompt-crafting | `prompts/vol-{N}-ch-{M}-prompt.md` |
+| writing | `archives/vol-{N}-ch-{M}-*.draft.md` |
+| anti-ai | `archives/vol-{N}-ch-{M}-*.anti-ai.md` |
+| reviewing | `.agent/review/vol-{N}-ch-{M}.md` |
+| archiving | `.agent/archiving/vol-{N}-ch-{M}.done` |
+
+**writer 中断恢复（唯一长输出阶段）**：`.draft.md` 缺失但 `archives/*.draft.partial.md` 存在 →
+重派 writer，order 带 `resume_from: {partial 路径}`，从 partial 已写到的段落续写，不整章重写。
+
+**归档幂等**：`.agent/archiving/{chapter}.done` 存在 → updater 幂等补缺，不整章重跑。
+
 ## 禁止事项
 
 - ❌ 不用 Bash
