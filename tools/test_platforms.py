@@ -16,7 +16,6 @@ import tempfile
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
-REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
 PASS = 0
@@ -114,7 +113,7 @@ def test_init_layout():
         init_project(tmp, "reasonix")
         names = ["novel-agent", "writer", "volume-planner", "chapter-planner",
                  "prompt-crafter", "anti-ai", "reader", "updater",
-                 "memory-recording", "roleplay-sandbox"]
+                 "memory-recording", "roleplay-sandbox"]  # 与 deploy_reasonix_skills 的 10 个 skill 名对应（spec 契约）
         for n in names:
             check(f"reasonix skill {n}", (tmp / ".reasonix/skills" / n / "SKILL.md").exists())
         w = (tmp / ".reasonix/skills/writer/SKILL.md").read_text(encoding="utf-8")
@@ -126,7 +125,7 @@ def test_init_layout():
         tmp = Path(td)
         init_project(tmp, "claude")
         n = len(list((tmp / ".claude/agents").glob("*.md")))
-        check(f"claude agents 数量=8", n == 8, f"实际 {n}")
+        check(f"claude agents 数量=8", n == 8, f"实际 {n}")  # agents/ 源有 8 个 .md（spec 契约）
 
     # opencode agent 引用改写
     with tempfile.TemporaryDirectory() as td:
@@ -144,14 +143,16 @@ def test_sync():
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "claude")
-        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp)], cwd=str(tmp))
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "claude"], cwd=str(tmp))
         check("claude sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         check("claude sync 生成 .claude/skills", (tmp / ".claude/skills").exists())
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "reasonix")
-        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp)], cwd=str(tmp))
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "reasonix"], cwd=str(tmp))
         check("reasonix sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         check("reasonix sync 保持 skill", (tmp / ".reasonix/skills/writer/SKILL.md").exists())
         check("reasonix sync 无 .claude", not (tmp / ".claude").exists())
@@ -160,16 +161,23 @@ def test_sync():
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "reasonix")
-        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp), "--check"], cwd=str(tmp))
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "reasonix", "--check"], cwd=str(tmp))
         check("reasonix --check 无指纹 exit 1", r.returncode == 1, str(r.returncode))
 
 
 def main():
-    test_detect()
-    test_rewrite()
-    test_config()
-    test_init_layout()
-    test_sync()
+    for name, fn in [
+        ("test_detect", test_detect),
+        ("test_rewrite", test_rewrite),
+        ("test_config", test_config),
+        ("test_init_layout", test_init_layout),
+        ("test_sync", test_sync),
+    ]:
+        try:
+            fn()
+        except Exception as e:
+            check(f"{name} 异常", False, repr(e))
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
