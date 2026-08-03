@@ -62,8 +62,15 @@ def main():
         idx = sys.argv.index("--platform")
         if idx + 1 < len(sys.argv):
             platform_override = sys.argv[idx + 1]
+        else:
+            print("错误: --platform 需要一个平台名（claude|opencode|reasonix）")
+            sys.exit(1)
     platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
-    platform = detect_platform(SKILL_HOME, platform_override)
+    try:
+        platform = detect_platform(SKILL_HOME, platform_override)
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
 
     # 处理 Windows 中文路径乱码：从 os.environ 重新取当前目录
     raw_arg = sys.argv[1]
