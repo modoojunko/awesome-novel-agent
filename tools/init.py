@@ -48,45 +48,60 @@ GENRES = [
 SKILL_HOME = resolve_skill_home()
 
 SOURCE_AGENTS = SKILL_HOME / "agents"
-SOURCE_SKILLS = SKILL_HOME / "skills"
 SOURCE_KNOWLEDGE = SKILL_HOME / "knowledge"
 SOURCE_TEMPLATES = SKILL_HOME / "templates"
-SOURCE_MEMORY = SKILL_HOME / "memory"  # no-op since anti-ai/writer-style moved to knowledge/
 SOURCE_ANTI_AI = SKILL_HOME / "knowledge" / "anti-ai"
 SOURCE_GENRE_EXAMPLE = SKILL_HOME / "knowledge" / "genre-example"
 SOURCE_FORMAT_SPECS = SKILL_HOME / "knowledge" / "format-specs"
 
 
 def main():
-    if "-h" in sys.argv or "--help" in sys.argv:
+    args = sys.argv[1:]
+    if "-h" in args or "--help" in args:
         print(__doc__.strip())
         return
 
-    if len(sys.argv) >= 2 and not sys.argv[1].startswith("--"):
-        project_path = Path(sys.argv[1]).resolve()
-    else:
-        project_path = Path.cwd()
-
-    # 平台：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude
+    project_arg = None
     platform_override = None
-    if "--platform" in sys.argv:
-        idx = sys.argv.index("--platform")
-        if idx + 1 < len(sys.argv):
-            platform_override = sys.argv[idx + 1]
+    genre_num = None
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--platform":
+            if i + 1 >= len(args) or args[i + 1].startswith("--"):
+                print("错误: --platform 需要一个平台名（claude|opencode|reasonix）")
+                sys.exit(1)
+            platform_override = args[i + 1]
+            i += 2
+            continue
+        if a == "--genre":
+            if i + 1 < len(args) and not args[i + 1].startswith("--"):
+                genre_num = args[i + 1]
+                i += 2
+                continue
+            print("错误: --genre 需要一个题材编号")
+            sys.exit(1)
+        if not a.startswith("--") and project_arg is None:
+            project_arg = a
+        i += 1
+
+    project_path = Path(project_arg).resolve() if project_arg else Path.cwd()
     platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
-    platform = detect_platform(SKILL_HOME, platform_override)
+    try:
+        platform = detect_platform(SKILL_HOME, platform_override)
+    except ValueError as e:
+        print(e)
+        sys.exit(1)
     print(f"平台: {platform.label}")
 
     # 解析可选参数
     genre = None
-    if "--genre" in sys.argv:
-        idx = sys.argv.index("--genre")
-        if idx + 1 < len(sys.argv):
-            try:
-                genre = GENRES[int(sys.argv[idx + 1]) - 1]
-            except (IndexError, ValueError):
-                print(f"无效题材编号，可选 1-{len(GENRES)}")
-                sys.exit(1)
+    if genre_num is not None:
+        try:
+            genre = GENRES[int(genre_num) - 1]
+        except (IndexError, ValueError):
+            print(f"无效题材编号，可选 1-{len(GENRES)}")
+            sys.exit(1)
 
     if project_path.exists():
         print(f"目录已存在，将在其中创建缺失的文件和目录")
@@ -157,6 +172,15 @@ def select_genre() -> str:
         print("无效选择，请重试")
 
 
+def _rewrite_template_refs(text: str, platform: Platform) -> str:
+    """项目模板里的 Claude Code 路径引用 → 平台路径。claude 原样返回。"""
+    if platform.key == "claude":
+        return text
+    agents_ref = ".reasonix/skills/" if platform.key == "reasonix" else f"{platform.root}/agents/"
+    text = text.replace(".claude/agents/", agents_ref)
+    return rewrite_refs(text, platform)
+
+
 def create_skeleton(project_path: Path, platform: Platform):
     """创建项目目录结构"""
     dirs = [
@@ -182,7 +206,11 @@ def create_skeleton(project_path: Path, platform: Platform):
                     continue
                 target = project_path / rel_path
                 target.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(item, target)
+                if item.name in ("CLAUDE.md", "AGENTS.md"):
+                    content = _rewrite_template_refs(item.read_text(encoding="utf-8"), platform)
+                    target.write_text(content, encoding="utf-8")
+                else:
+                    shutil.copy2(item, target)
         print("  ✅ 已拷贝项目模板")
 
 
@@ -285,7 +313,7 @@ def deploy_memory(project_path: Path, genre: str):
 
 
 def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
-    """按题材拷贝参考材料 + 反 AI/文风规则到 .claude/knowledge/"""
+    """按题材拷贝参考材料 + 反 AI/文风规则到 <平台>/knowledge/"""
     knowledge_dir = platform.knowledge_dir(project_path)
     count = 0
 
@@ -338,12 +366,13 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
     # 永久记忆占位文件（空，后续由 updater 晋升填充）
     permanent_memory = knowledge_dir / "permanent-memory.md"
     if not permanent_memory.exists():
-        permanent_memory.write_text(
+        content = rewrite_refs(
             "# 永久记忆\n\n> 从 .claude/memory/ 晋升的高频条目，"
             "内容格式与 memory 条目一致，由 updater 在兜底 sweep 时维护。\n\n"
             "---\n\n## 条目列表\n",
-            encoding="utf-8",
+            platform,
         )
+        permanent_memory.write_text(content, encoding="utf-8")
         count += 1
 
     # 创作方法论目录（plot-craft / scene-craft / character-craft / title-craft）
@@ -391,7 +420,7 @@ def _md_bullets(sec: str) -> list:
 def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform):
     """按题材预填 settings/genre-setting.md + writing-style.md 的默认值。
 
-    genre-example/{genre}.md 由 deploy_knowledge 已拷贝为 .claude/knowledge/genre-example.md。
+    genre-example/{genre}.md 由 deploy_knowledge 已拷贝为 <平台>/knowledge/genre-example.md。
     此处从其中提取叙事者角色/文风蓝图/类型禁忌/题材配置，替换 settings/ 下的占位符，
     避免 writer/prompt-crafter 在设定阶段未执行时把 `{placeholder}` 原样注入提示词。
     产出标注 [auto-seeded]，设定阶段由 updater 与作者确认调整。
@@ -493,7 +522,7 @@ def write_status(project_path: Path):
 
 
 def write_memory_index(project_path: Path, platform: Platform):
-    """生成 .claude/memory/MEMORY.md 占位索引"""
+    """生成 <平台>/memory/MEMORY.md 占位索引"""
     memory_dir = platform.memory_dir(project_path)
     (memory_dir / "MEMORY.md").write_text("# 写作记忆库\n\n（暂无记忆）\n", encoding="utf-8")
 
