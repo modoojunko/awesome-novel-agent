@@ -62,7 +62,7 @@ def main():
     platform_override = None
     if "--platform" in sys.argv:
         idx = sys.argv.index("--platform")
-        if idx + 1 < len(sys.argv):
+        if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
             platform_override = sys.argv[idx + 1]
         else:
             print("错误: --platform 需要一个平台名（claude|opencode|reasonix）")
