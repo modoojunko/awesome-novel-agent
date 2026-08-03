@@ -37,7 +37,9 @@
 3. 平台检测：`--platform` / `NOVEL_PLATFORM` 显式指定优先，否则按 `SKILL_HOME` 路径关键词识别。
 4. 源文件保持 Claude Code 格式不动，**部署时转换 + 改写引用**（沿用 design doc「部署时转换」原则）。
 
-## 四、`tools/platform.py` — 新共享模块
+## 四、`tools/platforms.py` — 新共享模块
+
+> 注：模块名 `platforms`（复数）避开标准库 `platform` 撞名，防止后续 `import platform` 拿到本模块。
 
 ### 4.1 Platform 配置表
 
