@@ -27,6 +27,13 @@ import os
 import shutil
 from pathlib import Path
 
+from platforms import (
+    Platform,
+    detect_platform,
+    deploy_reasonix_skills,
+    resolve_skill_home,
+)
+
 for s in (sys.stdin, sys.stdout, sys.stderr):
     try:
         s.reconfigure(encoding="utf-8")
@@ -34,16 +41,12 @@ for s in (sys.stdin, sys.stdout, sys.stderr):
         pass
 
 
-SKILL_HOME = Path(__file__).parent.parent
+SKILL_HOME = resolve_skill_home()
 AGENT_DIR = SKILL_HOME / "agents"
 SKILL_DIR = SKILL_HOME / "skills"
 KNOWLEDGE_DIR = SKILL_HOME / "knowledge"
 FINGERPRINT_FILE = Path(".agent") / ".sync-fingerprint"
 VERSION_FILE = Path(".agent") / ".sync-version"
-
-# 根据 SKILL_HOME 路径判断平台
-IS_OPENCODE = "opencode" in str(SKILL_HOME).lower()
-AGENT_TARGET = ".opencode/agents" if IS_OPENCODE else ".claude/agents"
 
 
 def main():
@@ -52,6 +55,15 @@ def main():
         return
 
     check_only = "--check" in sys.argv
+
+    # 平台：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude
+    platform_override = None
+    if "--platform" in sys.argv:
+        idx = sys.argv.index("--platform")
+        if idx + 1 < len(sys.argv):
+            platform_override = sys.argv[idx + 1]
+    platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
+    platform = detect_platform(SKILL_HOME, platform_override)
 
     # 处理 Windows 中文路径乱码：从 os.environ 重新取当前目录
     raw_arg = sys.argv[1]
@@ -70,10 +82,10 @@ def main():
         sys.exit(2)
 
     if check_only:
-        check_freshness(project_path)
+        check_freshness(project_path, platform)
         return
 
-    do_sync(project_path)
+    do_sync(project_path, platform)
 
 
 # ============================================================
@@ -149,7 +161,7 @@ def write_project_fingerprint(project: Path, fingerprint: str, version: str | No
 # 检查
 # ============================================================
 
-def check_freshness(project: Path):
+def check_freshness(project: Path, platform: Platform):
     current = compute_fingerprint()
     stored, stored_ver = read_project_fingerprint(project)
     latest_ver, _ = get_version_info()
@@ -172,32 +184,46 @@ def check_freshness(project: Path):
         print("已是最新。")
         sys.exit(0)
     else:
-        changes = find_changes(project)
-        lines = [f"有更新可用 ({len(changes)} 个文件发生变化):"]
-        for f in changes:
-            lines.append(f"  - {f}")
-        if version_info:
-            lines.append(version_info)
-        print("\n".join(lines))
+        changes = find_changes(project, platform)
+        if not changes and platform.key == "reasonix":
+            print("有更新可用（源文件变化，reasonix skill 由同步时重新生成）。")
+        else:
+            lines = [f"有更新可用 ({len(changes)} 个文件发生变化):"]
+            for f in changes:
+                lines.append(f"  - {f}")
+            if version_info:
+                lines.append(version_info)
+            print("\n".join(lines))
         sys.exit(1)
 
 
-def find_changes(project: Path) -> list[str]:
-    """返回与源不同的文件列表（相对路径）"""
+def find_changes(project: Path, platform: Platform) -> list[str]:
+    """返回与源不同的文件列表（相对路径）。reasonix 的 skills 是派生产物，不枚举。"""
     changed = []
-
-    for name, src_dir in [("agents", AGENT_DIR), ("skills", SKILL_DIR), ("knowledge", KNOWLEDGE_DIR)]:
-        if not src_dir.exists():
+    targets = {
+        "agents": platform.agents_dir(project),
+        "skills": platform.skills_dir(project),
+        "knowledge": platform.knowledge_dir(project),
+    }
+    src_dirs = {
+        "agents": AGENT_DIR,
+        "skills": SKILL_DIR,
+        "knowledge": KNOWLEDGE_DIR,
+    }
+    for name in ("agents", "skills", "knowledge"):
+        dst_base = targets[name]
+        src_dir = src_dirs[name]
+        if dst_base is None or not src_dir.exists():
             continue
-        dst_dir = project / (AGENT_TARGET if name == "agents" else ".claude") / name
+        if platform.key == "reasonix" and name == "skills":
+            continue  # 派生产物靠源指纹检测，同步时重新生成
         for item in sorted(src_dir.rglob("*.md")):
             if item.name == ".gitkeep":
                 continue
             rel = item.relative_to(src_dir)
-            target = dst_dir / rel
+            target = dst_base / rel
             if not target.exists() or target.read_bytes() != item.read_bytes():
                 changed.append(f"{name}/{rel}")
-
     return changed
 
 
@@ -205,7 +231,7 @@ def find_changes(project: Path) -> list[str]:
 # 同步
 # ============================================================
 
-def do_sync(project: Path):
+def do_sync(project: Path, platform: Platform):
     print(f"项目: {project}")
     print(f"来源: {SKILL_HOME}")
 
@@ -224,9 +250,9 @@ def do_sync(project: Path):
         return
 
     changes = []
-    changes.append(sync_agents(project))
-    changes.append(sync_skills(project))
-    changes.append(sync_knowledge(project))
+    changes.append(sync_agents(project, platform))
+    changes.append(sync_skills(project, platform))
+    changes.append(sync_knowledge(project, platform))
 
     total = sum(c for c in changes if c > 0)
 
@@ -238,23 +264,31 @@ def do_sync(project: Path):
         print("提示: 下次写作时生效。")
 
 
-def sync_agents(project_path: Path) -> int:
+def sync_agents(project_path: Path, platform: Platform) -> int:
     """同步 agent 定义到当前平台对应的目录"""
     if not AGENT_DIR.exists():
         print("  [!] agents 源目录不存在，跳过")
         return 0
-    target = project_path / AGENT_TARGET
+    target = platform.agents_dir(project_path)
+    if target is None:
+        print("  [i] reasonix 平台无 agents 目录（agents 即 skills）")
+        return 0
     target.mkdir(parents=True, exist_ok=True)
     count = _sync_dir(AGENT_DIR, target, "*.md")
     if count > 0:
-        print(f"  [OK] agent 定义: {count} 个文件已更新（{AGENT_TARGET}）")
+        print(f"  [OK] agent 定义: {count} 个文件已更新（{platform.root}/agents）")
     else:
-        print(f"  [i] agent 定义: 已是最新")
+        print("  [i] agent 定义: 已是最新")
     return count
 
 
-def sync_skills(project_path: Path) -> int:
-    target = project_path / ".claude" / "skills"
+def sync_skills(project_path: Path, platform: Platform) -> int:
+    if platform.key == "reasonix":
+        deploy_reasonix_skills(project_path, SKILL_HOME, platform)
+        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
+        print(f"  [OK] reasonix skills: {n} 个 SKILL.md 已重新生成")
+        return n
+    target = platform.skills_dir(project_path)
     target.mkdir(parents=True, exist_ok=True)
     if not SKILL_DIR.exists():
         print("  [!] skills 源目录不存在，跳过")
@@ -263,43 +297,38 @@ def sync_skills(project_path: Path) -> int:
     if count > 0:
         print(f"  [OK] skill 文件: {count} 个文件已更新")
     else:
-        print(f"  [i] skill 文件: 已是最新")
+        print("  [i] skill 文件: 已是最新")
     return count
 
 
-def sync_knowledge(project_path: Path) -> int:
-    target = project_path / ".claude" / "knowledge"
+def sync_knowledge(project_path: Path, platform: Platform) -> int:
+    target = platform.knowledge_dir(project_path)
     target.mkdir(parents=True, exist_ok=True)
     if not KNOWLEDGE_DIR.exists():
         print("  [!] knowledge 源目录不存在，跳过")
         return 0
     count = 0
 
-    # 平铺到 .claude/knowledge/ 根的目录（部署约定与 init.py 的 deploy_knowledge 一致）。
-    # format-specs 的文件 agent/skill 都以平铺路径引用（.claude/knowledge/*.md），
-    # 若保留子目录会导致引用断链。
+    # 平铺到平台 knowledge 根的目录（部署约定与 init.py 的 deploy_knowledge 一致）。
     FLAT_SUBDIRS = {"format-specs"}
 
-    # knowledge/*.md 平铺
     for f in KNOWLEDGE_DIR.glob("*.md"):
         if _sync_file(f, target / f.name):
             count += 1
     for subdir in KNOWLEDGE_DIR.iterdir():
         if subdir.is_dir() and not subdir.name.startswith("."):
             if subdir.name in FLAT_SUBDIRS:
-                # 平铺到 .claude/knowledge/ 根（与 init.py 一致）
                 for f in sorted(subdir.glob("*.md")):
                     if _sync_file(f, target / f.name):
                         count += 1
             else:
-                # 保留子目录结构（plot-craft / scene-craft 等）
                 sub_target = target / subdir.name
                 sub_target.mkdir(parents=True, exist_ok=True)
                 count += _sync_dir(subdir, sub_target, "*.md")
     if count > 0:
         print(f"  [OK] 知识库: {count} 个文件已更新")
     else:
-        print(f"  [i] 知识库: 已是最新")
+        print("  [i] 知识库: 已是最新")
     return count
 
 
