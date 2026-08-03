@@ -246,3 +246,71 @@ def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) 
             skill_dir = target / skill_name
             skill_dir.mkdir(parents=True, exist_ok=True)
             (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+
+# ---------------------------------------------------------------
+# OpenCode agent 转换（Claude Code agent frontmatter → OpenCode 语法）
+# ---------------------------------------------------------------
+
+_OPENCODE_TOOL_TO_PERM = {
+    "Read": "read",
+    "Write": "edit",   # OpenCode 的 edit 覆盖 write/edit/apply_patch
+    "Edit": "edit",
+    "Glob": "glob",
+    "Grep": "grep",
+    "Agent": "task",   # Claude Code Agent 工具 ↔ OpenCode task
+}
+# 白名单外，OpenCode 下显式 deny 的权限键（避免默认 ask 弹窗）
+_OPENCODE_DENY_KEYS = ["bash", "webfetch", "websearch", "list", "lsp", "skill"]
+
+
+def convert_to_opencode(text: str) -> str:
+    """Claude Code agent frontmatter → OpenCode 语法（tools: → permission:）。
+
+    关键差异：
+    - Claude Code 用 `tools: Read, Write, ...` 逗号串（白名单，缺省=继承全部）
+    - OpenCode 用 `permission:` map（allow/ask/deny，默认 ask）
+    仅处理 `tools:` 字段 → `permission:`；其余字段（name/description/role 等）原样保留。
+    """
+    if not text.startswith("---"):
+        return text
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    fm = parts[1]
+    if "tools:" not in fm:
+        return text
+    try:
+        import yaml
+        data = yaml.safe_load(fm)
+    except Exception:
+        return text
+
+    tools_line = None
+    new_lines = []
+    for ln in fm.splitlines():
+        if ln.strip().startswith("tools:"):
+            tools_line = ln
+            continue
+        new_lines.append(ln)
+
+    allowed = []
+    if tools_line:
+        val = tools_line.split(":", 1)[1].strip()
+        allowed = [t.strip() for t in val.split(",") if t.strip()]
+
+    perm = {}
+    for key in _OPENCODE_DENY_KEYS:
+        perm[key] = "deny"
+    for tool in allowed:
+        p = _OPENCODE_TOOL_TO_PERM.get(tool)
+        if p:
+            perm[p] = "allow"
+    if not perm:
+        perm = {"*": "deny"}
+
+    perm_text = "permission:\n" + "".join(
+        f"  {k}: {v}\n" for k, v in sorted(perm.items())
+    )
+    new_fm = "\n".join(new_lines).rstrip() + "\n" + perm_text
+    return "---" + new_fm + "---" + parts[2]

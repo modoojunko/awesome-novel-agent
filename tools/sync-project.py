@@ -29,9 +29,11 @@ from pathlib import Path
 
 from platforms import (
     Platform,
+    convert_to_opencode,
     detect_platform,
     deploy_reasonix_skills,
     resolve_skill_home,
+    rewrite_refs,
 )
 
 for s in (sys.stdin, sys.stdout, sys.stderr):
@@ -229,8 +231,14 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
                 continue
             rel = item.relative_to(src_dir)
             target = dst_base / rel
-            if not target.exists() or target.read_bytes() != item.read_bytes():
-                changed.append(f"{name}/{rel}")
+            if name == "agents" and platform.key == "opencode":
+                expected = convert_to_opencode(item.read_text(encoding="utf-8"))
+                expected = rewrite_refs(expected, platform)
+                if not target.exists() or target.read_text(encoding="utf-8") != expected:
+                    changed.append(f"{name}/{rel}")
+            else:
+                if not target.exists() or target.read_bytes() != item.read_bytes():
+                    changed.append(f"{name}/{rel}")
     return changed
 
 
@@ -281,7 +289,23 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
         print("  [i] reasonix 平台无 agents 目录（agents 即 skills）")
         return 0
     target.mkdir(parents=True, exist_ok=True)
-    count = _sync_dir(AGENT_DIR, target, "*.md")
+    if platform.key == "opencode":
+        # opencode agents 是转换产物（permission: 格式 + 引用改写），与 init 保持一致
+        count = 0
+        for item in sorted(AGENT_DIR.rglob("*.md")):
+            if item.name == ".gitkeep":
+                continue
+            rel = item.relative_to(AGENT_DIR)
+            dest = target / rel
+            content = convert_to_opencode(item.read_text(encoding="utf-8"))
+            content = rewrite_refs(content, platform)
+            if dest.exists() and dest.read_text(encoding="utf-8") == content:
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content, encoding="utf-8")
+            count += 1
+    else:
+        count = _sync_dir(AGENT_DIR, target, "*.md")
     if count > 0:
         print(f"  [OK] agent 定义: {count} 个文件已更新（{platform.root}/agents）")
     else:
