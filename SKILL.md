@@ -61,7 +61,7 @@ python tools/init.py [project-path] [--genre <编号>]
 5. 按题材继承格式规范、题材案例到平台 knowledge 目录
 6. 创建空白的写作记忆文件（平台 memory 目录）
 7. 创建永久记忆占位文件（平台 knowledge 目录）
-8. 生成 CLAUDE.md（OpenCode 下生成 AGENTS.md）
+8. 生成 CLAUDE.md（OpenCode / Reasonix 下同时生成 AGENTS.md）
 9. 初始化状态文件 `.agent/status.md`
 
 以上 9 步全部由 `init.py` 自动完成，AI 无需也不应手动干预。
@@ -223,8 +223,10 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 │   ├── agents/          # Agent 定义
 │   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
 │   └── memory/          # 写作动态记忆
-├── .opencode/           # OpenCode 用（平台二，三选一，同 .claude 结构）
-│   └── agents/           # Agent 定义
+├── .opencode/           # OpenCode 用（平台二，三选一）
+│   ├── agents/          # Agent 定义
+│   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
+│   └── memory/          # 写作动态记忆
 └── .reasonix/           # Reasonix 用（平台三，三选一）
     ├── skills/          # 10 个 SKILL.md（agents 即 skills）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
