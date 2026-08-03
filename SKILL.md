@@ -41,7 +41,7 @@ description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成
 - 确认后必须运行 `init.py`，禁止手动创建目录结构替代
 - **禁止在 skill 安装目录（含 `skills/awesome-novel` 路径）内运行 `init.py`** — 此目录是技能仓库，不是小说项目
 - 如果当前目录是 skill 安装目录，应提示作者切换到目标目录后再执行
-- `init.py` 执行完毕后，确认 `.agent/status.md` 和 `.opencode/agents/` 已生成，方可进入 `@novel-agent`
+- `init.py` 执行完毕后，确认 `.agent/status.md` 与平台部署目录已生成（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix → `.reasonix/skills/`），方可进入 `@novel-agent`
 - 如果 `init.py` 报错，必须先修复问题重新执行，不允许绕过
 
 ## 初始化 — 先询问，确认后执行，不可跳过
@@ -56,11 +56,11 @@ python tools/init.py [project-path] [--genre <编号>]
 `init.py` 会：
 1. 选题材
 2. 创建项目骨架（settings/、volumes/、chapters/、prompts/、archives/）
-3. 部署 agent 定义到 `.opencode/agents/`（OpenCode）或 `.claude/agents/`（Claude Code）
-4. 按题材继承反 AI 规则和文风偏好到 `.claude/knowledge/`
-5. 按题材继承格式规范、题材案例到 `.claude/knowledge/`
-6. 创建空白的写作记忆文件（`.claude/memory/*.md`）
-7. 创建永久记忆占位文件（`.claude/knowledge/permanent-memory.md`）
+3. 部署 agent/skill 到当前平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix 不部署 agents，agents 即 `.reasonix/skills/`）
+4. 按题材继承反 AI 规则和文风偏好到平台 knowledge 目录（`.claude/knowledge/` / `.opencode/knowledge/` / `.reasonix/knowledge/`）
+5. 按题材继承格式规范、题材案例到平台 knowledge 目录
+6. 创建空白的写作记忆文件（平台 memory 目录）
+7. 创建永久记忆占位文件（平台 knowledge 目录）
 8. 生成 CLAUDE.md（OpenCode 下生成 AGENTS.md）
 9. 初始化状态文件 `.agent/status.md`
 
@@ -133,7 +133,7 @@ python tools/init.py [project-path] [--genre <编号>]
 | P3 | `old/chapters/*.yaml`（archived）→ `chapters/vol-{N}-ch-{M}.md` | `templates/migration/chapter.md.template` |
 | P4 | `old/settings/world-setting.yaml` → `settings/world-setting.md` | `templates/migration/world-setting.md.template` |
 | P5 | `old/settings/writing-style.yaml` → `settings/writing-style.md` | `templates/migration/writing-style.md.template` |
-| P6 | `old/settings/anti-ai.yaml` → `.claude/knowledge/anti-ai.md` | `templates/migration/anti-ai.md.template`（所有 agent 读 knowledge 路径，不读 settings/anti-ai.md） |
+| P6 | `old/settings/anti-ai.yaml` → 平台 knowledge/anti-ai.md（`.claude/` / `.opencode/` / `.reasonix/`） | `templates/migration/anti-ai.md.template`（所有 agent 读 knowledge 路径，不读 settings/anti-ai.md） |
 | P7 | `old/settings/hooks.yaml` → `settings/foreshadowing.md` | `templates/migration/foreshadowing.md.template`（也可沿用 init 生成的空台账） |
 | P8 | 无旧源 → `settings/genre-setting.md` | `templates/migration/genre-setting.md.template` |
 
@@ -161,7 +161,7 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 - [ ] settings/world-setting.md 存在且已填充
 - [ ] settings/writing-style.md 存在且已填充
 - [ ] settings/genre-setting.md 存在
-- [ ] `.claude/knowledge/anti-ai.md` 存在（迁移自旧 anti-ai.yaml）
+- [ ] 平台 knowledge/anti-ai.md 存在（迁移自旧 anti-ai.yaml）
 - [ ] settings/foreshadowing.md 存在（迁移自旧 hooks.yaml，或沿用 init 生成的空台账）
 - [ ] settings/character-setting/ 角色数与旧版一致
 - [ ] volumes/ 卷数与旧版一致
@@ -219,13 +219,18 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 ├── .agent/
 │   ├── status.md         # 进度追踪
 │   └── task/             # agent 间 order 文件
-├── .opencode/
-│   └── agents/           # Agent 定义（OpenCode 用）
-└── .claude/
-    ├── agents/           # Agent 定义（Claude Code 用）
-    ├── knowledge/        # 反 AI 规则、文风偏好、永久记忆、格式规范
-    └── memory/           # 写作动态记忆
+├── .claude/             # Claude Code 用（平台一，三选一）
+│   ├── agents/          # Agent 定义
+│   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
+│   └── memory/          # 写作动态记忆
+├── .opencode/           # OpenCode 用（平台二，三选一，同 .claude 结构）
+│   └── agents/           # Agent 定义
+└── .reasonix/           # Reasonix 用（平台三，三选一）
+    ├── skills/          # 10 个 SKILL.md（agents 即 skills）
+    ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
+    └── memory/          # 写作动态记忆
 ```
+> 实际项目只生成三选一的一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` 不会同时存在。
 
 ## Agent 协作架构
 
@@ -241,7 +246,7 @@ novel-agent（总指挥）
   └─ 归档完成 → 卷完成判定 → 下一章 / 卷 N+1 / 完本
 ```
 
-各 agent 定义在 `.opencode/agents/`（OpenCode）或 `.claude/agents/`（Claude Code），skill SOP 在 `skills/`。agent 间通过 `.agent/task/*-order.md` 文件通信。
+各 agent 定义在平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix → `.reasonix/skills/`），skill SOP 在 `skills/`。agent 间通过 `.agent/task/*-order.md` 文件通信。
 
 **可选工具：** 剧情推演沙盘（`skills/roleplay-sandbox.md`）是独立的交互式工具，不在 agent 调度链中。作者卡剧情时主动调用，产出推演记录（`sandbox/`）供编写章纲时参考。
 
@@ -257,6 +262,6 @@ novel-agent（总指挥）
 | **Read** | 检测项目文件、读取设定/状态 | 所有 agent |
 | **Write** | 写 order 文件（novel-agent）；写设定/记忆/知识（子 agent） | 各 agent 按权限 |
 | **Agent** | novel-agent 调用子 agent | novel-agent 专用 |
-| **Edit** | 写 settings/、.claude/ 下的内容文件 | 子 agent（非 novel-agent） |
+| **Edit** | 写 settings/、平台目录下的内容文件 | 子 agent（非 novel-agent） |
 | **Glob** | 扫描文件 | 所有 agent |
 | **Grep** | 搜索内容 | 所有 agent |
