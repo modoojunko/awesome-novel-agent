@@ -6,6 +6,8 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
   - claude   → .claude/   agents=agents, knowledge, memory
   - opencode → .opencode/ agents=agents, knowledge, memory
   - reasonix → .reasonix/ agents=None（agents 即 skills）, skills=skills, knowledge, memory
+
+模块名用 platforms（复数）是刻意避开标准库 platform（单数）同名冲突。
 """
 
 from __future__ import annotations
@@ -64,10 +66,9 @@ def detect_platform(skill_home: Path, override: str | None = None) -> Platform:
     if override:
         return platform_from_key(override)
     p = str(skill_home).lower()
-    if "reasonix" in p:
-        return PLATFORMS["reasonix"]
-    if "opencode" in p:
-        return PLATFORMS["opencode"]
+    for plat in PLATFORMS.values():
+        if any(kw in p for kw in plat.detect_keywords):
+            return plat
     return PLATFORMS["claude"]
 
 
@@ -114,8 +115,9 @@ _REASONIX_TOOL_MAP = {
 def _convert_to_reasonix(text: str, run_as: str = "subagent", inline_sops=None) -> str:
     """Claude Code agent frontmatter → Reasonix skill frontmatter。
 
-    - frontmatter: 保留 name/description，tools→allowed-tools（Agent 丢弃），
-      需要加载共享 SOP 的 agent 补 read_skill
+    - frontmatter: 保留 name/description，tools→allowed-tools（Agent 丢弃，
+      role/react/memory/knowledge 丢弃），需要加载共享 SOP 的 agent 补 read_skill
+    - tools 映射: 已知名经 _REASONIX_TOOL_MAP 映射为 Reasonix 名，未知名原样保留
     - body: agent 身份段 + 内联的专属 SOP 全文
     - runAs: subagent（执行 agent）/ inline（调度者）
     """
@@ -196,6 +198,8 @@ def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) 
 
     仅 reasonix 平台调用（agents=None）。产物引用 platform.root/knowledge、memory。
     """
+    if platform.key != "reasonix":
+        return
     agents_dir = skill_home / "agents"
     skills_dir = skill_home / "skills"
     target = platform.skills_dir(project)
