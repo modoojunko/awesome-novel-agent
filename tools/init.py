@@ -174,11 +174,14 @@ def select_genre() -> str:
 
 
 def _rewrite_template_refs(text: str, platform: Platform) -> str:
-    """项目模板里的 Claude Code 路径引用 → 平台路径。claude 原样返回。"""
+    """项目模板里的 Claude Code/OpenCode 路径引用 → 平台路径。claude 原样返回。"""
     if platform.key == "claude":
         return text
-    agents_ref = ".reasonix/skills/" if platform.key == "reasonix" else f"{platform.root}/agents/"
-    text = text.replace(".claude/agents/", agents_ref)
+    if platform.key == "reasonix":
+        text = text.replace(".claude/agents/", ".reasonix/skills/")
+        text = text.replace(".opencode/agents/", ".reasonix/skills/")
+    else:  # opencode
+        text = text.replace(".claude/agents/", f"{platform.root}/agents/")
     return rewrite_refs(text, platform)
 
 
@@ -207,9 +210,12 @@ def create_skeleton(project_path: Path, platform: Platform):
                     continue
                 target = project_path / rel_path
                 target.parent.mkdir(parents=True, exist_ok=True)
-                if item.name in ("CLAUDE.md", "AGENTS.md"):
-                    content = _rewrite_template_refs(item.read_text(encoding="utf-8"), platform)
-                    target.write_text(content, encoding="utf-8")
+                if item.name in ("CLAUDE.md", "AGENTS.md") and platform.key != "claude":
+                    with open(item, encoding="utf-8", newline="") as f:
+                        content = f.read()
+                    content = _rewrite_template_refs(content, platform)
+                    with open(target, "w", encoding="utf-8", newline="") as f:
+                        f.write(content)
                 else:
                     shutil.copy2(item, target)
         print("  ✅ 已拷贝项目模板")
