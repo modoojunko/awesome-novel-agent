@@ -106,7 +106,7 @@ def rewrite_refs(text: str, platform: Platform) -> str:
 从 init.py 迁入（单一事实来源，sync-project 复用）：
 - `resolve_skill_home()`（`__file__` 推导 + `NOVEL_SKILL_HOME` 兜底）
 - `_convert_to_reasonix()`、`_convert_inline_skill()`、`_REASONIX_TOOL_MAP`
-- `deploy_reasonix_skills(project, skill_home)` → 生成 `.reasonix/skills/<name>/SKILL.md`（10 个），改写 `.claude/knowledge|memory` 引用
+- `deploy_reasonix_skills(project, skill_home, platform)` → 生成 `.reasonix/skills/<name>/SKILL.md`（10 个），改写 `.claude/knowledge|memory` 引用
 
 签名统一收 SKILL_HOME 作参数，不依赖模块全局状态。
 
