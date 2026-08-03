@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""平台适配层：不同 coding agent 对 agent/skill/knowledge/memory 的目录约定不同，
+init.py / sync-project.py 共用本模块完成平台检测、目录派发、引用改写与 Reasonix skill 生成。
+
+支持平台（扩展新平台 = 往 PLATFORMS 加一行 + 处理 agents=None 语义）：
+  - claude   → .claude/   agents=agents, knowledge, memory
+  - opencode → .opencode/ agents=agents, knowledge, memory
+  - reasonix → .reasonix/ agents=None（agents 即 skills）, skills=skills, knowledge, memory
+"""
+
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Platform:
+    key: str                 # "claude" | "opencode" | "reasonix"
+    label: str               # 显示名
+    root: str                # 平台根目录，如 ".reasonix"
+    agents: str | None       # agents 子目录；reasonix 为 None（agents 即 skills）
+    skills: str | None       # skills 子目录
+    knowledge: str           # knowledge 子目录
+    memory: str              # memory 子目录
+    detect_keywords: tuple   # SKILL_HOME 路径识别关键词
+
+    def agents_dir(self, project: Path) -> Path | None:
+        if self.agents is None:
+            return None
+        return project / self.root / self.agents
+
+    def skills_dir(self, project: Path) -> Path | None:
+        if self.skills is None:
+            return None
+        return project / self.root / self.skills
+
+    def knowledge_dir(self, project: Path) -> Path:
+        return project / self.root / self.knowledge
+
+    def memory_dir(self, project: Path) -> Path:
+        return project / self.root / self.memory
+
+
+PLATFORMS = {
+    "claude":   Platform("claude", "Claude Code", ".claude",   agents="agents",
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=()),
+    "opencode": Platform("opencode", "OpenCode", ".opencode", agents="agents",
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("opencode",)),
+    "reasonix": Platform("reasonix", "Reasonix", ".reasonix", agents=None,
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("reasonix",)),
+}
+
+
+def platform_from_key(key: str) -> Platform:
+    if key not in PLATFORMS:
+        raise ValueError(f"未知平台: {key}，可选: {', '.join(PLATFORMS)}")
+    return PLATFORMS[key]
+
+
+def detect_platform(skill_home: Path, override: str | None = None) -> Platform:
+    """平台检测：显式指定 > SKILL_HOME 路径关键词 > 默认 claude。"""
+    if override:
+        return platform_from_key(override)
+    p = str(skill_home).lower()
+    if "reasonix" in p:
+        return PLATFORMS["reasonix"]
+    if "opencode" in p:
+        return PLATFORMS["opencode"]
+    return PLATFORMS["claude"]
+
+
+def rewrite_refs(text: str, platform: Platform) -> str:
+    """部署内容里的 Claude Code 路径引用 → 平台路径。仅改 knowledge/memory，claude 原样返回。"""
+    if platform.key == "claude":
+        return text
+    text = text.replace(".claude/knowledge/", f"{platform.root}/knowledge/")
+    text = text.replace(".claude/memory/", f"{platform.root}/memory/")
+    return text
+
+
+def resolve_skill_home() -> Path:
+    """技能仓库根目录。脚本永远位于技能根 tools/ 下。
+
+    __file__ 推导即正确来源（仓库 / 安装版 / reasonix 项目级安装）；
+    NOVEL_SKILL_HOME 仅作异常兜底（__file__ 解析异常时），不能优先——
+    install.sh 会把它持久化到 profile，可能指向陈旧安装副本。
+    """
+    by_file = Path(__file__).resolve().parent.parent
+    if (by_file / "agents").is_dir() and (by_file / "tools").is_dir():
+        return by_file
+    env_home = os.environ.get("NOVEL_SKILL_HOME")
+    if env_home:
+        cand = Path(env_home)
+        if (cand / "agents").is_dir() and (cand / "tools").is_dir():
+            return cand
+    return by_file
+
+
+# ---------------------------------------------------------------
+# Reasonix skill 生成（agents + skills 源 → .reasonix/skills/<name>/SKILL.md）
+# ---------------------------------------------------------------
+
+_REASONIX_TOOL_MAP = {
+    "Read": "read_file",
+    "Write": "write_file",
+    "Edit": "edit_file",
+    "Glob": "glob",
+    "Grep": "grep",
+}
+
+
+def _convert_to_reasonix(text: str, run_as: str = "subagent", inline_sops=None) -> str:
+    """Claude Code agent frontmatter → Reasonix skill frontmatter。
+
+    - frontmatter: 保留 name/description，tools→allowed-tools（Agent 丢弃），
+      需要加载共享 SOP 的 agent 补 read_skill
+    - body: agent 身份段 + 内联的专属 SOP 全文
+    - runAs: subagent（执行 agent）/ inline（调度者）
+    """
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    try:
+        import yaml
+        data = yaml.safe_load(parts[1])
+    except Exception:
+        return text
+    if not isinstance(data, dict):
+        return text
+
+    name = str(data.get("name", "unknown")).strip()
+    desc = str(data.get("description", "")).strip().replace('"', "'")
+    tools_raw = str(data.get("tools", "") or "")
+    allowed = []
+    for t in tools_raw.split(","):
+        t = t.strip()
+        if not t or t == "Agent":
+            continue
+        mapped = _REASONIX_TOOL_MAP.get(t, t)
+        if mapped not in allowed:
+            allowed.append(mapped)
+    if name in ("volume-planner", "chapter-planner", "prompt-crafter", "updater"):
+        if "read_skill" not in allowed:
+            allowed.append("read_skill")
+
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc}\"\n"
+        f"runAs: {run_as}\n"
+        f"allowed-tools: [{', '.join(allowed)}]\n"
+        f"---\n"
+    )
+
+    agent_body = parts[2].strip()
+    if name == "novel-agent":
+        agent_body += (
+            "\n\n## Reasonix 调度适配（本环境无 Agent 工具）\n"
+            "在 Reasonix 环境调度子 agent 用 `run_skill` 工具：\n"
+            "- `run_skill(name=\"<子agent名>\", arguments=\"{order 内容}\")` 调单个子 agent\n"
+            "- 子 agent 名即 .reasonix/skills/ 下的 skill 名（writer / volume-planner / "
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
+            "- 子 agent 是 subagent 类型，run_skill 的 arguments 会作为它唯一的 task 输入\n"
+            "- 并发调度只读子 agent 可用 `parallel_tasks`；order 文件协议（status: DONE）不变\n"
+        )
+    sop_sections = []
+    for sop in (inline_sops or []):
+        if sop and sop.exists():
+            sop_sections.append(
+                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
+            )
+    return fm + "\n" + agent_body + "\n".join(sop_sections)
+
+
+def _convert_inline_skill(text: str, name: str) -> str:
+    """纯正文 SOP → Reasonix inline skill。"""
+    desc = ""
+    for ln in text.split("\n"):
+        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
+            desc = ln.strip().lstrip("# ").strip()
+            break
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc or name}（由 awesome-novel 自动生成的 inline skill）\"\n"
+        f"runAs: inline\n"
+        f"---\n"
+    )
+    return fm + "\n" + text.strip()
+
+
+def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) -> None:
+    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（10 个），引用改写为平台路径。
+
+    仅 reasonix 平台调用（agents=None）。产物引用 platform.root/knowledge、memory。
+    """
+    agents_dir = skill_home / "agents"
+    skills_dir = skill_home / "skills"
+    target = platform.skills_dir(project)
+    if target is None:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+
+    exec_agents = {
+        "writer": ["writing-execution"],
+        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
+        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
+        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
+        "anti-ai": ["anti-ai"],
+        "reader": ["reader-review"],
+        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
+    }
+    for agent_name, sops in exec_agents.items():
+        agent_file = agents_dir / f"{agent_name}.md"
+        if not agent_file.exists():
+            continue
+        sop_files = [skills_dir / f"{s}.md" for s in sops]
+        body = _convert_to_reasonix(agent_file.read_text(encoding="utf-8"),
+                                    run_as="subagent", inline_sops=sop_files)
+        body = rewrite_refs(body, platform)
+        skill_dir = target / agent_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    novel_file = agents_dir / "novel-agent.md"
+    if novel_file.exists():
+        body = _convert_to_reasonix(novel_file.read_text(encoding="utf-8"),
+                                    run_as="inline",
+                                    inline_sops=[skills_dir / "novel-dispatch.md"])
+        body = rewrite_refs(body, platform)
+        skill_dir = target / "novel-agent"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    for skill_name in ("memory-recording", "roleplay-sandbox"):
+        sf = skills_dir / f"{skill_name}.md"
+        if sf.exists():
+            body = _convert_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
+            body = rewrite_refs(body, platform)
+            skill_dir = target / skill_name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
