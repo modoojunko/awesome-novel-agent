@@ -120,6 +120,17 @@ def test_init_layout():
         check("reasonix writer 引用改写",
               ".reasonix/knowledge/" in w and ".claude/knowledge/" not in w)
 
+    # reasonix AGENTS.md 模板改写
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "reasonix")
+        ag = (tmp / "AGENTS.md").read_text(encoding="utf-8")
+        check("reasonix AGENTS.md 无 .opencode/agents",
+              ".opencode/" not in ag and ".reasonix/skills/" in ag, ag[:200])
+        cl = (tmp / "CLAUDE.md").read_text(encoding="utf-8")
+        check("reasonix CLAUDE.md 无 .claude/agents",
+              ".claude/agents" not in cl and ".reasonix/skills/" in cl, cl[:200])
+
     # claude agents 数量
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
@@ -147,6 +158,16 @@ def test_sync():
                  "--platform", "claude"], cwd=str(tmp))
         check("claude sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         check("claude sync 生成 .claude/skills", (tmp / ".claude/skills").exists())
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "opencode")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "opencode"], cwd=str(tmp))
+        check("opencode sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        w = (tmp / ".opencode/agents/writer.md").read_text(encoding="utf-8")
+        check("opencode sync 保持 permission 格式",
+              "permission:" in w and "tools:" not in w and ".opencode/knowledge/" in w)
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
