@@ -1,10 +1,12 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>Write Novels with Claude Code</em>
+  <em>Write Novels with Claude Code / OpenCode / Reasonix</em>
 </p>
 
 <p align="center">
   <a href="https://docs.anthropic.com/en/docs/claude-code/overview"><img src="https://img.shields.io/badge/Claude%20Code-%E2%9C%93%20%E6%94%AF%E6%8C%81-6B46C1?style=flat-square" alt="Claude Code"></a>
+  <a href="https://github.com/sglaboratory/opencode"><img src="https://img.shields.io/badge/OpenCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-4A90D9?style=flat-square" alt="OpenCode"></a>
+  <img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix">
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
 </p>
@@ -44,15 +46,31 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## What You Need
 
-- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) installed
+- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), or Reasonix installed
 - About 1 minute to install
 
 ## Installation
 
-Copy the command and paste it in your terminal:
+Pick the command matching your tool and paste it in your terminal:
 
+**Claude Code:**
 ```bash
 git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh claude-code
+```
+
+**OpenCode:**
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode
+```
+
+**Reasonix:**
+
+Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not globally. Clone the repo and initialize your novel project with init.py:
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+python tools/init.py <novel-project-path> --platform reasonix
+cd <novel-project-path> && reasonix code
 ```
 
 Manual installation:

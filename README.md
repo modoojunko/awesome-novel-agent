@@ -1,20 +1,30 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode</em>
+  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix</em>
 </p>
 
 <p align="center">
   <a href="README-en.md"><img src="https://img.shields.io/badge/English-README-blue?style=flat-square" alt="English README"></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code/overview"><img src="https://img.shields.io/badge/Claude%20Code-%E2%9C%93%20%E6%94%AF%E6%8C%81-6B46C1?style=flat-square" alt="Claude Code"></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-4A90D9?style=flat-square" alt="OpenCode"></a>
+  <a href="#reasonix-集成"><img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
+  <br>
+  <a href="#加入交流群"><img src="https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-1006050538-12B7F5?style=flat-square" alt="QQ交流群 1006050538"></a>
 </p>
 
 > **个人使用免费** — 本 Skill 对个人用户完全免费。<br>
 > **商业使用** — 请联系作者获取授权。
 
 让 AI 成为你的小说创作搭档,从世界观搭建到角色塑造，从章节规划到正文写作，一步步陪你完成整部小说。
+
+## 加入交流群
+
+遇到问题、交流写作心得、催更或提建议，欢迎进群，作者常在。
+
+> **QQ 交流群 2群：`1006050538`**
+> 进群后可直接提问，或和大伙儿分享你写的小说。
 
 <!-- 开篇示例：修仙小说节选 + 配图 -->
 <div align="center">
@@ -57,7 +67,7 @@
 
 ## 你需要什么
 
-- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview) 或 [OpenCode](https://github.com/sglaboratory/opencode) 的电脑
+- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode) 或 **Reasonix** 的电脑
 - 大概 1 分钟完成安装
 
 
@@ -72,6 +82,18 @@ git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-no
 ```bash
 git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode
 ```
+
+**Reasonix：**
+
+Reasonix 的 skill 是**项目级部署**（装在每个小说项目的 `.reasonix/skills/`），不走 install.sh。克隆仓库后直接用 init.py 初始化小说项目：
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+python tools/init.py <小说项目路径> --platform reasonix
+cd <小说项目路径> && reasonix code
+```
+
+> 用 `--genre <编号>` 指定预置题材，不传则交互式选题材。装好后在项目目录里输入 `@novel-agent` 开始写作。
 
 或者手动复制（以 Claude Code 为例）：
 ```bash
@@ -97,7 +119,7 @@ echo "安装完成!"
 
 ## 开始写小说
 
-安装后，打开终端，在**你想放小说项目的目录**下启动 Claude Code 或 OpenCode，然后说一句：
+安装后，打开终端，在**你想放小说项目的目录**下启动 Claude Code、OpenCode 或 Reasonix，然后说一句：
 
 > **帮我写本小说**
 
@@ -149,19 +171,25 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── .agent/               # Agent 进度 + 任务通信
 │   ├── status.md         # 进度标记（phase/volume/chapter）
 │   └── task/             # 子 agent 间 order 文件
-├── .opencode/            # Agent 定义（OpenCode 用）
-│   └── agents/           # 8 个 Agent 定义（初始化时部署）
-└── .claude/              # Agent 定义（Claude Code 用）+ 知识库 + 写作记忆
-    ├── agents/           # 8 个 Agent 定义（初始化时部署）
+├── .opencode/            # OpenCode 用（三选一，由 init.py --platform 决定）
+│   ├── agents/           # 8 个 Agent 定义（初始化时部署）
+│   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
+│   └── memory/           # 写作动态记忆
+├── .claude/              # Claude Code 用（三选一）
+│   ├── agents/           # 8 个 Agent 定义（初始化时部署）
+│   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
+│   └── memory/           # 写作动态记忆（各环节作者反馈）
+│       ├── volume-memory.md
+│       ├── chapter-memory.md
+│       ├── prompt-memory.md
+│       └── writing-memory.md
+└── .reasonix/            # Reasonix 用（三选一）
+    ├── skills/           # 10 个 SKILL.md（agents 即 skills）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
-    └── memory/           # 写作动态记忆（各环节作者反馈）
-        ├── volume-memory.md
-        ├── chapter-memory.md
-        ├── prompt-memory.md
-        └── writing-memory.md
+    └── memory/           # 写作动态记忆
 ```
 
-这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。
+这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` 不会同时存在。
 
 ### 规划故事骨架
 
@@ -234,7 +262,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。上面那几行命令复制粘贴到终端，回车就行。唯一的前提是你的电脑上已经装好了 Claude Code 或 OpenCode。
+能。上面那几行命令复制粘贴到终端，回车就行。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode 或 Reasonix。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
@@ -373,7 +401,7 @@ python ~/.config/opencode/skills/awesome-novel/tools/init.py . --genre <编号>
 
 ### 项目结构差异
 
-OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义部署在 `.opencode/agents/` 而非 `.claude/agents/`。两种平台共享同一套写作流程和知识库。
+OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义部署在 `.opencode/agents/` 而非 `.claude/agents/`。三个平台共享同一套写作流程和知识库。
 
 ### Agent 技能贡献
 
@@ -399,3 +427,50 @@ OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义
 - 改动需有明确的问题驱动（"因为XX问题，所以改XX"）
 - 新增功能需向后兼容，不破坏现有项目
 - 复杂改动先提 Issue 讨论再实现
+
+## Reasonix 集成
+
+本 skill 也支持 Reasonix（DeepSeek 专属终端 AI agent，借助字节稳定前缀缓存优化推理成本）。
+
+与 Claude Code / OpenCode 不同，Reasonix 的 skill 是**项目级部署**——每个小说项目初始化时生成 `.reasonix/skills/`（10 个 SKILL.md，agents 即 skills），不装到全局。
+
+### 安装框架源码
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+```
+
+### 初始化项目
+
+在项目目录（或指定路径）运行 init.py，指定 Reasonix 平台：
+
+```bash
+python tools/init.py <小说项目路径> --genre <编号> --platform reasonix
+```
+
+### 开始写作
+
+初始化完成后，进入项目目录启动 Reasonix：
+
+```bash
+cd <小说项目路径> && reasonix code
+```
+
+然后通过 `@novel-agent` 进入写作循环。Reasonix 环境里 novel-agent 用 `run_skill` 调度子 agent，调度协议与其余平台一致。
+
+### 项目结构差异
+
+Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，不产生 `.claude/`：
+
+```
+.reasonix/
+├── skills/               # 10 个 SKILL.md（agents 即 skills）
+│   ├── novel-agent/SKILL.md
+│   ├── writer/SKILL.md
+│   ├── volume-planner/SKILL.md
+│   └── ...
+├── knowledge/            # 反 AI 规则、文风偏好、永久记忆、格式规范
+└── memory/               # 写作动态记忆
+```
+
+升级时用 `python tools/sync-project.py <小说项目路径> --platform reasonix` 同步最新框架。
