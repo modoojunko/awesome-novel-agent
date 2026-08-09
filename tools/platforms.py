@@ -55,7 +55,7 @@ PLATFORMS = {
     "reasonix": Platform("reasonix", "Reasonix", ".reasonix", agents=None,
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("reasonix",)),
     "codex":    Platform("codex", "Codex", ".codex", agents="agents",
-                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("codex",)),
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".codex",)),
 }
 
 

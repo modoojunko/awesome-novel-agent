@@ -66,10 +66,17 @@ export NOVEL_SKILL_HOME="$DEST"
 # 持久化会遮蔽仓库来源（init.py 以 __file__ 解析技能根，env 优先会导致新项目部署安装版旧提示词）。
 
 # 安全检查：DEST 必须是以 $HOME 开头的 skills/awesome-novel 路径。
-# 先创建父目录，避免全新 HOME（skills 目录尚不存在）时 dirname 取不到导致误拒。
+# 先做无副作用的字符串校验（HOME 未设置/路径异常时在创建任何目录前即拒绝），
+# 再创建父目录并复核 canonical 路径（避免全新 HOME 下 dirname 取不到导致误拒）。
+HOME_NORM="${HOME%/}"
+if [[ -z "$HOME_NORM" || -z "$DEST" || "$DEST" == "/" \
+      || "$DEST" != "$HOME_NORM/."*"/skills/awesome-novel" ]]; then
+    echo "错误：安装目标路径异常 ($DEST)，中止。"
+    exit 1
+fi
 mkdir -p "$(dirname "$DEST")"
 CANONICAL_DEST="$(cd "$(dirname "$DEST")" && pwd)/$(basename "$DEST")"
-if [[ -z "$DEST" || "$DEST" == "/" || "$CANONICAL_DEST" != "$HOME/."*"/skills/awesome-novel" ]]; then
+if [[ "$CANONICAL_DEST" != "$HOME_NORM/."*"/skills/awesome-novel" ]]; then
     echo "错误：安装目标路径异常 ($DEST)，中止。"
     exit 1
 fi

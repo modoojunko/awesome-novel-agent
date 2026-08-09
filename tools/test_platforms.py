@@ -95,6 +95,8 @@ def test_config():
     check("检测优先显式覆盖", p.detect_platform(Path("d:/x/.reasonix/skills"), "claude").key == "claude")
     check("检测 codex 路径",
           p.detect_platform(Path("d:/x/.codex/skills/awesome-novel")).key == "codex")
+    check("检测 claude 路径含 codex 子串回落 claude",
+          p.detect_platform(Path("/Users/codex-dev/.claude/skills/awesome-novel")).key == "claude")
 
 
 def test_yaml_precheck():
@@ -307,6 +309,17 @@ def test_install_fresh_home():
         check("fresh home agents 存在", (dest / "agents").is_dir())
 
 
+def test_install_no_home():
+    """P2 回归：HOME 未设置时安装脚本在创建任何目录前即拒绝（报路径异常）。"""
+    print("[e2e] install.sh 无 HOME 拒绝安装")
+    env = dict(os.environ)
+    env.pop("HOME", None)
+    r = run(["bash", str(TOOLS.parent / "install.sh"), "codex"],
+            cwd=str(TOOLS.parent), env=env)
+    check("no HOME exit 1", r.returncode == 1, str(r.returncode))
+    check("no HOME 报路径异常", "安装目标路径异常" in (r.stdout + r.stderr))
+
+
 def test_noyaml_e2e():
     """F5 回归：缺 pyyaml 时 init --platform codex 明确报错退出，不产出损坏 TOML。"""
     print("[e2e] 缺 pyyaml 时 init --platform codex 明确报错")
@@ -332,6 +345,7 @@ def main():
         ("test_init_layout", test_init_layout),
         ("test_sync", test_sync),
         ("test_install_fresh_home", test_install_fresh_home),
+        ("test_install_no_home", test_install_no_home),
         ("test_noyaml_e2e", test_noyaml_e2e),
     ]:
         try:
