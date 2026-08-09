@@ -1,12 +1,13 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>Write Novels with Claude Code / OpenCode / Reasonix</em>
+  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex</em>
 </p>
 
 <p align="center">
   <a href="https://docs.anthropic.com/en/docs/claude-code/overview"><img src="https://img.shields.io/badge/Claude%20Code-%E2%9C%93%20%E6%94%AF%E6%8C%81-6B46C1?style=flat-square" alt="Claude Code"></a>
   <a href="https://github.com/sglaboratory/opencode"><img src="https://img.shields.io/badge/OpenCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-4A90D9?style=flat-square" alt="OpenCode"></a>
   <img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix">
+  <a href="#codex-integration"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
 </p>
@@ -46,7 +47,7 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## What You Need
 
-- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), or Reasonix installed
+- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, or **Codex** installed
 - About 1 minute to install
 
 ## Installation
@@ -71,6 +72,16 @@ Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not glo
 git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
 python tools/init.py <novel-project-path> --platform reasonix
 cd <novel-project-path> && reasonix code
+```
+
+**Codex:**
+
+The Codex skill is installed **user-level** (`~/.codex/skills/awesome-novel/`), while agents/skills/knowledge/memory are deployed **project-level** into `.codex/` at init time:
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
+python tools/init.py <novel-project-path> --platform codex
+cd <novel-project-path>  # then call @novel-agent in Codex to start writing
 ```
 
 Manual installation:
@@ -139,7 +150,7 @@ After setup, the Agent creates your novel project in the current directory:
 ├── .agent/               # Agent progress + task communication
 │   ├── status.md         # Progress marker (phase/volume/chapter)
 │   └── task/             # Order files for sub-agent dispatch
-└── .claude/              # Agent definitions + knowledge + memory
+├── .claude/              # Claude Code: agent definitions + knowledge + memory
     ├── agents/           # 7 agent definitions (deployed at init)
     ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
     └── memory/           # Dynamic writing memory (feedback per phase)
@@ -147,6 +158,11 @@ After setup, the Agent creates your novel project in the current directory:
         ├── chapter-memory.md
         ├── prompt-memory.md
         └── writing-memory.md
+└── .codex/               # Codex: 8 custom agents (TOML) + knowledge + memory
+    ├── agents/           # Custom agent definitions (deployed at init)
+    ├── skills/           # Standalone tools (memory-recording, roleplay-sandbox)
+    ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
+    └── memory/           # Dynamic writing memory (feedback per phase)
 ```
 
 All files are plain Markdown — you can open and edit them directly.
@@ -219,7 +235,7 @@ Agent asks if you want to choose one during setup.
 
 **Q: I'm not a programmer, can I install it?**
 
-Yes. Just copy and paste those commands into your terminal. The only requirement is having Claude Code installed.
+Yes. Just copy and paste those commands into your terminal. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
 
 **Q: I upgraded the skill, how do I migrate my existing novel projects to the new format?**
 
@@ -236,6 +252,32 @@ Default config is "low AI flavor" — common machine phrases prohibited ("cannot
 **Q: Can I use my own writing style?**
 
 Yes. After project creation, there's a writing style file where you can write in your preferences, and all subsequent chapters will follow this style.
+
+## Codex Integration
+
+This skill also supports [Codex](https://developers.openai.com/codex) (OpenAI's coding agent). The skill itself is installed **user-level**, while agents/skills/knowledge/memory are deployed **project-level** into `.codex/` at init time.
+
+### Install
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
+```
+
+Installs to `~/.codex/skills/awesome-novel/`.
+
+### Initialize a project
+
+```bash
+python tools/init.py <novel-project-path> --genre <number> --platform codex
+```
+
+The 8 custom agents are deployed as Codex TOML files (`.codex/agents/*.toml`, with `name` / `description` / `developer_instructions`), standalone tools as `.codex/skills/<name>/SKILL.md`, and anti-AI rules, style preferences, format specs, and writing memory land in `.codex/knowledge/` / `.codex/memory/`.
+
+### Start writing
+
+Open the project directory in Codex and call `@novel-agent` to enter the writing loop. In Codex, novel-agent dispatches sub-agents with `spawn_agent` (agent name = the TOML name under `.codex/agents/`); the order-file protocol is identical to the other platforms.
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform codex`.
 
 ## Star History
 

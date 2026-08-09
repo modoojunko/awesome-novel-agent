@@ -7,7 +7,7 @@
 ## 一、文件结构
 
 ```
-.claude/
+<平台目录>/
 ├── memory/                          # 动态记忆（各环节实时记录）
 │   ├── volume-memory.md             # 卷纲环节记忆
 │   ├── chapter-memory.md            # 章纲环节记忆
@@ -17,6 +17,8 @@
 └── knowledge/
     └── permanent-memory.md          # 永久记忆（从 memory/ 晋升的高频条目）
 ```
+
+> 平台目录由 init.py 按 `--platform` 决定：Claude Code → `.claude/`、OpenCode → `.opencode/`、Reasonix → `.reasonix/`、Codex → `.codex/`。
 
 ## 二、文件头
 

@@ -16,7 +16,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("claude-code", "opencode")]
+    [ValidateSet("claude-code", "opencode", "codex")]
     [string]$Platform
 )
 
@@ -28,6 +28,9 @@ switch ($Platform) {
     }
     "opencode" {
         $DEST_DIR = "$HOME_DIR\.config\opencode\skills\awesome-novel"
+    }
+    "codex" {
+        $DEST_DIR = "$HOME_DIR\.codex\skills\awesome-novel"
     }
 }
 

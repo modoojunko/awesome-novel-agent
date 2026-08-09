@@ -6,6 +6,7 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
   - claude   → .claude/   agents=agents, knowledge, memory
   - opencode → .opencode/ agents=agents, knowledge, memory
   - reasonix → .reasonix/ agents=None（agents 即 skills）, skills=skills, knowledge, memory
+  - codex    → .codex/    agents=agents（TOML 转换产物）, skills=skills, knowledge, memory
 
 模块名用 platforms（复数）是刻意避开标准库 platform（单数）同名冲突。
 """
@@ -13,6 +14,7 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,6 +54,8 @@ PLATFORMS = {
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("opencode",)),
     "reasonix": Platform("reasonix", "Reasonix", ".reasonix", agents=None,
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("reasonix",)),
+    "codex":    Platform("codex", "Codex", ".codex", agents="agents",
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("codex",)),
 }
 
 
@@ -73,12 +77,33 @@ def detect_platform(skill_home: Path, override: str | None = None) -> Platform:
 
 
 def rewrite_refs(text: str, platform: Platform) -> str:
-    """部署内容里的 Claude Code 路径引用 → 平台路径。仅改 knowledge/memory，claude 原样返回。"""
+    """部署内容里的 Claude Code 路径引用 → 平台路径。claude 原样返回。
+
+    knowledge/memory 精确替换后，剩余裸 .claude/（禁写区、目录树说明等）
+    整体替换为平台根，避免部署产物残留失效引用。
+    """
     if platform.key == "claude":
         return text
     text = text.replace(".claude/knowledge/", f"{platform.root}/knowledge/")
     text = text.replace(".claude/memory/", f"{platform.root}/memory/")
+    text = text.replace(".claude/", f"{platform.root}/")
     return text
+
+
+def ensure_yaml(platform: Platform) -> None:
+    """非 claude 平台的 agent 转换依赖 pyyaml；缺失时明确报错退出。
+
+    claude 平台是纯复制不转换，不需要 pyyaml。init.py / sync-project.py
+    在平台检测后调用本函数，避免"退出 0 却产出损坏产物"的静默故障。
+    """
+    if platform.key == "claude":
+        return
+    try:
+        import yaml  # noqa: F401
+    except ImportError:
+        print(f"错误: {platform.label} 平台需要 pyyaml（pip install pyyaml），当前环境未安装。",
+              file=sys.stderr)
+        sys.exit(1)
 
 
 def resolve_skill_home() -> Path:
@@ -314,3 +339,183 @@ def convert_to_opencode(text: str) -> str:
     )
     new_fm = "\n".join(new_lines).rstrip() + "\n" + perm_text
     return "---" + new_fm + "---" + parts[2]
+
+
+# ---------------------------------------------------------------
+# Codex agent 转换（Claude Code agent frontmatter → Codex 自定义 agent TOML）
+# ---------------------------------------------------------------
+
+_CODEX_TOOL_MAP = {
+    "Read": "Read",
+    "Write": "Write",
+    "Edit": "Edit",
+    "Glob": "Glob",
+    "Grep": "Grep",
+    "Agent": "spawn_agent",   # Claude Code Agent 工具 ↔ Codex spawn_agent
+}
+
+
+def _toml_escape(s: str) -> str:
+    """单行 TOML 基本字符串转义。"""
+    return s.replace("\\", "\\\\").replace('"', '\\"')
+
+
+def _toml_multiline(s: str) -> str:
+    """多行 TOML 基本字符串转义（反斜杠 + 结束定界符冲突）。"""
+    return s.replace("\\", "\\\\").replace('"""', '\\"\\"\\"')
+
+
+def _agent_skill_paths(data: dict) -> list:
+    """从 agent frontmatter 的 skills 列表提取 skills/*.md 相对路径。"""
+    paths = []
+    skills = data.get("skills") or []
+    if not isinstance(skills, list):
+        return paths
+    for s in skills:
+        if isinstance(s, dict):
+            path = s.get("path")
+        elif isinstance(s, str):
+            path = s
+        else:
+            continue
+        if isinstance(path, str) and path.startswith("skills/"):
+            paths.append(Path(path))
+    return paths
+
+
+def convert_to_codex(text: str, skill_home: Path) -> str:
+    """Claude Code agent frontmatter → Codex 自定义 agent TOML。
+
+    - 必填字段：name / description / developer_instructions（Codex 官方约定）
+    - tools：Codex agent TOML 无工具白名单字段，改为在指令中声明允许工具；
+      Agent → spawn_agent（调度说明见 novel-agent 适配段）
+    - skills：frontmatter 声明的 SOP 内联进 developer_instructions（与 reasonix 一致）
+    - 路径改写：.claude/knowledge、.claude/memory → .codex/ 对应目录
+    """
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return text
+    try:
+        import yaml
+        data = yaml.safe_load(parts[1])
+    except Exception:
+        return text
+    if not isinstance(data, dict):
+        return text
+
+    name = str(data.get("name", "unknown")).strip()
+    desc = str(data.get("description", "") or "").strip()
+
+    tools_raw = str(data.get("tools", "") or "")
+    allowed = []
+    for t in tools_raw.split(","):
+        t = t.strip()
+        if not t:
+            continue
+        mapped = _CODEX_TOOL_MAP.get(t, t)
+        if mapped not in allowed:
+            allowed.append(mapped)
+
+    body = parts[2].strip()
+    if name == "novel-agent":
+        body += (
+            "\n\n## Codex 调度适配（本环境无 Agent 工具）\n"
+            "在 Codex 环境调度子 agent 用 `spawn_agent` 工具：\n"
+            "- 子 agent 名即 `.codex/agents/` 下的 TOML 名（writer / volume-planner / "
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
+            "- 把 order 文件内容作为任务消息传给子 agent；order 文件协议（status: DONE）不变\n"
+            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+        )
+
+    tool_line = ""
+    if allowed:
+        tool_line = f"\n\n（自动生成）本 agent 允许使用的工具：{'、'.join(allowed)}"
+    body += tool_line
+
+    sop_sections = []
+    for rel in _agent_skill_paths(data):
+        sop = skill_home / rel
+        if sop.exists():
+            sop_sections.append(
+                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
+            )
+    instructions = body + "\n".join(sop_sections)
+    instructions = rewrite_refs(instructions, PLATFORMS["codex"])
+
+    lines = [
+        f"# 由 awesome-novel 自动生成，源文件: agents/{name}.md",
+        f'name = "{name}"',
+        f'description = "{_toml_escape(desc)}"',
+        "",
+        'developer_instructions = """',
+        _toml_multiline(instructions).rstrip(),
+        '"""',
+        "",
+    ]
+    return "\n".join(lines)
+
+
+def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> None:
+    """生成 <project>/<platform.root>/agents/<name>.toml（8 个），引用改写为平台路径。
+
+    仅 codex 平台调用。Claude agent frontmatter → Codex TOML，与 sync 保持一致。
+    """
+    if platform.key != "codex":
+        return
+    agents_dir = skill_home / "agents"
+    target = platform.agents_dir(project)
+    if target is None:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for item in sorted(agents_dir.rglob("*.md")):
+        if item.name == ".gitkeep":
+            continue
+        dest = target / (item.stem + ".toml")
+        dest.write_text(
+            convert_to_codex(item.read_text(encoding="utf-8"), skill_home),
+            encoding="utf-8",
+        )
+        count += 1
+    print(f"  ✅ 已部署 {count} 个 Codex agent 定义到 {target}")
+
+
+def _convert_codex_inline_skill(text: str, name: str) -> str:
+    """纯正文 SOP → Codex skill（SKILL.md，name/description frontmatter）。"""
+    desc = ""
+    for ln in text.split("\n"):
+        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
+            desc = ln.strip().lstrip("# ").strip()
+            break
+    desc_clean = desc.replace('"', "'")
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc_clean or name}（由 awesome-novel 自动生成的 Codex skill）\"\n"
+        f"---\n"
+    )
+    return fm + "\n" + text.strip()
+
+
+def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform) -> None:
+    """生成独立交互工具为 Codex skill（<project>/<platform.root>/skills/<name>/SKILL.md）。
+
+    仅 codex 平台调用。8 个 agent 走 .codex/agents/*.toml（deploy_codex_agents），
+    此处只部署不进调度链的独立工具（memory-recording、roleplay-sandbox）。
+    """
+    if platform.key != "codex":
+        return
+    skills_dir = skill_home / "skills"
+    target = platform.skills_dir(project)
+    if target is None:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+    for skill_name in ("memory-recording", "roleplay-sandbox"):
+        sf = skills_dir / f"{skill_name}.md"
+        if sf.exists():
+            body = _convert_codex_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
+            body = rewrite_refs(body, platform)
+            skill_dir = target / skill_name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+    print(f"  ✅ 已部署 Codex 独立工具 skill 到 {target}")

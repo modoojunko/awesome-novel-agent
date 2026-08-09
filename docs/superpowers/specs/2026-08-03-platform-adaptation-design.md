@@ -179,3 +179,18 @@ reasonix / opencode 纯原生结果：
 - 不新增平台（Gemini CLI / Codex / Cursor 等）——只抽象，以后加配置一行。
 - 不改 `install.sh`（reasonix 走项目级部署，与设计文档一致）。
 - 不做旧项目 `.claude/` → `.reasonix/` 的自动迁移。
+
+---
+
+## 十一、扩展：Codex 平台（2026-08-09）
+
+按 §十 的抽象设计新增第四平台（本条取代 §十 中"不新增平台"对 Codex 的约束）：
+
+- **目录约定**：`Platform("codex", "Codex", ".codex", agents="agents", skills="skills", knowledge="knowledge", memory="memory", detect_keywords=("codex",))`
+- **agents 形态**：Codex 自定义 agent 是官方 TOML（`name` / `description` / `developer_instructions`），`deploy_codex_agents()` 把 8 个 Claude frontmatter 定义转换为 `.codex/agents/*.toml`；frontmatter 声明的 SOP 内联进 `developer_instructions`，`.claude/knowledge|memory` 引用改写为 `.codex/` 对应目录
+- **工具映射**：`Agent` → `spawn_agent`（novel-agent 指令内附 Codex 调度适配段，agent 名 = TOML 名）
+- **skills**：只把独立交互工具（memory-recording、roleplay-sandbox）部署为 `.codex/skills/<name>/SKILL.md`
+- **依赖**：转换依赖 pyyaml，`ensure_yaml()` 在 init/sync 入口预检，缺失时明确报错退出（防"退出 0 但产物损坏"）
+- **安装**：`install.sh codex` / `install.ps1 codex` 装到用户级 `~/.codex/skills/awesome-novel/`；小说项目内 agents/skills/knowledge/memory 全部项目级部署到 `.codex/`
+- **模板**：codex 项目生成 `AGENTS.md`（内容取自 `templates/AGENTS.codex.md`），不生成 `CLAUDE.md`；`AGENTS.codex.md` 模板源不复制进项目
+- **同步**：`.codex/agents|skills` 视为派生产物，靠源指纹检测，`sync-project.py --platform codex` 重新生成

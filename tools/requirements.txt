@@ -1,1 +1,2 @@
-# init.py 使用 Python 标准库，无需额外依赖
+# Python 主体使用标准库；opencode / reasonix / codex 平台的 agent 转换需要 pyyaml（CI 自动安装）
+pyyaml

@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
 permissions:
@@ -31,9 +32,12 @@ jobs:
         run: python tools/check-agents.py
       - name: Check rule conflicts
         run: python tools/check-conflicts.py
+      - name: Run platform tests
+        run: python tools/test_platforms.py
 
   deploy:
     needs: lint
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

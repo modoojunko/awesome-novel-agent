@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix</em>
+  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex</em>
 </p>
 
 <p align="center">
@@ -8,6 +8,7 @@
   <a href="https://docs.anthropic.com/en/docs/claude-code/overview"><img src="https://img.shields.io/badge/Claude%20Code-%E2%9C%93%20%E6%94%AF%E6%8C%81-6B46C1?style=flat-square" alt="Claude Code"></a>
   <a href="#opencode"><img src="https://img.shields.io/badge/OpenCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-4A90D9?style=flat-square" alt="OpenCode"></a>
   <a href="#reasonix-集成"><img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix"></a>
+  <a href="#codex-集成"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
   <br>
@@ -67,7 +68,7 @@
 
 ## 你需要什么
 
-- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode) 或 **Reasonix** 的电脑
+- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode)、**Reasonix** 或 **Codex** 的电脑
 - 大概 1 分钟完成安装
 
 
@@ -95,6 +96,16 @@ cd <小说项目路径> && reasonix code
 
 > 用 `--genre <编号>` 指定预置题材，不传则交互式选题材。装好后在项目目录里输入 `@novel-agent` 开始写作。
 
+**Codex：**
+
+Codex 的 skill 是**用户级安装**（`~/.codex/skills/awesome-novel/`），小说项目内的 agents/skills/knowledge/memory 则在初始化时**项目级部署**到 `.codex/`：
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
+python tools/init.py <小说项目路径> --platform codex
+cd <小说项目路径>  # 然后在 Codex 中调用 @novel-agent 开始写作
+```
+
 或者手动复制（以 Claude Code 为例）：
 ```bash
 git clone https://github.com/modoojunko/awesome-novel-skill.git
@@ -111,6 +122,8 @@ echo "安装完成!"
 ```
 
 > **OpenCode 用户注意：** 安装路径为 `~/.config/opencode/skills/awesome-novel/`，初始化后 agent 定义部署在项目 `.opencode/agents/` 下，OpenCode 自动发现。详情见下方 [OpenCode 集成](#opencode) 说明。
+
+> **Codex 用户注意：** skill 安装到 `~/.codex/skills/awesome-novel/`，初始化后 8 个自定义 agent 以 TOML 形式部署在项目 `.codex/agents/` 下，Codex 自动发现。详情见下方 [Codex 集成](#codex-集成) 说明。
 
 看到 "安装完成" 就可以了。
 
@@ -171,11 +184,11 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── .agent/               # Agent 进度 + 任务通信
 │   ├── status.md         # 进度标记（phase/volume/chapter）
 │   └── task/             # 子 agent 间 order 文件
-├── .opencode/            # OpenCode 用（三选一，由 init.py --platform 决定）
+├── .opencode/            # OpenCode 用（四选一，由 init.py --platform 决定）
 │   ├── agents/           # 8 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆
-├── .claude/              # Claude Code 用（三选一）
+├── .claude/              # Claude Code 用（四选一）
 │   ├── agents/           # 8 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆（各环节作者反馈）
@@ -183,13 +196,18 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 │       ├── chapter-memory.md
 │       ├── prompt-memory.md
 │       └── writing-memory.md
-└── .reasonix/            # Reasonix 用（三选一）
+├── .reasonix/            # Reasonix 用（四选一）
     ├── skills/           # 10 个 SKILL.md（agents 即 skills）
+    ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
+    └── memory/           # 写作动态记忆
+└── .codex/               # Codex 用（四选一）
+    ├── agents/           # 8 个自定义 agent（TOML，初始化时部署）
+    ├── skills/           # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
 ```
 
-这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` 不会同时存在。
+这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` 不会同时存在。
 
 ### 规划故事骨架
 
@@ -262,7 +280,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。上面那几行命令复制粘贴到终端，回车就行。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode 或 Reasonix。
+能。上面那几行命令复制粘贴到终端，回车就行。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix 或 Codex。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
@@ -474,3 +492,43 @@ Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，�
 ```
 
 升级时用 `python tools/sync-project.py <小说项目路径> --platform reasonix` 同步最新框架。
+
+## Codex 集成
+
+本 skill 也支持 [Codex](https://developers.openai.com/codex)（OpenAI 的 AI 编码 agent）。skill 本体**用户级安装**，小说项目内的 agents/skills/knowledge/memory 全部**项目级部署**在 `.codex/`。
+
+### 安装
+
+```bash
+git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
+```
+
+安装到 `~/.codex/skills/awesome-novel/`。
+
+### 初始化项目
+
+```bash
+python tools/init.py <小说项目路径> --genre <编号> --platform codex
+```
+
+初始化后 8 个自定义 agent 以 Codex 官方 TOML 格式部署到项目 `.codex/agents/*.toml`（`name` / `description` / `developer_instructions`），独立交互工具（memory-recording、roleplay-sandbox）部署为 `.codex/skills/<name>/SKILL.md`，反 AI 规则、文风偏好、格式规范与写作记忆分别落在 `.codex/knowledge/`、`.codex/memory/`。
+
+### 开始写作
+
+在 Codex 中打开项目目录，调用 `@novel-agent` 进入写作循环。Codex 环境里 novel-agent 用 `spawn_agent` 调度子 agent（agent 名 = `.codex/agents/*.toml` 的 name），order 文件协议与其余平台一致。
+
+### 项目结构差异
+
+```
+.codex/
+├── agents/               # 8 个自定义 agent（TOML）
+│   ├── novel-agent.toml
+│   ├── writer.toml
+│   ├── volume-planner.toml
+│   └── ...
+├── skills/               # 独立交互工具（memory-recording、roleplay-sandbox）
+├── knowledge/            # 反 AI 规则、文风偏好、永久记忆、格式规范
+└── memory/               # 写作动态记忆
+```
+
+升级时用 `python tools/sync-project.py <小说项目路径> --platform codex` 同步最新框架。
