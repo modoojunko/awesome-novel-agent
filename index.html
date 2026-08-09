@@ -61,7 +61,7 @@
 <body>
   <div class="container">
     <h1>Novel Agent</h1>
-    <p class="subtitle">和 AI 一起写小说 —— 无需订阅，DeepSeek V4 原生支持</p>
+    <p class="subtitle">和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex</p>
 
     <div class="features">
       <div class="feature">
@@ -90,17 +90,26 @@
       </div>
       <div class="feature">
         <h3>🛠️ 多端支持</h3>
-        <p>DeepSeek TUI、Claude Code、Hermes、OpenClaw 均可使用</p>
+        <p>Claude Code、OpenCode、Reasonix、Codex 均可使用</p>
       </div>
     </div>
 
     <div class="install">
       <h2>快速安装</h2>
-      <p><span class="badge">DeepSeek TUI</span></p>
-      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh deepseek-tui</code></pre>
 
       <p style="margin-top: 1rem;"><span class="badge">Claude Code</span></p>
       <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh claude-code</code></pre>
+
+      <p style="margin-top: 1rem;"><span class="badge">OpenCode</span></p>
+      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode</code></pre>
+
+      <p style="margin-top: 1rem;"><span class="badge">Codex</span></p>
+      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex</code></pre>
+
+      <p style="margin-top: 1rem;"><span class="badge">Reasonix</span>（项目级部署，不走 install.sh）</p>
+      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+python tools/init.py &lt;小说项目路径&gt; --platform reasonix
+cd &lt;小说项目路径&gt; && reasonix code</code></pre>
     </div>
 
     <h2>开始创作</h2>
@@ -108,7 +117,7 @@
     <pre><code>帮我写本小说</code></pre>
 
     <footer>
-      <p>基于 <a href="https://github.com/hust-open-atom-club/DeepSeek-TUI">DeepSeek TUI</a> 完全免费使用</p>
+      <p>GPLv3 开源 · 个人使用免费</p>
       <p><a href="https://github.com/modoojunko/awesome-novel-skill">GitHub</a> · <a href="https://github.com/modoojunko/awesome-novel-skill/blob/main/README.md">文档</a></p>
     </footer>
   </div>
