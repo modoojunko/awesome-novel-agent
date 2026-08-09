@@ -183,6 +183,7 @@ tools/           # init.py（初始化）、sync-project.py（同步更新）
 
 - **Claude Code**：init.py 部署 agent 定义到 `.claude/agents/`，知识到 `.claude/knowledge/`，建 `.claude/memory/` 动态记忆桩
 - **OpenCode**：init.py 同时部署到 `.opencode/agents/`，OpenCode 自动发现 `@novel-agent` 等
+- **Codex**：init.py 部署 8 个自定义 agent 为 `.codex/agents/*.toml`（TOML 转换产物，引用改写为 `.codex/knowledge|memory`），独立工具为 `.codex/skills/<name>/SKILL.md`；novel-agent 用 `spawn_agent` 调度子 agent
 - **安装**：`install.sh` / `install.ps1` 将 skill 装到用户级 skills 目录
 
 ---

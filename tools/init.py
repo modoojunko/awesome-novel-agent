@@ -2,7 +2,7 @@
 """
 awesome-novel-skill 项目初始化工具
 
-用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix>]
+用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex>]
 
 平台缺省：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude。
 
@@ -22,7 +22,10 @@ from platforms import (
     Platform,
     convert_to_opencode,
     detect_platform,
+    deploy_codex_agents,
+    deploy_codex_skills,
     deploy_reasonix_skills,
+    ensure_yaml,
     rewrite_refs,
     resolve_skill_home,
 )
@@ -70,7 +73,7 @@ def main():
         a = args[i]
         if a == "--platform":
             if i + 1 >= len(args) or args[i + 1].startswith("--"):
-                print("错误: --platform 需要一个平台名（claude|opencode|reasonix）")
+                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex）")
                 sys.exit(1)
             platform_override = args[i + 1]
             i += 2
@@ -93,6 +96,7 @@ def main():
     except ValueError as e:
         print(e)
         sys.exit(1)
+    ensure_yaml(platform)
     print(f"平台: {platform.label}")
 
     # 解析可选参数
@@ -121,12 +125,17 @@ def main():
     # Step 2: 创建骨架
     create_skeleton(project_path, platform)
 
-    # Step 3: 部署 agent 定义
-    deploy_agents(project_path, platform)
+    # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix agents 即 skills）
+    if platform.key == "codex":
+        deploy_codex_agents(project_path, SKILL_HOME, platform)
+    else:
+        deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署 Reasonix skills（仅 reasonix 平台）
+    # Step 3.5: 部署平台 skills（reasonix 生成 10 个 SKILL.md；codex 只部署独立工具）
     if platform.key == "reasonix":
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
+    elif platform.key == "codex":
+        deploy_codex_skills(project_path, SKILL_HOME, platform)
 
     # Step 4: 按题材继承记忆
     deploy_memory(project_path, genre)
@@ -152,6 +161,8 @@ def main():
         print("输入 @novel-agent 开始写作（Claude Code）")
     elif platform.key == "opencode":
         print("在 OpenCode 中通过 @novel-agent 开始写作")
+    elif platform.key == "codex":
+        print("在 Codex 中打开项目目录，调用 @novel-agent 开始写作")
     else:
         print("在 Reasonix 中运行 `reasonix code`，然后调用 @novel-agent 开始写作")
 
@@ -180,6 +191,9 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
     if platform.key == "reasonix":
         text = text.replace(".claude/agents/", ".reasonix/skills/")
         text = text.replace(".opencode/agents/", ".reasonix/skills/")
+    elif platform.key == "codex":
+        text = text.replace(".claude/agents/", ".codex/agents/")
+        text = text.replace(".opencode/agents/", ".codex/agents/")
     else:  # opencode
         text = text.replace(".claude/agents/", f"{platform.root}/agents/")
     return rewrite_refs(text, platform)
@@ -210,6 +224,20 @@ def create_skeleton(project_path: Path, platform: Platform):
                     continue
                 target = project_path / rel_path
                 target.parent.mkdir(parents=True, exist_ok=True)
+                if platform.key == "codex" and item.name == "CLAUDE.md":
+                    # Codex 项目不生成 CLAUDE.md（Codex 只读 AGENTS.md）
+                    continue
+                if item.name == "AGENTS.codex.md":
+                    # 模板源仅用于生成 codex 项目的 AGENTS.md，不复制进项目
+                    continue
+                if platform.key == "codex" and item.name == "AGENTS.md":
+                    codex_tpl = SOURCE_TEMPLATES / "AGENTS.codex.md"
+                    if codex_tpl.exists():
+                        content = codex_tpl.read_text(encoding="utf-8")
+                        content = _rewrite_template_refs(content, platform)
+                        with open(target, "w", encoding="utf-8", newline="") as f:
+                            f.write(content)
+                        continue
                 if item.name in ("CLAUDE.md", "AGENTS.md") and platform.key != "claude":
                     with open(item, encoding="utf-8", newline="") as f:
                         content = f.read()

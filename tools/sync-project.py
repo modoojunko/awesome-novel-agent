@@ -29,9 +29,12 @@ from pathlib import Path
 
 from platforms import (
     Platform,
+    convert_to_codex,
     convert_to_opencode,
     detect_platform,
+    deploy_codex_skills,
     deploy_reasonix_skills,
+    ensure_yaml,
     resolve_skill_home,
     rewrite_refs,
 )
@@ -65,7 +68,7 @@ def main():
         if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
             platform_override = sys.argv[idx + 1]
         else:
-            print("错误: --platform 需要一个平台名（claude|opencode|reasonix）")
+            print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex）")
             sys.exit(1)
     platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
     try:
@@ -73,6 +76,7 @@ def main():
     except ValueError as e:
         print(e)
         sys.exit(1)
+    ensure_yaml(platform)
 
     # 处理 Windows 中文路径乱码：从 os.environ 重新取当前目录
     raw_arg = sys.argv[1]
@@ -194,8 +198,8 @@ def check_freshness(project: Path, platform: Platform):
         sys.exit(0)
     else:
         changes = find_changes(project, platform)
-        if not changes and platform.key == "reasonix":
-            print("有更新可用（源文件变化，reasonix skill 由同步时重新生成）。")
+        if not changes and platform.key in ("reasonix", "codex"):
+            print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
         else:
             lines = [f"有更新可用 ({len(changes)} 个文件发生变化):"]
             for f in changes:
@@ -226,6 +230,8 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
             continue
         if platform.key == "reasonix" and name == "skills":
             continue  # 派生产物靠源指纹检测，同步时重新生成
+        if platform.key == "codex" and name in ("agents", "skills"):
+            continue  # TOML/SKILL.md 是派生产物，靠源指纹检测，同步时重新生成
         for item in sorted(src_dir.rglob("*.md")):
             if item.name == ".gitkeep":
                 continue
@@ -304,6 +310,19 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(content, encoding="utf-8")
             count += 1
+    elif platform.key == "codex":
+        # codex agents 是转换产物（.codex/agents/*.toml），与 init 保持一致
+        count = 0
+        for item in sorted(AGENT_DIR.rglob("*.md")):
+            if item.name == ".gitkeep":
+                continue
+            content = convert_to_codex(item.read_text(encoding="utf-8"), SKILL_HOME)
+            dest = target / (item.stem + ".toml")
+            if dest.exists() and dest.read_text(encoding="utf-8") == content:
+                continue
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(content, encoding="utf-8")
+            count += 1
     else:
         count = _sync_dir(AGENT_DIR, target, "*.md")
     if count > 0:
@@ -318,6 +337,11 @@ def sync_skills(project_path: Path, platform: Platform) -> int:
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
         print(f"  [OK] reasonix skills: {n} 个 SKILL.md 已重新生成")
+        return n
+    if platform.key == "codex":
+        deploy_codex_skills(project_path, SKILL_HOME, platform)
+        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
+        print(f"  [OK] codex skills: {n} 个 SKILL.md 已重新生成")
         return n
     target = platform.skills_dir(project_path)
     target.mkdir(parents=True, exist_ok=True)
