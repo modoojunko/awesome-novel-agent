@@ -36,6 +36,18 @@ switch ($Platform) {
 
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
 
+# Python 版本门槛：在任何目录创建/删除前检查（fail-fast）。
+$PY_BIN = "python"
+if (-not (Get-Command $PY_BIN -ErrorAction SilentlyContinue)) {
+    Write-Host "错误: 未找到 python。请先安装 Python 3.9+（https://www.python.org/downloads/）"
+    exit 1
+}
+& $PY_BIN "$SCRIPT_DIR\tools\check-python.py"
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "安装中止：请升级 Python 后重试。"
+    exit 1
+}
+
 Write-Host "安装到: $DEST_DIR"
 
 # 创建目录，已存在则清空

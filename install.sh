@@ -59,6 +59,22 @@ esac
 DEST="$SKILLS_DIR/awesome-novel"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Python 版本门槛：在任何目录创建/删除前检查（fail-fast）。
+# 版本不满足时安装立即中止，而不是等 init.py / sync-project.py 执行时才报错。
+# 可用 NOVEL_PYTHON 显式指定解释器（如 Homebrew 的 python3.12）。
+PY_BIN="${NOVEL_PYTHON:-}"
+if [ -z "$PY_BIN" ]; then
+    PY_BIN="$(command -v python3 || true)"
+fi
+if [ -z "$PY_BIN" ]; then
+    echo "错误: 未找到 python3。请先安装 Python 3.9+（https://www.python.org/downloads/）"
+    exit 1
+fi
+if ! "$PY_BIN" "$SCRIPT_DIR/tools/check-python.py"; then
+    echo "安装中止：请升级 Python 后重试。"
+    exit 1
+fi
+
 echo "安装到: $DEST"
 export NOVEL_SKILL_HOME="$DEST"
 
