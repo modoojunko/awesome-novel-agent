@@ -20,6 +20,8 @@ Windows 中文路径乱码：
   python tools\\sync-project.py "d:\\novels\\daily\\小说项目"
 """
 
+from __future__ import annotations  # str | None 等注解在 Python 3.9 下延迟求值，避免 import 即 TypeError
+
 import hashlib
 import subprocess
 import sys

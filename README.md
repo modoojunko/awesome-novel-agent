@@ -69,6 +69,7 @@
 ## 你需要什么
 
 - 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode)、**Reasonix** 或 **Codex** 的电脑
+- Python 3.9+（macOS 系统自带 3.9 即可用；推荐 3.11+）
 - 大概 1 分钟完成安装
 
 
@@ -86,7 +87,7 @@ AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-skill> 下载
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 
-看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+），不满足会直接中止并给出升级提示，不会等到 `sync-project.py` 执行时才报错。
 
 **Reasonix：**
 

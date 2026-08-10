@@ -48,6 +48,7 @@ Let AI be your novel writing partner, from world-building to character developme
 ## What You Need
 
 - A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, or **Codex** installed
+- Python 3.9+ (the one bundled with macOS works; 3.11+ recommended)
 - About 1 minute to install
 
 ## Installation
@@ -64,7 +65,7 @@ The agent will download from <https://github.com/modoojunko/awesome-novel-skill>
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms).
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version first (3.9+ required) and aborts with a clear upgrade message instead of failing later when `sync-project.py` runs.
 
 **Reasonix:**
 
