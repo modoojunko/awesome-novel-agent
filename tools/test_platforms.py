@@ -9,7 +9,7 @@
 - 单元：check-python.py 版本门槛（安装阶段 fail-fast）
 - E2E：init.py 各平台布局 + 引用改写 + reasonix 10 个 skill + codex TOML agent（含 tomllib 解析）
 - E2E：sync-project.py 各平台同步 + --check
-- E2E：install.sh 全新 HOME 首次安装（F1 回归）+ 版本门槛 fail-fast（P-ver 回归）+ 缺 pyyaml 负向场景（F5 回归）
+- E2E：install.sh 全新 HOME 首次安装（F1 回归）+ 版本门槛 fail-fast（P-ver 回归）+ pyyaml 安装门槛 fail-fast（Y-ver 回归）+ 缺 pyyaml 负向场景（F5 回归）
 """
 
 import os
@@ -133,6 +133,29 @@ def test_check_python():
     check("拒绝信息含版本号与升级提示",
           "Python 99.0" in (r.stdout + r.stderr) and "升级" in (r.stdout + r.stderr),
           (r.stdout + r.stderr)[-300:])
+
+
+def test_check_yaml():
+    """Y-ver 回归：check-yaml.py 在安装阶段暴露缺 pyyaml，而不是 init 时才报错。"""
+    print("[unit] check-yaml.py pyyaml 门槛")
+    with tempfile.TemporaryDirectory() as td:
+        (Path(td) / "yaml.py").write_text('raise ImportError("blocked")\n', encoding="utf-8")
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(td) + os.pathsep + env.get("PYTHONPATH", "")
+        r = run([sys.executable, str(TOOLS / "check-yaml.py"), "codex"], env=env)
+        check("缺 yaml exit 1", r.returncode == 1, str(r.returncode))
+        check("缺 yaml 报错含 pyyaml 与 pip 提示",
+              "需要 pyyaml" in (r.stdout + r.stderr)
+              and "pip install pyyaml" in (r.stdout + r.stderr),
+              (r.stdout + r.stderr)[-300:])
+        check("缺 yaml 报错含解释器路径", sys.executable in (r.stdout + r.stderr),
+              (r.stdout + r.stderr)[-300:])
+    with tempfile.TemporaryDirectory() as td:
+        (Path(td) / "yaml.py").write_text("# stub\n", encoding="utf-8")
+        env = dict(os.environ)
+        env["PYTHONPATH"] = str(td) + os.pathsep + env.get("PYTHONPATH", "")
+        r = run([sys.executable, str(TOOLS / "check-yaml.py"), "opencode"], env=env)
+        check("有 yaml exit 0", r.returncode == 0, (r.stdout + r.stderr)[-200:])
 
 
 def _raises(fn, *a) -> bool:
@@ -327,8 +350,12 @@ def test_install_fresh_home():
     with tempfile.TemporaryDirectory() as td:
         home = Path(td) / "home"
         home.mkdir()
+        stub = Path(td) / "stub"
+        stub.mkdir()
+        (stub / "yaml.py").write_text("# stub\n", encoding="utf-8")
         env = dict(os.environ)
         env["HOME"] = str(home)
+        env["PYTHONPATH"] = str(stub) + os.pathsep + env.get("PYTHONPATH", "")
         r = run(["bash", str(TOOLS.parent / "install.sh"), "codex"],
                 cwd=str(TOOLS.parent), env=env)
         check("fresh home install exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
@@ -340,12 +367,17 @@ def test_install_fresh_home():
 def test_install_no_home():
     """P2 回归：HOME 未设置时安装脚本在创建任何目录前即拒绝（报路径异常）。"""
     print("[e2e] install.sh 无 HOME 拒绝安装")
-    env = dict(os.environ)
-    env.pop("HOME", None)
-    r = run(["bash", str(TOOLS.parent / "install.sh"), "codex"],
-            cwd=str(TOOLS.parent), env=env)
-    check("no HOME exit 1", r.returncode == 1, str(r.returncode))
-    check("no HOME 报路径异常", "安装目标路径异常" in (r.stdout + r.stderr))
+    with tempfile.TemporaryDirectory() as td:
+        stub = Path(td) / "stub"
+        stub.mkdir()
+        (stub / "yaml.py").write_text("# stub\n", encoding="utf-8")
+        env = dict(os.environ)
+        env.pop("HOME", None)
+        env["PYTHONPATH"] = str(stub) + os.pathsep + env.get("PYTHONPATH", "")
+        r = run(["bash", str(TOOLS.parent / "install.sh"), "codex"],
+                cwd=str(TOOLS.parent), env=env)
+        check("no HOME exit 1", r.returncode == 1, str(r.returncode))
+        check("no HOME 报路径异常", "安装目标路径异常" in (r.stdout + r.stderr))
 
 
 def test_install_python_gate():
@@ -362,6 +394,27 @@ def test_install_python_gate():
         check("版本门槛拒绝 exit 1", r.returncode == 1, str(r.returncode))
         check("拒绝信息含安装中止", "安装中止" in (r.stdout + r.stderr),
               (r.stdout + r.stderr)[-300:])
+        dest = home / ".codex" / "skills" / "awesome-novel"
+        check("拒绝时未创建目标目录", not dest.exists())
+
+
+def test_install_yaml_gate():
+    """Y-ver E2E 回归：缺 pyyaml 时 install.sh codex 在创建目标目录前中止。"""
+    print("[e2e] install.sh pyyaml 门槛 fail-fast")
+    with tempfile.TemporaryDirectory() as td:
+        home = Path(td) / "home"
+        home.mkdir()
+        block = Path(td) / "block"
+        block.mkdir()
+        (block / "yaml.py").write_text('raise ImportError("blocked")\n', encoding="utf-8")
+        env = dict(os.environ)
+        env["HOME"] = str(home)
+        env["PYTHONPATH"] = str(block) + os.pathsep + env.get("PYTHONPATH", "")
+        r = run(["bash", str(TOOLS.parent / "install.sh"), "codex"],
+                cwd=str(TOOLS.parent), env=env)
+        check("缺 pyyaml 拒绝 exit 1", r.returncode == 1, str(r.returncode))
+        check("缺 pyyaml 报安装中止", "安装中止" in (r.stdout + r.stderr)
+              and "pyyaml" in (r.stdout + r.stderr), (r.stdout + r.stderr)[-300:])
         dest = home / ".codex" / "skills" / "awesome-novel"
         check("拒绝时未创建目标目录", not dest.exists())
 
@@ -389,11 +442,13 @@ def main():
         ("test_config", test_config),
         ("test_yaml_precheck", test_yaml_precheck),
         ("test_check_python", test_check_python),
+        ("test_check_yaml", test_check_yaml),
         ("test_init_layout", test_init_layout),
         ("test_sync", test_sync),
         ("test_install_fresh_home", test_install_fresh_home),
         ("test_install_no_home", test_install_no_home),
         ("test_install_python_gate", test_install_python_gate),
+        ("test_install_yaml_gate", test_install_yaml_gate),
         ("test_noyaml_e2e", test_noyaml_e2e),
     ]:
         try:
