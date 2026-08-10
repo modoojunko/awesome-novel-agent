@@ -31,7 +31,7 @@
 
 ---
 
-> **关于多 Agent 协作架构：** 本系统由 7 个 Agent 协作驱动。`@novel-agent` 是顶层入口，由主 AI 加载后扮演总指挥角色。它不直接写内容，而是通过 Agent 工具调度子 agent（volume-planner / chapter-planner / prompt-crafter / writer / reader / updater）各司其职。子 agent 完成后清理任务标记，novel-agent 检测到后自动推进下一阶段。
+> **关于多 Agent 协作架构：** 本系统由 8 个 Agent 协作驱动。`@novel-agent` 是顶层入口，由主 AI 加载后扮演总指挥角色。它不直接写内容，而是通过 Agent 工具调度子 agent（volume-planner / chapter-planner / prompt-crafter / writer / reader / anti-ai / updater）各司其职。子 agent 完成后清理任务标记，novel-agent 检测到后自动推进下一阶段。
 
 ---
 
@@ -56,7 +56,9 @@
 
 **如果 AI 说不知道这个项目，再试试：**
 
-> "去 https://github.com/modoojunko/awesome-novel-skill/releases 下载最新的 release，然后运行 install.sh"
+> "去 https://github.com/modoojunko/awesome-novel-skill/releases 下载最新的 release，然后按 README 安装"
+
+（Reasonix 不走 install.sh：克隆后用 `python tools/init.py <项目路径> --platform reasonix` 初始化。）
 
 ---
 

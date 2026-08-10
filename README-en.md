@@ -86,9 +86,9 @@ After the skill is installed, launch Claude Code / OpenCode / Codex in the direc
 
 (In Codex, type `/use awesome-novel`, or just say **"帮我写本小说"**.)
 
-The skill detects the directory state: for a new directory it confirms with you, then runs `init.py` to scaffold the novel workspace locally (project skeleton, agent definitions, knowledge base, memory files) before entering the writing flow. The system uses 7 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
+The skill detects the directory state: for a new directory it confirms with you, then runs `init.py` to scaffold the novel workspace locally (project skeleton, agent definitions, knowledge base, memory files) before entering the writing flow. The system uses 8 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
 
-Reasonix users: run `reasonix code` in the project directory, then type `/awesome-novel` or `@novel-agent` to enter the writing flow.
+Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow.
 
 ```
 novel-agent (top-level entry — loaded via @novel-agent)

@@ -117,7 +117,7 @@ cd <小说项目路径> && reasonix code
 
 skill 会自动检测目录状态：新目录会先和你确认，然后运行 `init.py` 在本地初始化小说工作空间（项目骨架、agent 定义、知识库、记忆文件），完成后进入写作流程。后续再进入该项目时，说 `@novel-agent` 或 **"帮我继续写"** 就能从中断处恢复。
 
-Reasonix 用户在项目目录运行 `reasonix code` 后，同样输入 `/awesome-novel` 或 `@novel-agent` 进入写作流程。
+Reasonix 用户在项目目录运行 `reasonix code` 后，输入 `@novel-agent` 进入写作流程。
 
 Agent 会引导你完成后续步骤。系统由 8 个 AI Agent 协作驱动，自动检测进度、调度任务，你只需确认方向和审阅内容。
 
@@ -435,7 +435,7 @@ OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义
 
 ### 初始化项目
 
-在项目目录（或指定路径）运行 init.py，指定 Reasonix 平台；也可对 Reasonix 说 `/awesome-novel` 让它自动完成：
+在项目目录（或指定路径）运行 init.py，指定 Reasonix 平台：
 
 ```bash
 python tools/init.py <小说项目路径> --genre <编号> --platform reasonix
@@ -449,7 +449,7 @@ python tools/init.py <小说项目路径> --genre <编号> --platform reasonix
 cd <小说项目路径> && reasonix code
 ```
 
-然后输入 `/awesome-novel` 或 `@novel-agent` 进入写作循环。Reasonix 环境里 novel-agent 用 `run_skill` 调度子 agent，调度协议与其余平台一致。
+然后输入 `@novel-agent` 进入写作循环。Reasonix 环境里 novel-agent 用 `run_skill` 调度子 agent，调度协议与其余平台一致。
 
 ### 项目结构差异
 
