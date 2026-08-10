@@ -354,6 +354,28 @@ _CODEX_TOOL_MAP = {
     "Agent": "spawn_agent",   # Claude Code Agent 工具 ↔ Codex spawn_agent
 }
 
+# 子 agent 注入段：Codex TOML 无工具白名单字段，只能靠指令文本声明硬约束。
+# 放在 developer_instructions 最顶部，先于源文件正文与 SOP。
+_CODEX_DISPATCH_BAN = """## 调度权限硬约束（最高优先级，先于本文件其余一切指令）
+
+你是执行型子 agent，没有任何调度权。**禁止使用 `spawn_agent` 工具派生子 agent**
+（包括派发与自己同名的 agent，禁止任何形式的递归派生）。你实际拥有完整工具集，
+但这条禁令不因工具可用而失效。
+
+同时禁止：
+- 写 `.agent/task/` 下除本 order 以外的任何文件
+- 写 `.agent/status.md` 的 `phase` / `current_step` / `last_volume_completed` 字段
+  （这些字段只有 novel-agent 能写）
+- 代替 novel-agent 推进流水线（写新 order、更新 phase）
+
+你只做：
+1. 读取 order 文件，执行其中指定的任务
+2. 写 order 的 `outputs` 指向的文件
+3. 完成后把 order 的 `status` 覆盖为 `DONE` 并结束
+
+任务需要其他 agent 协作（如发现需要新增设定/归档/评审）时，不要自己调度——
+在回复中明确告诉 novel-agent"下一步应调度谁、为什么"，由 novel-agent 调度。"""
+
 
 def _toml_escape(s: str) -> str:
     """单行 TOML 基本字符串转义。"""
@@ -387,8 +409,9 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
     """Claude Code agent frontmatter → Codex 自定义 agent TOML。
 
     - 必填字段：name / description / developer_instructions（Codex 官方约定）
-    - tools：Codex agent TOML 无工具白名单字段，改为在指令中声明允许工具；
-      Agent → spawn_agent（调度说明见 novel-agent 适配段）
+    - tools：Codex agent TOML 无工具白名单字段，子 agent 注入「调度权限硬约束」
+      （禁止 spawn_agent / 越权写文件），声明的工具范围仅作提示；
+      Agent → spawn_agent（仅 novel-agent 持有，调度说明见适配段）
     - skills：frontmatter 声明的 SOP 内联进 developer_instructions（与 reasonix 一致）
     - 路径改写：.claude/knowledge、.claude/memory → .codex/ 对应目录
     """
@@ -425,11 +448,26 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
             "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
             "- 把 order 文件内容作为任务消息传给子 agent；order 文件协议（status: DONE）不变\n"
             "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+            "- 你是本项目唯一调度者：spawn 后留意 agent 树，子 agent 若尝试再派生，立即 interrupt 并按规范重派\n"
         )
+    else:
+        body = _CODEX_DISPATCH_BAN + "\n\n" + body
 
     tool_line = ""
     if allowed:
-        tool_line = f"\n\n（自动生成）本 agent 允许使用的工具：{'、'.join(allowed)}"
+        if name == "novel-agent":
+            tool_line = (
+                "\n\n（自动生成）本 agent 声明的工具范围："
+                + "、".join(allowed)
+                + "。你是唯一调度者，spawn_agent 只用于调度子 agent，禁止派生 novel-agent 自身。"
+            )
+        else:
+            tool_line = (
+                "\n\n（自动生成）本 agent 声明的工具范围："
+                + "、".join(allowed)
+                + "。Codex 自定义 agent TOML 无工具白名单字段，该声明不裁剪实际工具集；"
+                "真正的约束见上文「调度权限硬约束」的禁止项。"
+            )
     body += tool_line
 
     sop_sections = []
