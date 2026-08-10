@@ -1,9 +1,9 @@
-# 类型档案：unknown
+# 类型档案：玄幻脑洞
 
-> 
+> 脑洞向玄幻。
 
-- **id:** ``
-- **label:** 
+- **id:** `xuanhuan-brained`
+- **label:** 玄幻脑洞
 
 ---
 

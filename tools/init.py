@@ -49,6 +49,34 @@ GENRES = [
     "game-sports", "anime-derivative", "derivative", "male-derivative",
 ]
 
+# 题材中文名（展示给作者用，与 GENRES 一一对应；知识库 genre-example 文件同源）
+GENRE_LABELS = {
+    "xianxia": "东方仙侠",
+    "xuanhuan": "传统玄幻",
+    "urban": "都市大类",
+    "urban-romance": "都市言情",
+    "urban-daily": "都市日常",
+    "urban-farming": "都市种田",
+    "urban-brained": "都市脑洞",
+    "urban-cultivation": "都市修真",
+    "urban-high-martial": "都市高武",
+    "war-god": "战神赘婿",
+    "western-fantasy": "西方奇幻",
+    "ancient-politics": "古风权谋",
+    "historical": "历史大类",
+    "historical-ancient": "历史古代",
+    "historical-brained": "历史脑洞",
+    "anti-japanese-war": "抗战谍战",
+    "scifi-apocalypse": "科幻末世",
+    "suspense-crime": "悬疑刑侦",
+    "suspense-paranormal": "悬疑灵异",
+    "suspense-brained": "悬疑脑洞",
+    "game-sports": "游戏体育",
+    "anime-derivative": "动漫衍生",
+    "derivative": "衍生类",
+    "male-derivative": "男频衍生",
+}
+
 SKILL_HOME = resolve_skill_home()
 
 SOURCE_AGENTS = SKILL_HOME / "agents"
@@ -120,7 +148,7 @@ def main():
     if genre is None:
         genre = select_genre()
     else:
-        print(f"题材: {genre}")
+        print(f"题材: {GENRE_LABELS.get(genre, genre)}（{genre}）")
 
     # Step 2: 创建骨架
     create_skeleton(project_path, platform)
@@ -171,7 +199,7 @@ def select_genre() -> str:
     """交互式选题材"""
     print("\n可选题材:")
     for i, g in enumerate(GENRES, 1):
-        print(f"  {i:2d}. {g}")
+        print(f"  {i:2d}. {GENRE_LABELS[g]}（{g}）")
 
     while True:
         try:
@@ -400,11 +428,13 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
         print(f"  ⚠️  genre-example/{genre}.md 为空模板，settings 保留占位符（请在设定阶段填写）")
         return
 
-    # 题材显示名：优先标题行 "# 类型档案：X"，fallback 到 **label:**
-    label = genre
+    # 题材显示名：优先标题行 "# 类型档案：X"，fallback 到 **label:**，再 fallback 中文注册名
+    label = GENRE_LABELS.get(genre, genre)
     title_m = re.match(r"^#\s+类型档案[:：]\s*(.+)$", text, re.M)
     if title_m:
-        label = title_m.group(1).strip()
+        title = title_m.group(1).strip()
+        if title != "unknown":
+            label = title
     else:
         lm = re.search(r"\*\*label:\*\*\s*(\S+)", text)
         if lm:

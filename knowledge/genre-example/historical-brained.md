@@ -1,9 +1,9 @@
-# 类型档案：unknown
+# 类型档案：历史脑洞
 
-> 
+> 脑洞向历史，一般有金手指。
 
-- **id:** ``
-- **label:** 
+- **id:** `historical-brained`
+- **label:** 历史脑洞
 
 ---
 
