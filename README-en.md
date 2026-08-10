@@ -56,7 +56,7 @@ Let AI be your novel writing partner, from world-building to character developme
 
 > **Install awesome-novel-skill for me**
 
-The agent will download the repo and run the prepared installer `./install.sh <platform>` itself:
+The agent will download from <https://github.com/modoojunko/awesome-novel-skill> (if it can't find it, paste this repo URL to it) and run the prepared installer `./install.sh <platform>` itself:
 
 | Platform | Install location |
 |----------|------------------|
@@ -217,7 +217,7 @@ Agent asks if you want to choose one during setup.
 
 **Q: I'm not a programmer, can I install it?**
 
-Yes. Tell your AI tool "帮我安装 awesome-novel-skill" — the agent runs the installer for you. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
+Yes. Tell your AI tool "帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill" — the agent runs the installer for you. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
 
 **Q: I upgraded the skill, how do I migrate my existing novel projects to the new format?**
 

@@ -27,7 +27,7 @@
 
 把下面这段话复制给 AI：
 
-> "帮我安装 awesome-novel-skill"
+> "帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill"
 
 ---
 

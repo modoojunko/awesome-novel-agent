@@ -78,7 +78,7 @@
 
 > **帮我安装 awesome-novel-skill**
 
-AI 会自动下载仓库，并运行准备好的安装脚本 `./install.sh <平台>`，把 skill 本体装到你机器上：
+AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-skill> 下载（若它说找不到，就把这个仓库地址发给它），并运行准备好的安装脚本 `./install.sh <平台>`，把 skill 本体装到你机器上：
 
 | 平台 | 安装位置 |
 |------|---------|
@@ -261,7 +261,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-skill"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix 或 Codex。
+能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix 或 Codex。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
