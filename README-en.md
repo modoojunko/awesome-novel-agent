@@ -64,7 +64,7 @@ The agent will download the repo and run the prepared installer `./install.sh <p
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`).
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms).
 
 **Reasonix:**
 

@@ -86,7 +86,7 @@ AI 会自动下载仓库，并运行准备好的安装脚本 `./install.sh <平�
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 
-看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex`）。
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。
 
 **Reasonix：**
 

@@ -52,6 +52,8 @@
 | Codex | `./install.sh codex` |
 | Reasonix | 项目级部署：`python tools/init.py <项目路径> --platform reasonix`（不走 install.sh） |
 
+> `install.sh` 同时兼容 deepseek-tui / hermes / openclaw；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。
+
 ---
 
 **如果 AI 说不知道这个项目，再试试：**
@@ -1636,5 +1638,5 @@ AI 会指出具体问题，修改后重新验收。
 
 ---
 
-**手册版本：** v6.1
-**适用版本：** awesome-novel-skill v3.2.3+
+**手册版本：** v4.12.0
+**适用版本：** awesome-novel-skill v4.12.0+
