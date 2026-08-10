@@ -49,6 +49,7 @@ Let AI be your novel writing partner, from world-building to character developme
 
 - A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, or **Codex** installed
 - Python 3.9+ (the one bundled with macOS works; 3.11+ recommended)
+- pyyaml for OpenCode / Codex (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
 - About 1 minute to install
 
 ## Installation
@@ -65,7 +66,7 @@ The agent will download from <https://github.com/modoojunko/awesome-novel-skill>
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version first (3.9+ required) and aborts with a clear upgrade message instead of failing later when `sync-project.py` runs.
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
 
 **Reasonix:**
 

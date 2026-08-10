@@ -48,6 +48,16 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
+# pyyaml 门槛：opencode / codex 的 agent 转换依赖 pyyaml（与 tools/platforms.py
+# ensure_yaml 的运行时规则对齐）；claude-code 纯复制不转换，不需要。
+if ($Platform -in @("opencode", "codex")) {
+    & $PY_BIN "$SCRIPT_DIR\tools\check-yaml.py" $Platform
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "安装中止：缺少 pyyaml。请先执行 pip install pyyaml 后重试。"
+        exit 1
+    }
+}
+
 Write-Host "安装到: $DEST_DIR"
 
 # 创建目录，已存在则清空
