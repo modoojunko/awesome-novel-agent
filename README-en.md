@@ -52,21 +52,23 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## Installation
 
-Pick the command matching your tool and paste it in your terminal:
+**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex) and tell it:
 
-**Claude Code:**
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh claude-code
-```
+> **Install awesome-novel-skill for me**
 
-**OpenCode:**
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode
-```
+The agent will download the repo and run the prepared installer `./install.sh <platform>` itself:
+
+| Platform | Install location |
+|----------|------------------|
+| Claude Code | `~/.claude/skills/awesome-novel/` |
+| OpenCode | `~/.config/opencode/skills/awesome-novel/` |
+| Codex | `~/.codex/skills/awesome-novel/` |
+
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms).
 
 **Reasonix:**
 
-Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not globally. Clone the repo and initialize your novel project with init.py:
+Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not globally — no `install.sh`. Tell Reasonix **"Install awesome-novel-skill for me"** and it will clone the repo and run `init.py` to initialize your novel project directly:
 
 ```bash
 git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
@@ -74,39 +76,19 @@ python tools/init.py <novel-project-path> --platform reasonix
 cd <novel-project-path> && reasonix code
 ```
 
-**Codex:**
-
-The Codex skill is installed **user-level** (`~/.codex/skills/awesome-novel/`), while agents/skills/knowledge/memory are deployed **project-level** into `.codex/` at init time:
-
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
-python tools/init.py <novel-project-path> --platform codex
-cd <novel-project-path>  # then call @novel-agent in Codex to start writing
-```
-
-Manual installation:
-
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git
-cd awesome-novel-skill
-mkdir -p ~/.claude/skills/awesome-novel
-cp -r agents ~/.claude/skills/awesome-novel/
-cp -r templates ~/.claude/skills/awesome-novel/
-cp -r knowledge ~/.claude/skills/awesome-novel/
-cp -r memory ~/.claude/skills/awesome-novel/
-cp -r tools ~/.claude/skills/awesome-novel/
-cp SKILL.md ~/.claude/skills/awesome-novel/
-```
-
-You'll see "安装完成" (Installation complete) when done.
+> Use `--genre <number>` to pick a preset genre; without it, init.py asks interactively.
 
 ## Start Writing
 
-After installation, open your terminal in the directory where you want your novel project and launch your AI tool. Then say:
+After the skill is installed, launch Claude Code / OpenCode / Codex in the directory where you want your novel project and type:
 
-> **"帮我写本小说"** (Help me write a novel)
+> **/awesome-novel**
 
-The Agent will guide you through the rest. The system uses 7 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
+(In Codex, type `/use awesome-novel`, or just say **"帮我写本小说"**.)
+
+The skill detects the directory state: for a new directory it confirms with you, then runs `init.py` to scaffold the novel workspace locally (project skeleton, agent definitions, knowledge base, memory files) before entering the writing flow. The system uses 8 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
+
+Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow.
 
 ```
 novel-agent (top-level entry — loaded via @novel-agent)
@@ -204,7 +186,7 @@ After chapter one, Agent asks "下一章继续吗？" (Continue to next chapter?
 
 | You Say | AI Does |
 |---------|---------|
-| "帮我写本小说" | Create project from scratch + start setting discussion |
+| "/awesome-novel" or "帮我写本小说" | Load the skill, initialize the novel workspace in the current directory + start setting discussion |
 | "帮我继续写" | Resume from last progress |
 | "写下一章" | Start writing latest chapter |
 | "改一下第 X 段" | Revise specified paragraph |
@@ -235,7 +217,7 @@ Agent asks if you want to choose one during setup.
 
 **Q: I'm not a programmer, can I install it?**
 
-Yes. Just copy and paste those commands into your terminal. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
+Yes. Tell your AI tool "帮我安装 awesome-novel-skill" — the agent runs the installer for you. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
 
 **Q: I upgraded the skill, how do I migrate my existing novel projects to the new format?**
 
@@ -259,23 +241,21 @@ This skill also supports [Codex](https://developers.openai.com/codex) (OpenAI's 
 
 ### Install
 
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
-```
-
-Installs to `~/.codex/skills/awesome-novel/`.
+Tell Codex "帮我安装 awesome-novel-skill" and it runs `./install.sh codex` itself, installing to `~/.codex/skills/awesome-novel/`.
 
 ### Initialize a project
 
+Open the target directory in Codex and type `/use awesome-novel` (or say "帮我写本小说") — the skill initializes automatically. You can also run:
+
 ```bash
-python tools/init.py <novel-project-path> --genre <number> --platform codex
+python ~/.codex/skills/awesome-novel/tools/init.py <novel-project-path> --genre <number> --platform codex
 ```
 
 The 8 custom agents are deployed as Codex TOML files (`.codex/agents/*.toml`, with `name` / `description` / `developer_instructions`), standalone tools as `.codex/skills/<name>/SKILL.md`, and anti-AI rules, style preferences, format specs, and writing memory land in `.codex/knowledge/` / `.codex/memory/`.
 
 ### Start writing
 
-Open the project directory in Codex and call `@novel-agent` to enter the writing loop. In Codex, novel-agent dispatches sub-agents with `spawn_agent` (agent name = the TOML name under `.codex/agents/`); the order-file protocol is identical to the other platforms.
+Call `/awesome-novel` or `@novel-agent` to enter the writing loop. In Codex, novel-agent dispatches sub-agents with `spawn_agent` (agent name = the TOML name under `.codex/agents/`); the order-file protocol is identical to the other platforms.
 
 Upgrade later with `python tools/sync-project.py <novel-project-path> --platform codex`.
 

@@ -7,6 +7,8 @@ description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成
 
 和 AI 一起写小说。本 skill 负责项目状态检测、新项目初始化、旧版项目自动迁移，完成后将控制权交给 novel-agent。
 
+**唤起方式：** 用户在项目目录输入 `/awesome-novel`（Claude Code / OpenCode 直接输入；Codex 输入 `/use awesome-novel`；或说"帮我写本小说"）即进入下方检测流程。新目录会先询问作者，确认后运行 `init.py` 在本地初始化小说工作空间。
+
 ## OpenCode 集成说明
 
 本 skill 也支持 OpenCode。安装在 `~/.config/opencode/skills/awesome-novel/` 后，项目初始化脚本会自动部署 agent 定义到 `.opencode/agents/`，OpenCode 即可自动发现：
@@ -28,19 +30,19 @@ description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成
 ## 检测流程 — 严格按此执行，禁止跳过
 
 ```
-检测项目状态
+用户输入 /awesome-novel（或"帮我写本小说"）→ 检测项目状态
 ├─ story.yaml 存在 → 旧版 2.x → 执行自动迁移（见下文）
 ├─ story.md 不存在 → 询问作者是否初始化 → 是则执行 init.py
-│   └─ python tools/init.py [project-path] [--genre <编号>] → 完成后 @novel-agent
+│   └─ python <本 skill 安装目录>/tools/init.py [project-path] [--genre <编号>] → 完成后 @novel-agent
 └─ story.md 存在 → 已有项目
     ├─ 检查同步新鲜度
-    │   ├─ python tools/sync-project.py . --check → exit 0 → 已最新，略过
-    │   ├─ python tools/sync-project.py . --check → exit 1 → 有更新
+    │   ├─ python <本 skill 安装目录>/tools/sync-project.py . --check → exit 0 → 已最新，略过
+    │   ├─ python <本 skill 安装目录>/tools/sync-project.py . --check → exit 1 → 有更新
     │   │   └─ 展示变更文件，询问作者是否同步
-    │   │       ├─ 确认 → 运行 python tools/sync-project.py .
+    │   │       ├─ 确认 → 运行 python <本 skill 安装目录>/tools/sync-project.py .
     │   │       └─ 跳过 → 继续
     │   └─ .agent/.sync-fingerprint 不存在（首次）
-    │       └─ 静默运行 python tools/sync-project.py . → 写入指纹
+    │       └─ 静默运行 python <本 skill 安装目录>/tools/sync-project.py . → 写入指纹
     └─ → @novel-agent 继续写作
 ```
 
@@ -57,8 +59,10 @@ description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成
 
 全新项目先询问作者是否初始化，确认后运行 `init.py`（项目路径可选，默认当前目录）：
 ```
-python tools/init.py [project-path] [--genre <编号>]
+python <本 skill 安装目录>/tools/init.py [project-path] [--genre <编号>]
 ```
+
+`<本 skill 安装目录>` 即本 SKILL.md 所在目录（如 `~/.claude/skills/awesome-novel/`、`~/.config/opencode/skills/awesome-novel/`、`~/.codex/skills/awesome-novel/`）。AI 用绝对路径调用，避免在项目目录找不到 `tools/init.py`。
 
 **禁止以任何理由跳过 init.py：** 手动创建目录、复制模板、直接调用 agent 都属于违规行为。`init.py` 是初始化入口，必须执行且完整运行。
 

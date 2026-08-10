@@ -74,19 +74,23 @@
 
 ## 安装
 
-**Claude Code：**
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh claude-code
-```
+**不用复制粘贴命令。** 打开你正在使用的 AI 工具（Claude Code / OpenCode / Codex），对它说：
 
-**OpenCode：**
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode
-```
+> **帮我安装 awesome-novel-skill**
+
+AI 会自动下载仓库，并运行准备好的安装脚本 `./install.sh <平台>`，把 skill 本体装到你机器上：
+
+| 平台 | 安装位置 |
+|------|---------|
+| Claude Code | `~/.claude/skills/awesome-novel/` |
+| OpenCode | `~/.config/opencode/skills/awesome-novel/` |
+| Codex | `~/.codex/skills/awesome-novel/` |
+
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。
 
 **Reasonix：**
 
-Reasonix 的 skill 是**项目级部署**（装在每个小说项目的 `.reasonix/skills/`），不走 install.sh。克隆仓库后直接用 init.py 初始化小说项目：
+Reasonix 的 skill 是**项目级部署**（装在每个小说项目的 `.reasonix/skills/`），不走 install.sh。对 Reasonix 说 **"帮我安装 awesome-novel-skill"**，它会克隆仓库并用 `init.py` 在你的目标目录直接初始化小说项目：
 
 ```bash
 git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
@@ -94,49 +98,26 @@ python tools/init.py <小说项目路径> --platform reasonix
 cd <小说项目路径> && reasonix code
 ```
 
-> 用 `--genre <编号>` 指定预置题材，不传则交互式选题材。装好后在项目目录里输入 `@novel-agent` 开始写作。
-
-**Codex：**
-
-Codex 的 skill 是**用户级安装**（`~/.codex/skills/awesome-novel/`），小说项目内的 agents/skills/knowledge/memory 则在初始化时**项目级部署**到 `.codex/`：
-
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
-python tools/init.py <小说项目路径> --platform codex
-cd <小说项目路径>  # 然后在 Codex 中调用 @novel-agent 开始写作
-```
-
-或者手动复制（以 Claude Code 为例）：
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git
-cd awesome-novel-skill
-mkdir -p ~/.claude/skills/awesome-novel
-cp -r agents ~/.claude/skills/awesome-novel/
-cp -r skills ~/.claude/skills/awesome-novel/
-cp -r templates ~/.claude/skills/awesome-novel/
-cp -r knowledge ~/.claude/skills/awesome-novel/
-[ -d memory ] && cp -r memory ~/.claude/skills/awesome-novel/
-cp -r tools ~/.claude/skills/awesome-novel/
-cp SKILL.md ~/.claude/skills/awesome-novel/
-echo "安装完成!"
-```
+> 用 `--genre <编号>` 指定预置题材，不传则交互式选题材。
 
 > **OpenCode 用户注意：** 安装路径为 `~/.config/opencode/skills/awesome-novel/`，初始化后 agent 定义部署在项目 `.opencode/agents/` 下，OpenCode 自动发现。详情见下方 [OpenCode 集成](#opencode) 说明。
 
 > **Codex 用户注意：** skill 安装到 `~/.codex/skills/awesome-novel/`，初始化后 8 个自定义 agent 以 TOML 形式部署在项目 `.codex/agents/` 下，Codex 自动发现。详情见下方 [Codex 集成](#codex-集成) 说明。
-
-看到 "安装完成" 就可以了。
 
 > **看到这个项目觉得有用？** 顺手点个 Star，这样它会出现在你的 GitHub 首页，让更多人发现。
 > {: .prompt-info }
 
 ## 开始写小说
 
-安装后，打开终端，在**你想放小说项目的目录**下启动 Claude Code、OpenCode 或 Reasonix，然后说一句：
+安装好本体后，在**你想放小说项目的目录**下启动 Claude Code / OpenCode / Codex，输入：
 
-> **帮我写本小说**
+> **/awesome-novel**
 
-系统会自动加载写作流程。后续再进入该项目时，说 `@novel-agent` 或 **"帮我继续写"** 就能从中断处恢复。
+（Codex 输入 `/use awesome-novel`，或者直接说 **"帮我写本小说"**。）
+
+skill 会自动检测目录状态：新目录会先和你确认，然后运行 `init.py` 在本地初始化小说工作空间（项目骨架、agent 定义、知识库、记忆文件），完成后进入写作流程。后续再进入该项目时，说 `@novel-agent` 或 **"帮我继续写"** 就能从中断处恢复。
+
+Reasonix 用户在项目目录运行 `reasonix code` 后，输入 `@novel-agent` 进入写作流程。
 
 Agent 会引导你完成后续步骤。系统由 8 个 AI Agent 协作驱动，自动检测进度、调度任务，你只需确认方向和审阅内容。
 
@@ -250,7 +231,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 | 你说 | AI 做什么 |
 |------|-----------|
-| "帮我写本小说" | 首次加载技能 + 创建项目 + 设定讨论 |
+| "/awesome-novel" 或 "帮我写本小说" | 加载技能 + 在当前目录初始化小说工作空间 + 设定讨论 |
 | "@novel-agent" 或 "帮我继续写" | 进入 / 恢复写作循环 |
 | "写下一章" | 开始写最新一章 |
 | "跑一下推演" 或 "剧情推演" | 角色推演沙盘——卡剧情时让角色演一遍 |
@@ -280,7 +261,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。上面那几行命令复制粘贴到终端，回车就行。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix 或 Codex。
+能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-skill"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix 或 Codex。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
@@ -399,15 +380,11 @@ awesome-novel-skill/
 
 ### 安装
 
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode
-```
-
-安装到 `~/.config/opencode/skills/awesome-novel/`。
+在 OpenCode 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh opencode`，安装到 `~/.config/opencode/skills/awesome-novel/`。
 
 ### 初始化项目
 
-在目标目录运行 init.py（使用完整路径或设置 `NOVEL_SKILL_HOME` 环境变量）：
+在目标目录输入 `/awesome-novel`，skill 会自动调用 init.py 初始化；也可手动运行：
 
 ```bash
 python ~/.config/opencode/skills/awesome-novel/tools/init.py . --genre <编号>
@@ -415,7 +392,7 @@ python ~/.config/opencode/skills/awesome-novel/tools/init.py . --genre <编号>
 
 ### 开始写作
 
-初始化完成后，在 OpenCode 中通过 `@novel-agent` 或 Task 工具调用 novel-agent 进入写作循环。
+初始化完成后，在 OpenCode 中通过 `/awesome-novel` 或 `@novel-agent` 进入写作循环。
 
 ### 项目结构差异
 
@@ -454,9 +431,7 @@ OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义
 
 ### 安装框架源码
 
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
-```
+对 Reasonix 说 **"帮我安装 awesome-novel-skill"**，它会克隆仓库到本地（项目级部署，不装到全局）。
 
 ### 初始化项目
 
@@ -474,7 +449,7 @@ python tools/init.py <小说项目路径> --genre <编号> --platform reasonix
 cd <小说项目路径> && reasonix code
 ```
 
-然后通过 `@novel-agent` 进入写作循环。Reasonix 环境里 novel-agent 用 `run_skill` 调度子 agent，调度协议与其余平台一致。
+然后输入 `@novel-agent` 进入写作循环。Reasonix 环境里 novel-agent 用 `run_skill` 调度子 agent，调度协议与其余平台一致。
 
 ### 项目结构差异
 
@@ -499,23 +474,21 @@ Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，�
 
 ### 安装
 
-```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex
-```
-
-安装到 `~/.codex/skills/awesome-novel/`。
+在 Codex 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh codex`，安装到 `~/.codex/skills/awesome-novel/`。
 
 ### 初始化项目
 
+在 Codex 中打开目标目录，输入 `/use awesome-novel`（或说"帮我写本小说"），skill 会自动初始化；也可手动运行：
+
 ```bash
-python tools/init.py <小说项目路径> --genre <编号> --platform codex
+python ~/.codex/skills/awesome-novel/tools/init.py <小说项目路径> --genre <编号> --platform codex
 ```
 
 初始化后 8 个自定义 agent 以 Codex 官方 TOML 格式部署到项目 `.codex/agents/*.toml`（`name` / `description` / `developer_instructions`），独立交互工具（memory-recording、roleplay-sandbox）部署为 `.codex/skills/<name>/SKILL.md`，反 AI 规则、文风偏好、格式规范与写作记忆分别落在 `.codex/knowledge/`、`.codex/memory/`。
 
 ### 开始写作
 
-在 Codex 中打开项目目录，调用 `@novel-agent` 进入写作循环。Codex 环境里 novel-agent 用 `spawn_agent` 调度子 agent（agent 名 = `.codex/agents/*.toml` 的 name），order 文件协议与其余平台一致。
+初始化完成后，在 Codex 中调用 `/awesome-novel` 或 `@novel-agent` 进入写作循环。Codex 环境里 novel-agent 用 `spawn_agent` 调度子 agent（agent 名 = `.codex/agents/*.toml` 的 name），order 文件协议与其余平台一致。
 
 ### 项目结构差异
 
