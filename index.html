@@ -97,24 +97,22 @@
     <div class="install">
       <h2>快速安装</h2>
 
-      <p style="margin-top: 1rem;"><span class="badge">Claude Code</span></p>
-      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh claude-code</code></pre>
+      <p style="margin-top: 1rem;">打开你的 AI 工具，对它说：</p>
+      <pre><code>帮我安装 awesome-novel-skill</code></pre>
 
-      <p style="margin-top: 1rem;"><span class="badge">OpenCode</span></p>
-      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh opencode</code></pre>
-
-      <p style="margin-top: 1rem;"><span class="badge">Codex</span></p>
-      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill && ./install.sh codex</code></pre>
-
-      <p style="margin-top: 1rem;"><span class="badge">Reasonix</span>（项目级部署，不走 install.sh）</p>
-      <pre><code>git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
-python tools/init.py &lt;小说项目路径&gt; --platform reasonix
-cd &lt;小说项目路径&gt; && reasonix code</code></pre>
+      <p style="margin-top: 1rem;">AI 会自动运行准备好的安装脚本，把 skill 本体装好：</p>
+      <p style="margin-top: 1rem;">
+        <span class="badge">Claude Code</span> ./install.sh claude-code
+        <span class="badge">OpenCode</span> ./install.sh opencode
+        <span class="badge">Codex</span> ./install.sh codex
+        <span class="badge">Reasonix</span> 项目级部署（init.py --platform reasonix）
+      </p>
     </div>
 
     <h2>开始创作</h2>
-    <p>安装完成后，在你想放小说项目的目录下启动 AI 工具，然后说一句：</p>
-    <pre><code>帮我写本小说</code></pre>
+    <p>安装完成后，在你想放小说项目的目录下启动 AI 工具，输入：</p>
+    <pre><code>/awesome-novel</code></pre>
+    <p>Codex 输入 <code>/use awesome-novel</code>，或直接说"帮我写本小说"。skill 会在本地自动初始化小说工作空间。</p>
 
     <footer>
       <p>GPLv3 开源 · 个人使用免费</p>

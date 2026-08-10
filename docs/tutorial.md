@@ -38,8 +38,19 @@
 **AI 会帮你：**
 
 1. 下载最新版本
-2. 执行安装脚本
+2. 运行对应平台的安装脚本（`./install.sh <平台>`）安装 skill 本体
 3. 配置到你的 AI 工具中
+
+---
+
+**安装脚本支持的平台：**
+
+| 平台 | 命令 |
+|------|------|
+| Claude Code | `./install.sh claude-code` |
+| OpenCode | `./install.sh opencode` |
+| Codex | `./install.sh codex` |
+| Reasonix | 项目级部署：`python tools/init.py <项目路径> --platform reasonix`（不走 install.sh） |
 
 ---
 
@@ -49,26 +60,15 @@
 
 ---
 
-**安装脚本支持的平台：**
-
-| 平台 | 命令 |
-|------|------|
-| Claude Code | `./install.sh claude-code` |
-| DeepSeek TUI | `./install.sh deepseek-tui` |
-| Hermes | `./install.sh hermes` |
-| OpenClaw | `./install.sh openclaw` |
-
----
-
 ### 1.3 验证安装
 
-安装完成后，打开你的 AI 工具，说：
+安装完成后，在你想放小说项目的目录打开你的 AI 工具，输入：
 
 ```
-@novel-agent
+/awesome-novel
 ```
 
-如果出现小说写作相关的引导，说明安装成功。
+skill 会先确认并初始化小说工作空间；如果出现小说写作相关的引导，说明安装成功。
 
 ---
 
@@ -79,12 +79,14 @@
 在你的 AI 工具中输入：
 
 ```
-@novel-agent
+/awesome-novel
 ```
 
 或直接说：
 
 > 帮我写一本小说
+
+Codex 中输入 `/use awesome-novel`。
 
 ### 2.2 系统自动检测
 
@@ -109,10 +111,10 @@ AI 检测到是新项目，开始初始化：
 
 > "我来引导你完成小说设定。先确认项目基本信息。"
 
-**【AI】** 执行 init.py：
+**【AI】** 执行 init.py（本 skill 安装目录下的 `tools/init.py`，AI 会自动定位）：
 
 ```bash
-python $NOVEL_SKILL_HOME/tools/init.py
+python <本 skill 安装目录>/tools/init.py
 ```
 
 `init.py` 会自动创建项目骨架，无需额外参数。
