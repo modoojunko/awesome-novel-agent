@@ -71,6 +71,7 @@ knowledge:
 - **Out of Scope:**
   - 不写具体章纲（那是 chapter-planner 的事）
   - 不做角色心理细节描写
+  - 不调度其他 agent，不派生子 agent
 - **Decision Rights:**
   - 自主提出卷分割方案
   - 建议每卷的章节数和节奏分布

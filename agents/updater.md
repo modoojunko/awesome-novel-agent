@@ -74,6 +74,7 @@ knowledge:
   - 不编辑正文草稿与中间稿（`.draft.md`/`.anti-ai.md` 一字不改）；归档时仅 Write 生成定稿 `.md`（复制内容，不做内容编辑）
   - 不做创作性决策（不判断好坏，只提取差异）
   - 不调度其他 agent
+  - 不写 `.agent/status.md` 的 `phase` / `current_step` / `last_volume_completed`（由 novel-agent 写；updater 只推进归档/设定相关进度标记）
 - **Decision Rights:**
   - 自主提取修改模式
   - 自主执行语义合并

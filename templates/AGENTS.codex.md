@@ -8,6 +8,12 @@
 
 **写作流程：** 设定 → 卷纲 → 章纲 → 提示词 → 正文 → 去AI味 → 验收 → 归档 → 下一章
 
+## 调度边界（最高优先级）
+
+- **唯一调度者：** novel-agent 是唯一允许派生子 agent 的 agent；任何被 spawn 的子 agent 禁止再派生（包括派发同名 agent 的递归派生）。
+- 子 agent 即使持有 spawn_agent 工具也不得使用；需要协作时向 novel-agent 报告，由 novel-agent 调度。
+- novel-agent 每次 spawn 后留意 agent 树，发现子 agent 递归派生立即中断并重派。
+
 **项目结构：**
 - `story.md` — 项目索引 + 主线拆纲
 - `settings/` — 世界观、角色、写作风格、时间线

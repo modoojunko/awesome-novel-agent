@@ -218,12 +218,27 @@ def test_init_layout():
         nv = (tmp / ".codex/agents/novel-agent.toml").read_text(encoding="utf-8")
         check("codex novel-agent 调度适配",
               "spawn_agent" in nv and ".codex/agents/" in nv)
+        sub_toml = "".join(
+            f.read_text(encoding="utf-8")
+            for f in sorted((tmp / ".codex/agents").glob("*.toml"))
+            if f.name != "novel-agent.toml"
+        )
+        check("codex 子 agent 注入调度硬约束",
+              "调度权限硬约束" in sub_toml and "spawn_agent" in sub_toml
+              and "禁止使用" in sub_toml,
+              "子 agent TOML 缺少禁止派生指令")
+        check("codex novel-agent 不注入禁调",
+              "调度权限硬约束" not in nv, "novel-agent 是唯一调度者，不应注入禁调")
+        vp = (tmp / ".codex/agents/volume-planner.toml").read_text(encoding="utf-8")
+        check("codex volume-planner 源 OOS 含不调度",
+              "不调度其他 agent" in vp, "volume-planner 源文件缺少不调度声明")
         check("codex skill roleplay-sandbox",
               (tmp / ".codex/skills/roleplay-sandbox/SKILL.md").exists())
         check("codex skill memory-recording",
               (tmp / ".codex/skills/memory-recording/SKILL.md").exists())
         ag = (tmp / "AGENTS.md").read_text(encoding="utf-8")
         check("codex AGENTS.md 指向 .codex/agents", ".codex/agents/" in ag, ag[:200])
+        check("codex AGENTS.md 唯一调度者规则", "唯一调度者" in ag, ag[:400])
         check("codex 无 CLAUDE.md", not (tmp / "CLAUDE.md").exists())
         check("codex 无 AGENTS.codex.md 模板副本",
               not (tmp / "AGENTS.codex.md").exists())
