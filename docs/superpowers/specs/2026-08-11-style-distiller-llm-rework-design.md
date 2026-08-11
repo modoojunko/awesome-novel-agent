@@ -1,0 +1,356 @@
+# 设计文档：style-distiller 重构——LLM 特征提取 + 生成验收抽卡循环
+
+**状态：已获作者确认（2026-08-11）**
+
+## 1. 背景与目标
+
+原模块采用「脚本统计（jieba POS）+ LLM 语义」两段式蒸馏。验收暴露根因问题：jieba 词性打标对文学词汇不可靠（「死寂→v、空旷→nr、安静→nr、刺骨→l、冰冷→z」，7 个形容词只认 2 个），导致核心测量失真、C1 手工口径被迫迁就机器。
+
+核心使用场景（作者确认）：拿作者 1-3 章（约 1 万字）正文 → 蒸馏出**特征卡** → 特征卡被渲染成**生成提示词** → 生成 agent 按提示词写出接近作者文风的正文 → 生成正文被**验收**，不符则带反馈重写（抽卡）。
+
+**目标**：改用 LLM 直接做特征提取（弃 jieba），把「验收」从脚本数值对比改为「用生成提示词逐条指令遵循检查」，并新增「验收不过 → 反馈重写」的抽卡闭环。卡片一旦蒸馏即冻结，机器生成内容永不回写卡片。
+
+**不做**：确定性统计引擎（jieba POS 计数）、增量滑动平均更新、题材基线、compare/mix 工具、C1 人工计数对照验收。
+
+## 2. 核心决策（已与作者确认）
+
+| 决策点 | 结论 |
+|--------|------|
+| 测量层 | **纯 LLM 特征提取**，无 jieba、无脚本统计引擎 |
+| 卡片格式 | 按作者提供的案例 1 维度（9 维客观数值 + 三维 name_pronoun + 类别枚举 + 声音层） |
+| 生成提示词格式 | 按作者提供的案例 2（数值渲染成范围指令 + 声音层透传 + 剧情上下文） |
+| 验收 | **anti-ai 用生成提示词（案例 2）逐条做指令遵循检查**，不用独立特征再提取 |
+| 抽卡 | 验收违反 → 违反报告喂回 writer 带反馈重写，novel-agent 调度级，≤3 次 |
+| 卡生命周期 | **冻结**：一次蒸馏到位；归档后不动卡；机器生成章永不回写；重蒸馏仅作者主动触发 |
+| 场景卡 | 保留：通用卡 + 分场景卡（战斗/对话等），LLM 按段落类型聚合提取，inherits/override |
+| 退役 | compare-style、mix-style、题材基线、F5 增量更新、check 退出码契约、C1 |
+| 验收主标准 | C6 作者盲测正确率 ≥ 70% |
+
+## 3. 架构
+
+### 3.1 角色分工（产卡/注入/生成/验收四分离）
+
+| 角色 | 职责 | 产物 |
+|------|------|------|
+| **style-distiller** | 产卡：LLM 读样本 → 特征卡（主卡 + 场景卡） | `settings/writing-style.md` + `settings/style-profiles/*` + 备份 `.style-versions/` |
+| **prompt-crafter** | 注入：卡 → 生成提示词（案例 2 格式） | 渲染后的风格参数提示词（写入 `prompts/` 或随 order 传递） |
+| **writer** | 生成：按风格参数提示词写正文 | `*.draft.md` |
+| **anti-ai** | 验收：用同一份风格参数提示词逐条检查正文 → 违反报告 | `archives/*.anti-ai.md` 报告 |
+| **novel-agent** | 调度：writer 生成 → anti-ai 验收 → 违反则派 writer 重写（≤3）→ 全过进 review/archive | order 流转 |
+
+**关键约束**：生成提示词（案例 2）是**唯一操作规格**——writer 生成与 anti-ai 验收用同一份文字，天然同源，避免「提取→对比数值」的两次测量噪声。
+
+### 3.2 主循环
+
+```
+① style-distiller：样本(1-3章) → [feature-extract 模板] → 特征卡（案例1 格式）
+② prompt-crafter：卡 → 渲染 → 风格参数提示词（案例2 格式）
+③ writer：用提示词写正文
+④ anti-ai：用同一份提示词逐条验收正文
+      ├─ 违反 → 违反报告（条号/如何违反/建议）→ novel-agent 派 writer 带报告重写 → 回④（≤3 次）
+      ├─ 3 次仍违反 → 取最优稿，报告留作者人工裁决
+      └─ 全过 → review(reader) → archive(updater) → 卡不动
+```
+
+### 3.3 调度点
+
+| 触发 | 动作 |
+|------|------|
+| setup / 手动「重蒸馏」 | novel-agent 派 style-distiller（`style-distill-order.md`）→ 写主卡 + 场景卡 |
+| draft | prompt-crafter 读卡渲染提示词，writer 生成 |
+| 生成后 | novel-agent 派 anti-ai 验收；违反派 writer 重写（≤3） |
+| 归档后 | **不触发任何风格增量更新**（卡冻结） |
+
+## 4. F1：卡片数据结构（案例 1 维度，锁定）
+
+卡 = 案例 1 结构，字段一字不改。主卡 `scene_type: general`；场景卡同结构 + `inherits` + `override`。
+
+```yaml
+profile_version: "1.0"
+profile_name: "都市校园轻小说-贺天然视角"     # 新增：人类可读的卡名
+scene_type: "general"                        # general | dialogue | fight | environment | inner-mono | transition | group-scene
+source_sample_length: 5000
+confidence: 75
+last_updated: "2026-08-11"
+
+# ==================== 词汇层 ====================
+lexicon:
+  adj_density_per_100: 5.8                   # 客观数值（LLM 提取）
+  adv_density_per_100: 3.5
+  four_phrase_freq_per_100: 1.8
+  preferred_words: [贺天然, 温凉, 重生, ...]  # 高频偏好词（≤10）
+  banned_words: []                            # 禁用词
+  name_pronoun_ratio:                         # 三维分布（旧单值改为分布）
+    name: 45                                  # 人名占比 %
+    he_she: 50                                # 他/她占比 %
+    i_you: 5                                  # 我/你占比 %
+
+# ==================== 句式层 ====================
+syntax:
+  avg_sentence_length: 16
+  sentence_length_dist:                       # 客观阈值桶
+    short_le_8: 38
+    medium_9_20: 45
+    long_21_35: 14
+    xlong_gt_35: 3
+  single_sentence_paragraph_pct: 38
+  avg_sentences_per_paragraph: 2.2
+  question_ratio: 13
+  exclamation_ratio: 7
+
+# ==================== 节奏层 ====================
+rhythm:
+  dialogue_pct: 48
+  action_pct: 16
+  environment_pct: 6
+  inner_thought_pct: 25
+  narration_pct: 5
+
+# ==================== 修辞层 ====================
+rhetoric:
+  metaphor_density_per_100: 1.2
+  metaphor_preference:                        # 类别分布 %
+    weapon_metal: 5
+    nature: 10
+    body: 20
+    abstract: 30
+    other: 35
+  sensory_dist:                               # 类别分布 %
+    visual: 72
+    auditory: 15
+    tactile: 10
+    olfactory: 2
+    gustatory: 1
+
+# ==================== 情绪表达层 ====================
+emotion_expression:
+  direct_pct: 15
+  action_physiology_pct: 45
+  environment_projection_pct: 5
+  inner_monologue_pct: 35                     # 作者特有：内心吐槽直接呈现情绪
+
+# ==================== 叙事视角层 ====================
+narrative:
+  perspective: "third_limited"                # 类别枚举
+  focal_character: "贺天然"
+  inner_monologue_style: "direct"             # 类别枚举
+
+# ==================== 对话风格层 ====================
+dialogue_style:
+  tag_style: "mixed"                          # 类别枚举
+  avg_dialogue_length: 12
+  interrupt_freq_per_100: 6
+  subtext_ratio: 22
+  direct_address_freq_per_100: 8
+
+# ==================== 衔接层 ====================
+cohesion:
+  conjunction_freq_per_100: 2.6
+  transition_sentence_ratio: 0.04
+  paragraph_bridge_style: "action"            # 类别枚举
+
+# ==================== 动词风格层 ====================
+verb_style:
+  action_verb_ratio: 35
+  mental_verb_ratio: 40
+  state_verb_ratio: 25
+  strength: "medium"                          # 类别枚举（力度：weak/medium/strong）
+
+# ==================== 硬约束（声音层，LLM 提炼）====================
+hard_constraints:
+  - "内心独白必须用引号包裹，呈现为角色直接的心理活动"
+  - "禁止使用'宛如''宛若'等过于文艺的明喻词"
+  # …
+
+# ==================== 软引导（声音层）====================
+soft_guidance:
+  - "整体基调：轻松吐槽向，带点日式轻小说的脱线感"
+  # …
+
+# ==================== Few-shot 示例（声音层）====================
+few_shot_examples:
+  - type: "inner_thought"
+    text: "…"
+    reason: "…"
+  # …
+```
+
+### 4.1 类型规则
+
+- **客观数值**：密度/占比/长度（`5.8`、`48`），LLM 按字段客观定义输出精确值。
+- **类别枚举**：有限集合取值（`tag_style: mixed`、`strength: medium`、`perspective: third_limited`、`bridge_style: action`、`inner_monologue_style: direct`）。枚举是分类不是打分，属客观。
+- **分布**：`sentence_length_dist` / `metaphor_preference` / `sensory_dist` / `name_pronoun_ratio` 为百分比分布，和应为 100（±1 容忍）。
+- **声音层**：`hard_constraints` / `soft_guidance` / `few_shot_examples` 为 LLM 提炼的自由文本，不进验收数值对比。
+
+## 5. F2：LLM 特征提取（蒸馏）
+
+### 5.1 提取模板
+
+新建 `knowledge/style-distill/prompt-templates/feature-extract.md`（取代旧 distill-prompt.md）。模板必须包含：
+
+- 案例 1 完整字段清单 + 每个字段的**客观定义**（如「adj_density_per_100 = 每 100 字中形容词数」），保证 LLM 输出一致、可复现。
+- 类别枚举的封闭取值集合（防 LLM 自造值）。
+- 分布字段「和为 100」的约束。
+- 输出格式：完整 YAML 卡。
+
+### 5.2 主卡提取流程
+
+```
+样本(.md/.txt，≥1500 字，不足向 novel-agent 说明)
+ → style-distiller 读 feature-extract.md → LLM 读样本 → 输出完整卡（案例 1 格式）
+ → 校验 schema（check-agents 同款校验）→ 写 settings/writing-style.md
+ → 备份旧卡到 settings/.style-versions/v{N}_{YYYY-MM-DD}.md
+ → confidence 由 LLM 按样本质量/一致性给（0-100；0 = 手动设定）
+```
+
+### 5.3 场景卡提取流程
+
+```
+样本按段落分类场景（复用 6 类）→ 每类聚合子样本
+ → 子样本 ≥ 阈值（800 字）才产该场景卡；不足跳过
+ → LLM 参照主卡，只输出该场景显著差异维度（override）
+ → 写 settings/style-profiles/{scene_type}.md（inherits: writing-style.md + override）
+```
+
+### 5.4 幂等与备份
+
+- 重复蒸馏同一样本不产生多余备份（以当日版本为准，与现行为一致）。
+- 卡内 `last_updated` 写当日日期。
+
+## 6. F3：生成注入（prompt-crafter）
+
+### 6.1 渲染规则（卡 → 案例 2 提示词）
+
+| 卡内容 | 渲染 |
+|--------|------|
+| 数值密度类（`adj_density_per_100: 5.8`） | 「形容词密度：每百字 5-6 个」（按 confidence 定区间，见 6.1a） |
+| 占比类（`dialogue_pct: 48`） | 「对话约 48%（近一半是对话）」 |
+| 分布类（`sentence_length_dist`） | 「短句（≤8字）占比 ≥ 35%」等分条 |
+| 类别枚举（`tag_style: mixed`） | 中文短语（「对话标签混合使用」），映射表见 6.2 |
+| `preferred_words` | 「允许使用：网络用语、动漫梗、口语化表达」等聚合表述 |
+| `hard_constraints` | 「硬性规则」逐条透传（不删改） |
+| `soft_guidance` | 「整体基调」透传 |
+| `few_shot_examples` | 「风格参考例句」按 type 分组透传 |
+| — | prompt 固定含「严格匹配上述风格参数，偏差不超过 20%」生成目标 |
+| — | prompt 固定含「剧情上下文」「写作要求（直接写正文/字数）」占位 |
+
+### 6.2 类别枚举 → 中文映射表（渲染用）
+
+```
+tag_style: pure_tags → "标签用'XX说'为主" / mixed → "标签混合使用" / no_tags → "不用标签，动作替代"
+strength: weak → "动词力度轻" / medium → "动词力度中等" / strong → "动词力度烈"
+bridge_style: action → "段落靠动作衔接" / dialogue → "靠对话衔接" / transition → "少用过渡句"
+inner_monologue_style: direct → "内心独白用引号直接呈现" / indirect → "间接转述"
+perspective: first_person / second_person / third_limited / third_omniscient
+```
+
+### 6.1a 密度类区间规则（confidence → 区间宽度）
+
+仅密度类数值（`*_density_per_100`、`*_freq_per_100`、`avg_sentence_length`、`avg_dialogue_length` 等单值度量）渲染为「约 X，区间 [L, U]」：
+
+| confidence | 区间 |
+|------------|------|
+| ≥ 70 | X × (1±10%)，取整 |
+| 50-69 | X × (1±20%)，取整 |
+| < 50 | X × (1±30%)，取整 |
+
+占比类（`dialogue_pct` 等）渲染为「约 X%」+ 中文定性（近一半/大部分/少量）；分布类（`sentence_length_dist` 等）渲染为逐桶阈值。两类不套区间公式，由 anti-ai 做定性贴近判定。
+
+### 6.3 稀疏注入
+
+- 主卡兜底；按 scene_type 选场景卡（override 叠加主卡）。
+- 场景差异维度才额外注入，全量注入挤 prompt 空间时优先保声音层 + 差异维。
+
+## 7. 验收与抽卡（Gate G 重构 + 新闭环）
+
+### 7.1 anti-ai 验收（指令遵循检查）
+
+```
+输入：风格参数提示词（案例 2，prompt-crafter 渲染的那份）+ 生成正文
+过程：LLM 逐条对照提示词检查正文
+  · 数值/占比条：「对话约 48%」→ 本章对话是否明显偏离（偏离即违反，不要求数值）
+  · 硬性规则条：逐条判定（如「禁止'宛如'」→ 查是否出现）
+  · 软引导条：整体基调是否吻合
+输出：违反报告（.anti-ai.md）
+  · 逐条：条号 + 原文要求 + 正文表现 + 违反与否 + 建议
+  · 汇总：违反条数 / 总条数；结论 PASS / FAIL
+```
+
+### 7.2 抽卡循环（novel-agent 调度级）
+
+```
+writer 生成一版
+ → novel-agent 派 anti-ai 验收
+ → PASS → 进 review(reader) → archive(updater)
+ → FAIL → 违反报告随重写 order 喂 writer：
+        提示词 = 原风格参数提示词 + 「本次验收违反：[逐条]，重写时向 [建议] 靠拢」
+       → writer 重写 → 再验收（round ≤ 3）
+ → 3 次仍 FAIL → 取最优稿（违反最少），报告留作者人工裁决
+```
+
+### 7.3 反馈装配
+
+重写提示词由 novel-agent 在 order 中装配：原始渲染提示词（含剧情上下文）+ 最新违反报告全文 + 「仅重写上述违反项，其余保持」。
+
+## 8. 退役清单
+
+| 组件 | 处理 |
+|------|------|
+| `tools/distill-style.py` | 删除（distill/update/check 三子命令 + 统计引擎） |
+| `tools/compare-style.py`、`tools/mix-style.py` | 删除 |
+| jieba 依赖 | requirements、`static.yml` 的 `pip install jieba`、venv 说明删除 |
+| F5 增量更新 | `skills/style-distill.md` 增量节、novel-agent/novel-dispatch 的 style-update-order 调度点删除 |
+| 题材基线 | `genre-baselines/` 三层机制退役（模板可留作纯参照） |
+| check 退出码契约 | `skills/anti-ai.md` Gate G 的 0/1/2 语义替换为指令遵循验收 |
+| C1 验收 | 退休（无可参照物） |
+| 旧 `tools/test_style_distill.py` 数字断言 | 重写为模板/流程/schema 断言（见 §10） |
+
+**保留**：`tools/init.py`、`tools/sync-project.py`（模板部署，schema 更新）、`tools/check-agents.py`（卡 schema 校验更新）、`tools/check-conflicts.py`、`tools/test_platforms.py`。
+
+## 9. 迁移
+
+- 现有旧卡（数值 + 声音层）→ 新 schema：补 `profile_name`、`name_pronoun_ratio` 三维、`emotion_expression.inner_monologue_pct`、`verb_style.strength` 枚举；旧字段缺失项回退默认/LLM 补。
+- 迁移只发生在作者主动重蒸馏时（卡冻结模型下不自动迁移）；init 新建项目直接产新 schema。
+- 声音层（4 字段映射）零损失保留。
+
+## 10. 测试
+
+| 测试 | 内容 |
+|------|------|
+| schema 合法性 | feature-extract 输出即案例 1 结构合法（9 维键、类型、枚举值、分布和=100） |
+| 渲染正确性 | 卡值 → 案例 2 区间/中文映射正确（5.8 → "5-6 个"；mixed → "标签混合使用"） |
+| 验收判定 | 构造卡 + 构造正文 → 违反报告正确（PASS/FAIL、逐条判定） |
+| 抽卡装配 | 违反报告正确装配进重写提示词；round 计数上限 3；超限取最优 |
+| 场景卡 | 段落分类 → 聚合 → 场景卡 override 叠加主卡正确 |
+| 迁移 | 旧卡 → 新 schema 零丢失 |
+| init/sync | 新 schema 模板部署正确（保留在 test_platforms） |
+
+LLM 输出的非确定性由「schema 校验 + 模板一致性」兜底，不依赖精确数值断言。
+
+## 11. 验收标准（PRD 十，重定义）
+
+1. ~~C1 工具计数 vs 人工计数 ≤15%~~ → **退休**
+2. **C2' 生成验收**：同场景提示词生成正文，anti-ai 指令遵循验收 PASS 率 ≥ 90%（流程级）
+3. **C3' 场景区分**：战斗卡 vs 对话卡生成的正文，验收在差异维度显著区分
+4. ~~C4 5 章置信度 ≥70~~ → 由卡冻结模型取代（卡不再随归档更新）
+5. **C5 迁移**：现有项目升级不报错，旧卡迁移零损失
+6. **C6 作者盲测（主验收）**：三套标杆卡（或作者真实样本），作者盲测生成文风像不像原作者，正确率 ≥ 70%
+
+## 12. 实施顺序
+
+1. **Phase 1**：feature-extract 模板 + style-distiller 产卡（主卡 + 场景卡）+ schema 校验
+2. **Phase 2**：prompt-crafter 渲染（卡 → 案例 2）+ 枚举映射表
+3. **Phase 3**：anti-ai 验收 + 违反报告 + 抽卡闭环（novel-agent 调度）
+4. **Phase 4**：退役清理（distill/compare/mix/jieba/增量/题材基线）+ 测试重写 + CI 更新
+5. **Phase 5**：迁移 + 全量回归 + C6 作者盲测
+
+## 13. 风险与应对
+
+| 风险 | 应对 |
+|------|------|
+| LLM 提取噪声 | 客观字段定义写死在模板；容差在渲染层（区间化）；验收为指令遵循判定 |
+| LLM 自造枚举值 | 模板封闭枚举集合 + schema 校验兜底 |
+| 验收误判 | 验收用与生成同一份提示词（同源）；违反报告逐条可人工复核 |
+| 抽卡不收敛 | round ≤3 + 超限取最优 + 报告留人工裁决 |
+| 声音层信息丢失 | 硬约束/软引导/few-shot 原样透传，渲染不压缩 |
+| 成本 | 每次蒸馏/验收各 1 次 LLM 调用，抽卡 ≤3；生成场景本就在线 |
