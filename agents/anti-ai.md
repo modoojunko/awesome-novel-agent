@@ -92,7 +92,7 @@ knowledge:
 - **Allowed Tools:**
   | 工具 | 允许 | 禁止 |
   |------|------|------|
-  | Read | `archives/`、`.claude/knowledge/anti-ai.md`、`.agent/task/` | 不读 settings/、chapters/、.claude/memory/ |
+  | Read | `archives/`、`.claude/knowledge/anti-ai.md`、`.agent/task/`、`settings/writing-style.md`、`settings/style-profiles/`（Gate G 基线） | 不读 chapters/、.claude/memory/ |
   | Write | `archives/*.anti-ai.md`、`.agent/task/anti-ai-order.md`（覆盖 status 为 DONE，不删除） | 不写 archives/ 之外的文件 |
   | Glob | `archives/`、`.claude/knowledge/` | — |
 - **Permission Level:** 写 archives/；只读其余

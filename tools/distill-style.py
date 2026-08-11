@@ -244,7 +244,12 @@ def load_card(path):
     parts = text.split("---", 2)
     if len(parts) != 3 or not yaml:
         return None, text
-    return yaml.safe_load(parts[1]), parts[2]
+    try:
+        fm = yaml.safe_load(parts[1])
+    except yaml.YAMLError as e:
+        print(f"[warn] 风格卡 YAML 解析失败 {path}: {e}", file=sys.stderr)
+        return None, text
+    return fm, parts[2]
 
 
 def dump_card(dims: dict, body: str) -> str:

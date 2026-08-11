@@ -428,8 +428,8 @@ def sync_style_assets(project: Path) -> int:
     try:
         from init import migrate_writing_style   # init.py main 有 __main__ 守卫，导入安全
         migrate_writing_style(project)
-    except ImportError:
-        pass
+    except ImportError as e:
+        print(f"  [SKIP] 风格卡迁移跳过（init 导入失败）: {e}")
     if count:
         print(f"  [OK] 风格资产同步: {count} 个新文件")
     return count
