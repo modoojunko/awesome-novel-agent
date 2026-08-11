@@ -103,7 +103,7 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 ```
 
 **Gate G：风格偏差（可选，读 `settings/writing-style.md` 主卡 + 对应场景卡）**
-- Bash 调 `python tools/distill-style.py check -c settings/writing-style.md <正文>` → 读偏差表
+- Bash 调 `python tools/distill-style.py check -c settings/writing-style.md <正文>` → 读偏差表。`check` 退出码 0=通过 / 1=有 FAIL / 2=无法验证（无 jieba 或无期望维度可比对，需人工判定）
 - LLM 按风格卡估算语义维度（rhetoric/emotion_expression/narrative/dialogue_style）对比
 - 按 gate-g-checklist 分级：通过 / 警告（作者确认）/ 不通过（局部重写建议）
 - 命中 boundary-cases Gate G 豁免组 → SKIP 标注

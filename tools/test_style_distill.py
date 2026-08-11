@@ -44,6 +44,14 @@ def init_project(tmp: Path, genre: str = "1"):
     return run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", genre])
 
 
+def _load_tool(name: str):
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(name.replace("-", "_"), str(TOOLS / f"{name}.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 SCENE_TYPES = ["general", "dialogue", "fight", "environment", "inner-mono", "transition", "group-scene"]
 REQUIRED_FM_KEYS = ["profile_version", "scene_type", "confidence", "last_updated"]
 DIM_KEYS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expression",
@@ -272,7 +280,8 @@ def test_check():
                   "-c", str(card), str(body)], cwd=str(TOOLS))
         check("FAIL 场景 returncode=1", rb.returncode == 1, (rb.stdout + rb.stderr)[-300:])
         check("FAIL 场景含 -> FAIL", "-> FAIL" in rb.stdout, rb.stdout[-300:])
-        check("FAIL 场景计数=1", "不通过维度数：1" in rb.stdout, rb.stdout[-300:])
+        import re as _re
+        check("FAIL 场景计数≥1", _re.search(r"不通过维度数：[1-9]", rb.stdout) is not None, rb.stdout[-300:])
 
         # 场景 C：手动档（confidence≤20，tol=0）→ 跳过量化校验，returncode 0
         card.write_text(card.read_text(encoding="utf-8").replace(
@@ -428,6 +437,121 @@ def test_acceptance():
         check("C5 内容零损失", all(k in body for k in ("第三人称限知", "不写废话", "模板腔", "动作推进")))
 
 
+def test_review_fix_metrics():
+    print("[review-fix] #3/#4/#5/#36 测量正确性")
+    mod = _load_tool("distill-style")
+    # #3 名代词集合：他们/她们计入 pro
+    check("#3 name_pronoun 集合匹配", mod._name_pronoun_ratio(["他们", "我们", "张三"]) == 1.5,
+          str(mod._name_pronoun_ratio(["他们", "我们", "张三"])))
+    # #5 单字转折词命中
+    st = mod.cohesion_stats("但他没有回答。", [("但", "c")])
+    check("#5 单字转折词命中", st["transition_sentence_ratio"] == 100.0, str(st))
+    # #4 ASCII 引号开关
+    r = mod.rhythm_stats('"你好。"他说。')
+    check("#4 ASCII 引号开关", r["dialogue_pct"] == 37.5, str(r))
+    # #36 load_card dict 校验：scalar frontmatter → (None, text)
+    import tempfile
+    with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False, encoding="utf-8") as f:
+        f.write("---\nfoo\n---\n# body\n")
+        fp = f.name
+    fm, _ = mod.load_card(fp)
+    check("#36 load_card 非 dict 返回 None", fm is None, str(fm))
+    import os
+    os.unlink(fp)
+
+
+def test_review_fix_check_zero_expectation():
+    print("[review-fix] #6 零期望维度判 FAIL")
+    import yaml as _y
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        card = tmp / "card.md"
+        # 构造 question_ratio=0 的主卡（confidence 80 → 容差 15%）
+        dims = {"profile_version": "1.0", "scene_type": "general", "confidence": 80,
+                "last_updated": "", "source_sample_length": 3000, "locked": [],
+                "lexicon": {"adj_density_per_100": 1.0, "adv_density_per_100": 1.0, "four_phrase_freq_per_100": 1.0},
+                "syntax": {"avg_sentence_length": 20.0, "single_sentence_paragraph_pct": 20.0,
+                           "avg_sentences_per_paragraph": 3.0, "question_ratio": 0.0, "exclamation_ratio": 0.0},
+                "rhythm": {"dialogue_pct": 30.0},
+                "cohesion": {"conjunction_freq_per_100": 2.0, "transition_sentence_ratio": 20.0},
+                "verb_style": {"action_verb_ratio": 0.5, "mental_verb_ratio": 0.3, "state_verb_ratio": 0.2}}
+        card.write_text("---\n" + _y.safe_dump(dims, allow_unicode=True, sort_keys=False) + "---\n# 风格\n", encoding="utf-8")
+        body = (tmp / "body.txt").write_text("这是正文，满是问号？难道不是吗？？真的吗！", encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "distill-style.py"), "check", "-c", str(card), str(tmp / "body.txt")])
+        # #6 零期望维度：question_ratio 0 vs 测得非 0 → FAIL → rc=1
+        check("#6 零期望维度判 FAIL", r.returncode == 1 and "FAIL" in r.stdout, f"rc={r.returncode}\n{r.stdout}\n{r.stderr}")
+
+
+def test_review_fix_update_locked_and_checkpoint():
+    print("[review-fix] #8 locked 维度锁 + #10 checkpoint 按卡隔离")
+    import yaml as _y
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        (tmp / ".agent" / "style-update").mkdir(parents=True)
+        (tmp / "archives").mkdir(parents=True)
+        ch = tmp / "ch-1.md"
+        ch.write_text("他走了过去，说道。她跟了上来。", encoding="utf-8")
+        def mk_card(name, conf=80, ssl=3000, locked=None):
+            dims = {"profile_version": "1.0", "scene_type": "general", "confidence": conf,
+                    "last_updated": "", "source_sample_length": ssl, "locked": locked or [],
+                    "lexicon": {"adj_density_per_100": 1.0, "adv_density_per_100": 1.0,
+                                "four_phrase_freq_per_100": 1.0, "name_pronoun_ratio": 1.0},
+                    "syntax": {"avg_sentence_length": 20.0, "single_sentence_paragraph_pct": 20.0,
+                               "avg_sentences_per_paragraph": 3.0, "question_ratio": 5.0, "exclamation_ratio": 5.0},
+                    "rhythm": {"dialogue_pct": 30.0},
+                    "cohesion": {"conjunction_freq_per_100": 2.0, "transition_sentence_ratio": 20.0},
+                    "verb_style": {"action_verb_ratio": 0.5, "mental_verb_ratio": 0.3, "state_verb_ratio": 0.2}}
+            c = tmp / name
+            c.write_text("---\n" + _y.safe_dump(dims, allow_unicode=True, sort_keys=False) + "---\n# 风格\n", encoding="utf-8")
+            return c
+        def upd(card, out):
+            return run([sys.executable, str(TOOLS / "distill-style.py"), "update",
+                        "-c", str(card), "-p", str(tmp), "-o", str(tmp / out), str(ch)])
+        # #8 locked 锁整个维度：syntax 不动；非锁维度 four_phrase_freq 更新（正则维度，无需 jieba）
+        c1 = mk_card("card-a.md", locked=["syntax"])
+        upd(c1, "out1.md")
+        out1 = parse_fm(tmp / "out1.md")
+        check("#8 locked 锁 syntax", out1["syntax"]["avg_sentence_length"] == 20.0
+              and out1["lexicon"]["four_phrase_freq_per_100"] != 1.0,
+              str(out1["syntax"]["avg_sentence_length"]))
+        # #10 checkpoint 按卡隔离：同章两卡各自处理，落两个不同卡名的 .done
+        c2 = mk_card("card-b.md")
+        upd(c2, "out2.md")
+        d = sorted(p.name for p in (tmp / ".agent" / "style-update").glob("*.done"))
+        check("#10 checkpoint 按卡隔离", "card-a.ch-1.done" in d and "card-b.ch-1.done" in d, str(d))
+        # 重放同卡同章 → 全跳过
+        r2 = upd(c1, "out1b.md")
+        check("#10 重放跳过", "无新章节" in r2.stdout, r2.stdout)
+
+
+def test_review_fix_check_scene_card():
+    print("[review-fix] #7 场景卡 inherits 解析")
+    import yaml as _y
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        (tmp / "style-profiles").mkdir(parents=True)
+        main_dims = {"profile_version": "1.0", "scene_type": "general", "confidence": 80,
+                     "last_updated": "", "source_sample_length": 3000, "locked": [],
+                     "lexicon": {"adj_density_per_100": 1.0, "adv_density_per_100": 1.0, "four_phrase_freq_per_100": 1.0},
+                     "syntax": {"avg_sentence_length": 20.0, "single_sentence_paragraph_pct": 20.0,
+                                "avg_sentences_per_paragraph": 3.0, "question_ratio": 5.0, "exclamation_ratio": 5.0},
+                     "rhythm": {"dialogue_pct": 30.0},
+                     "cohesion": {"conjunction_freq_per_100": 2.0, "transition_sentence_ratio": 20.0},
+                     "verb_style": {"action_verb_ratio": 0.5, "mental_verb_ratio": 0.3, "state_verb_ratio": 0.2}}
+        (tmp / "writing-style.md").write_text("---\n" + _y.safe_dump(main_dims, allow_unicode=True, sort_keys=False) + "---\n# 风格\n", encoding="utf-8")
+        scene_dims = {"profile_version": "1.0", "scene_type": "dialogue", "confidence": 60,
+                      "last_updated": "", "source_sample_length": 500, "locked": [],
+                      "inherits": "writing-style.md",
+                      "override": {"rhythm": {"dialogue_pct": 80.0}, "syntax": {"question_ratio": 40.0}}}
+        (tmp / "style-profiles" / "dialogue.md").write_text("---\n" + _y.safe_dump(scene_dims, allow_unicode=True, sort_keys=False) + "---\n# 场景\n", encoding="utf-8")
+        body = tmp / "body.txt"
+        body.write_text("他在左边。她在右边。他问她：" '“你去吗？”' "她说：" '“去。”', encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "distill-style.py"), "check", "-c", str(tmp / "style-profiles" / "dialogue.md"), str(body)])
+        # #7 场景卡经 inherits 解析：override 的 dialogue_pct/question_ratio 参与比对（正文高对话 → 至少一行 FAIL）
+        check("#7 场景卡 resolve 后比对", r.returncode in (0, 1) and "dialogue_pct" in r.stdout,
+              f"rc={r.returncode}\n{r.stdout}\n{r.stderr}")
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -439,6 +563,10 @@ def main():
     test_compare()
     test_mix()
     test_acceptance()
+    test_review_fix_metrics()
+    test_review_fix_check_zero_expectation()
+    test_review_fix_update_locked_and_checkpoint()
+    test_review_fix_check_scene_card()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 

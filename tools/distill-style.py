@@ -12,6 +12,8 @@ style-distiller / anti-ai agent 用 Bash 调用。三种模式：
 无 jieba 时降级纯正则统计（需 POS 的项记 None）。退出码 0 = 成功。
 """
 
+from __future__ import annotations
+
 import argparse
 import re
 import sys
@@ -30,6 +32,8 @@ except Exception:
 
 RE_STOP = set("的了一是在不和有这我他她它们就都也不为之与把被让要向从到说走看想给去又再很那这本个子等面着头口手眼里出来过去上下前后中还是而但所以然后因为因此如果同时另外例如比如通过作为关于对于根据依照随着由")
 
+PRONOUNS = {"他", "她", "它", "你", "我", "你们", "我们", "他们", "她们", "它们"}
+
 ADJ_TAGS = {"a", "ad", "an"}
 ADV_TAGS = {"d"}
 VERB_TAGS = {"v", "vd", "vn", "vi", "vl", "vg", "vq"}
@@ -42,8 +46,8 @@ CONJUNCTIONS = {"而且", "并且", "但是", "不过", "可是", "然而", "所
 
 SENT_END = re.compile(r"[。！？…；!?;]")
 WORD4 = re.compile(r"[一-鿿]{4}")
-QUOTE_OPEN = set('“"「『')
-QUOTE_CLOSE = set('”"」』')
+QUOTE_OPEN = set('“「『')
+QUOTE_CLOSE = set('”」』')
 PARA_SPLIT = re.compile(r"\n\s*\n")
 WS = re.compile(r"\s")
 
@@ -74,7 +78,7 @@ def pos_tokens(text: str):
 
 def _name_pronoun_ratio(words):
     names = sum(1 for w in words if len(w) >= 2 and w not in RE_STOP)
-    pro = sum(1 for w in words if w in "他她它你们我们它们")
+    pro = sum(1 for w in words if w in PRONOUNS)
     return names / max(pro, 1)
 
 
@@ -126,7 +130,9 @@ def rhythm_stats(text):
     total = char_len(text)
     inside, in_quote = False, 0
     for ch in text:
-        if ch in QUOTE_OPEN:
+        if ch == '"':                       # ASCII 引号：开闭同字符，用开关
+            inside = not inside
+        elif ch in QUOTE_OPEN:
             inside = True
         elif ch in QUOTE_CLOSE:
             inside = False
@@ -140,7 +146,7 @@ def cohesion_stats(text, tokens):
     words = [w for w, _ in tokens]
     con = sum(1 for w in words if w in CONJUNCTIONS)
     sents = split_sentences(text)
-    trans = sum(1 for s in sents if s[:2] in TRANSITION_WORDS)
+    trans = sum(1 for s in sents if any(s.startswith(t) for t in TRANSITION_WORDS))
     return {
         "conjunction_freq_per_100": round(100 * con / n, 2),
         "transition_sentence_ratio": round(100 * trans / max(len(sents), 1), 1),
@@ -249,6 +255,8 @@ def load_card(path):
     except yaml.YAMLError as e:
         print(f"[warn] 风格卡 YAML 解析失败 {path}: {e}", file=sys.stderr)
         return None, text
+    if not isinstance(fm, dict):
+        return None, text
     return fm, parts[2]
 
 
@@ -273,10 +281,10 @@ def cmd_update(args) -> int:
     if dims is None:
         print(f"error: {args.card} 不是新格式风格卡（缺 frontmatter）", file=sys.stderr)
         return 2
-    processed = 0
+    processed = []
     for ch in args.chapters:
-        # 幂等 checkpoint（同章不重放）：有 .done 标记则整章跳过，避免就地更新时重复叠加该章统计
-        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
+        # 幂等 checkpoint（按卡隔离，同章同卡不重放）
+        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(args.card).stem}.{Path(ch).stem}.done"
         if ck.exists():
             continue
         partial = build_partial([ch])
@@ -290,17 +298,15 @@ def cmd_update(args) -> int:
                             ("verb_style", ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio"))):
             locked = set(dims.get("locked") or [])
             for field in fields:
-                key = f"{dim}.{field}"
-                if key in locked:
+                if dim in locked:
                     continue
                 old = (dims.get(dim) or {}).get(field)
                 new = (partial.get(dim) or {}).get(field)
                 if old is None or new is None:
                     continue
-                dims[dim][field] = round(old * alpha + new * (1 - alpha), 2)
-        ck.parent.mkdir(parents=True, exist_ok=True)
-        ck.write_text("done\n", encoding="utf-8")
-        processed += 1
+                d = dims.setdefault(dim, {})
+                d[field] = round(old * alpha + new * (1 - alpha), 2)
+        processed.append((ch, ck))
     if not processed:
         print("update: 无新章节（checkpoint 全跳过），卡未改动")
         return 0
@@ -321,14 +327,45 @@ def cmd_update(args) -> int:
                                             chapter_count_from_fs(Path(args.project)))
     dims["last_updated"] = datetime.date.today().isoformat()
     Path(args.out).write_text(dump_card(dims, body), encoding="utf-8")
-    print(f"update: 客观维度滑动平均更新 {processed} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
+    # 卡写入成功后才落 checkpoint（中途失败可重放）
+    for _, ck in processed:
+        ck.parent.mkdir(parents=True, exist_ok=True)
+        ck.write_text("done\n", encoding="utf-8")
+    print(f"update: 客观维度滑动平均更新 {len(processed)} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
     return 0
 
 
 # ------------------------------------------------------------ Gate G 校验
 
+def resolve_card_dims(card_path) -> dict | None:
+    """主卡返回 frontmatter；场景卡（override 型）加载继承目标 dims 并叠加 override。"""
+    dims, _ = load_card(str(card_path))
+    if dims is None:
+        return None
+    ov = dims.get("override")
+    if not isinstance(ov, dict):
+        return dims
+    inh = str(dims.get("inherits", "writing-style.md"))
+    parent = Path(card_path).parent
+    base_path = next((c for c in (parent / inh, parent.parent / inh) if c.exists()), None)
+    base = {}
+    if base_path is not None:
+        base_dims, _ = load_card(str(base_path))
+        if isinstance(base_dims, dict):
+            base = {k: dict(v) for k, v in base_dims.items() if isinstance(v, dict)}
+    merged = dict(base)
+    # 场景卡自身标量元数据（confidence/scene_type/locked 等）必须保留，否则 check 无法判断容差档位
+    for k, v in dims.items():
+        if k != "override" and not isinstance(v, dict):
+            merged[k] = v
+    for dim, fields in ov.items():
+        merged[dim] = {**(merged.get(dim) or {}), **fields}
+    return merged
+
+
 def cmd_check(args) -> int:
-    dims, _ = load_card(args.card)
+    card_path = Path(args.card)
+    dims = resolve_card_dims(card_path)
     if dims is None:
         print(f"error: {args.card} 不是新格式风格卡", file=sys.stderr)
         return 2
@@ -338,6 +375,8 @@ def cmd_check(args) -> int:
         return 0
     print(f"# 风格偏差表（容差 ±{int(tol * 100)}%）")
     total_fail = 0
+    compared = 0
+    unmeasured = []
     for text_file in args.texts:
         partial = build_partial([text_file])
         for dim, fields in (("lexicon", ("adj_density_per_100", "adv_density_per_100",
@@ -350,15 +389,31 @@ def cmd_check(args) -> int:
             for field in fields:
                 exp = (dims.get(dim) or {}).get(field)
                 got = (partial.get(dim) or {}).get(field)
-                if exp is None or got is None or not exp:
+                if exp is None:
+                    continue                       # 卡未定义该字段，不判
+                if got is None:
+                    unmeasured.append(f"{dim}.{field}")
+                    continue                        # 无 jieba / 无法计算
+                if not isinstance(exp, (int, float)):
                     continue
-                dev = (got - exp) / exp
+                compared += 1
+                if exp == 0:
+                    dev = 0.0 if got == 0 else float("inf")
+                else:
+                    dev = (got - exp) / exp
                 verdict = "pass" if abs(dev) <= tol else ("warn" if abs(dev) <= 2 * tol else "FAIL")
                 if verdict == "FAIL":
                     total_fail += 1
                 print(f"- {dim}.{field}: measured={got} expected={exp} dev={dev:+.0%} -> {verdict}")
+    if unmeasured:
+        print(f"\n⚠️  {len(unmeasured)} 个维度未测量（无 jieba 或无法计算）: {', '.join(unmeasured)}")
     print(f"\n不通过维度数：{total_fail}")
-    return 1 if total_fail else 0
+    if total_fail:
+        return 1
+    if compared == 0:
+        print("check: 无任何维度可比对（环境缺 jieba 或卡无期望维度），无法验证。", file=sys.stderr)
+        return 2
+    return 0
 
 
 def main(argv=None) -> int:
@@ -371,7 +426,7 @@ def main(argv=None) -> int:
     u = sub.add_parser("update", help="增量：客观维度滑动平均 + 备份 + 置信度重算")
     u.add_argument("-c", "--card", required=True, help="当前风格卡路径")
     u.add_argument("-o", "--out", required=True, help="新卡输出路径")
-    u.add_argument("--project", required=True, help="项目根（.agent/style-update checkpoint 与 archives 计数用）")
+    u.add_argument("-p", "--project", required=True, help="项目根（.agent/style-update checkpoint 与 archives 计数用）")
     u.add_argument("chapters", nargs="+", help="已归档定稿章节")
     c = sub.add_parser("check", help="Gate G：正文客观维度 vs 卡片容差")
     c.add_argument("-c", "--card", required=True, help="风格卡路径（主卡）")
