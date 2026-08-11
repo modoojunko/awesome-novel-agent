@@ -2133,14 +2133,14 @@ def check_style_card(path: Path) -> list:
         return [f"{path.name}: 卡片 frontmatter YAML 解析失败: {e}"]
     if not isinstance(fm, dict):
         return [f"{path.name}: 卡片 frontmatter 不是 map"]
-    for k in ("profile_version", "scene_type", "confidence", "last_updated"):
+    for k in ("profile_version", "scene_type", "confidence", "last_updated", "source_sample_length"):
         if k not in fm:
             errors.append(f"{path.name}: 卡片缺 {k}")
     st = fm.get("scene_type")
     if st not in STYLE_CARD_SCENE_TYPES:
         errors.append(f"{path.name}: scene_type={st!r} 不在枚举 {sorted(STYLE_CARD_SCENE_TYPES)}")
     conf = fm.get("confidence")
-    if not isinstance(conf, int) or not (0 <= conf <= 100):
+    if not type(conf) is int or not (0 <= conf <= 100):  # type(x) is int：排除布尔假通过（isinstance(True,int) 为真）
         errors.append(f"{path.name}: confidence 需为 0-100 整数（当前 {conf!r}）")
     if is_scene:
         ov = fm.get("override")
@@ -2157,6 +2157,10 @@ def check_style_card(path: Path) -> list:
     locked = fm.get("locked")
     if locked is not None and not isinstance(locked, list):
         errors.append(f"{path.name}: locked 需为列表")
+    elif locked:
+        for dim in locked:
+            if dim not in STYLE_CARD_DIMS:
+                errors.append(f"{path.name}: locked 含未知维度 {dim!r}（spec §13-5#3）")
     inh = fm.get("inherits")
     if inh:
         # 继承目标与卡同级于 templates/settings/（场景卡 inherits: "writing-style.md"）
@@ -2177,7 +2181,10 @@ def check_style_cards() -> list:
 `main()` 末尾（返回前）调用并合并错误：
 
 ```python
-    all_errors.extend(check_style_cards())
+    style_errs = check_style_cards()
+    for e in style_errs:  # 逐条打印，仿照 check_file 的 ❌ 输出——否则只计数不可诊断
+        print(f"  ❌ {e}")
+    all_errors.extend(style_errs)
 ```
 
 - [ ] **Step 3: 全量回归**
