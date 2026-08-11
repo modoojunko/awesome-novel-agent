@@ -189,10 +189,28 @@ def compute_conf(length, chapters=0):
     return min(100, 20 + min(40, int(length / 50)) + min(40, chapters * 5))
 
 
+def test_e2e_init_deploy():
+    print("[e2e] init 部署 style-distiller")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        agent_file = tmp / ".claude" / "agents" / "style-distiller.md"
+        check("agent style-distiller 已部署", agent_file.exists())
+        # claude 平台 skills 不入项目（技能源在仓库 skills/，init.py 只给 reasonix/codex 部署 skills）；
+        # 实际交付机制是部署到项目的 agent 定义里声明 skills/style-distill.md 引用 → 校验该接线
+        if agent_file.exists():
+            agent_txt = agent_file.read_text(encoding="utf-8")
+            check("agent 声明 style-distill SOP", "skills/style-distill.md" in agent_txt)
+        check("脚本已部署到 tools/", (tmp / "tools" / "distill-style.py").exists())
+        check("主卡为新格式", (tmp / "settings" / "writing-style.md").read_text(encoding="utf-8").startswith("---"))
+        check("场景卡已部署", (tmp / "settings" / "style-profiles" / "dialogue.md").exists())
+
+
 def main():
     test_card_schema()
     test_migration()
     test_distill()
+    test_e2e_init_deploy()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 

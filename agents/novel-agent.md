@@ -156,6 +156,10 @@ knowledge:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
     ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
+    │   ├─ 若作者提供了风格参考文本（或说"按这个风格写"）→
+    │   │   写 style-distill-order.md（inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
+    │   │   → 调 style-distiller → DONE 后再推进 outline
+    │   └─ 无样本 → 跳过（templates 预置题材卡兜底，confidence=0）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
