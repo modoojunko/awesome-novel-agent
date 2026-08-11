@@ -2317,15 +2317,16 @@ git commit -m "test: 验收 C1/C4/C5 固化 + C2/C3 验收运行步骤"
 - templates/CLAUDE.md：「8 个 agent」→「9 个 agent」。
 - README.md：功能列表补 style-distiller；版本号区与 bump 一致。
 
-- [ ] **Step 3: 版本 bump**
+- [ ] **Step 3: 版本 bump（代码层变更；不打 tag）**
 
-按既有惯例：bump git tag 到 `v4.13.0`，更新涉及的硬编码版本位置（`init.py` status skill_version、`templates/story.md`、`templates/.agent/status.md`、`SKILL.md` 的 skill_version，grep `4.0` 定位），提交：
+更新涉及的硬编码版本位置（`init.py` status skill_version、`templates/story.md`、`templates/.agent/status.md`、`SKILL.md` 的 skill_version，grep `4.0` 定位），提交随 PR review：
 
 ```bash
 git add -A
 git commit -m "docs: 9 agent 架构 + 版本 bump"
-git tag v4.13.0
 ```
+
+> ⚠️ **不在实施/验收中自动打 tag**：`git tag v4.13.0` 不作为自动步骤执行。版本 tag 由 PR #91 review + 合并后由作者/发布流程创建（`gh release` 或手动 tag），确保任何版本变更都经过 PR 审阅。
 
 - [ ] **Step 4: 全量回归 + spec 状态更新**
 
