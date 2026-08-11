@@ -320,6 +320,42 @@ def cmd_update(args) -> int:
     return 0
 
 
+# ------------------------------------------------------------ Gate G 校验
+
+def cmd_check(args) -> int:
+    dims, _ = load_card(args.card)
+    if dims is None:
+        print(f"error: {args.card} 不是新格式风格卡", file=sys.stderr)
+        return 2
+    tol = tolerance_for(dims.get("confidence", 0))
+    if tol == 0:
+        print(f"check: confidence={dims.get('confidence')}（手动档），跳过量化校验，仅报告。")
+        return 0
+    print(f"# 风格偏差表（容差 ±{int(tol * 100)}%）")
+    total_fail = 0
+    for text_file in args.texts:
+        partial = build_partial([text_file])
+        for dim, fields in (("lexicon", ("adj_density_per_100", "adv_density_per_100",
+                                         "four_phrase_freq_per_100")),
+                            ("syntax", ("avg_sentence_length", "single_sentence_paragraph_pct",
+                                        "avg_sentences_per_paragraph", "question_ratio", "exclamation_ratio")),
+                            ("rhythm", ("dialogue_pct",)),
+                            ("cohesion", ("conjunction_freq_per_100", "transition_sentence_ratio")),
+                            ("verb_style", ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio"))):
+            for field in fields:
+                exp = (dims.get(dim) or {}).get(field)
+                got = (partial.get(dim) or {}).get(field)
+                if exp is None or got is None or not exp:
+                    continue
+                dev = (got - exp) / exp
+                verdict = "pass" if abs(dev) <= tol else ("warn" if abs(dev) <= 2 * tol else "FAIL")
+                if verdict == "FAIL":
+                    total_fail += 1
+                print(f"- {dim}.{field}: measured={got} expected={exp} dev={dev:+.0%} -> {verdict}")
+    print(f"\n不通过维度数：{total_fail}")
+    return 1 if total_fail else 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="distill-style.py", description="文风蒸馏统计引擎")
     sub = ap.add_subparsers(dest="mode", required=True)
@@ -332,12 +368,17 @@ def main(argv=None) -> int:
     u.add_argument("-o", "--out", required=True, help="新卡输出路径")
     u.add_argument("--project", required=True, help="项目根（.agent/style-update checkpoint 与 archives 计数用）")
     u.add_argument("chapters", nargs="+", help="已归档定稿章节")
-    # check / compare / mix 子命令在 Phase 4 / Phase 5 追加
+    c = sub.add_parser("check", help="Gate G：正文客观维度 vs 卡片容差")
+    c.add_argument("-c", "--card", required=True, help="风格卡路径（主卡）")
+    c.add_argument("texts", nargs="+", help="待校验正文文件")
+    # compare / mix 子命令在 Phase 5 追加
     args = ap.parse_args(argv)
     if args.mode == "distill":
         return cmd_distill(args)
     if args.mode == "update":
         return cmd_update(args)
+    if args.mode == "check":
+        return cmd_check(args)
     ap.error(f"未知模式: {args.mode}")
 
 

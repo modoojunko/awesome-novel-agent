@@ -246,6 +246,24 @@ def test_update():
               len(list((tmp / "settings" / ".style-versions").glob("v*_*.md"))) == 1)
 
 
+def test_check():
+    print("[unit] check 容差校验")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        card = tmp / "settings" / "writing-style.md"
+        text = card.read_text(encoding="utf-8").replace(
+            "confidence: 0", "confidence: 80").replace(
+            "avg_sentence_length: 0", "avg_sentence_length: 25")
+        card.write_text(text, encoding="utf-8")
+        body = tmp / "body.md"
+        body.write_text("他缓缓推开门，寒风扑面而来，院子里一片死寂。\n\n" * 20, encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "distill-style.py"), "check",
+                 "-c", str(card), str(body)], cwd=str(TOOLS))
+        check("check exit 0/1 皆合法（有 FAIL 为 1）", r.returncode in (0, 1))
+        check("check 输出偏差表", "风格偏差表" in r.stdout)
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -253,6 +271,7 @@ def main():
     test_genre_baselines()
     test_e2e_init_deploy()
     test_update()
+    test_check()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
