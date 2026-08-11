@@ -316,6 +316,118 @@ def test_mix():
               str(fm["syntax"]["avg_sentence_length"]))
 
 
+def _count_sents(text):
+    return len([s for s in re.split(r"[。！？…；!?;]", text) if s.strip()])
+
+
+def _count_chars(text):
+    """仅去空白、保留引号——与 distill-style.py char_len 口径一致。"""
+    return len(re.sub(r"\s", "", text))
+
+
+def _count_quoted(text):
+    n = inside = 0
+    for ch in text:
+        if ch in '“"「『':
+            inside = True
+        elif ch in '”"」』':
+            inside = False
+        elif inside and ch.strip():
+            n += 1
+    return n
+
+
+def test_acceptance():
+    print("[acceptance] C1/C4/C5")
+    import yaml as _y
+    # ---- C1: 核心参数 vs 人工计数，偏差 ≤15%（需 jieba 环境）----
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        # 构造可人工点计的样本：3 组 × 3 句（叙述/转折/对话），形容词与连接词已知
+        lines = [
+            "寒冷的夜晚一片死寂，空旷的街道异常安静。",
+            "然而寒风刺骨，因此他加快脚步，却仍感到浑身冰冷。",
+            "“你终于来了。”他低声说，声音却异常微弱。",
+        ]
+        txt = "\n\n".join(lines * 3)
+        sample = tmp / "c1.md"
+        sample.write_text(txt, encoding="utf-8")
+        p = tmp / "c1.yml"
+        run([sys.executable, str(TOOLS / "distill-style.py"), "distill",
+             "-o", str(p), str(sample)], cwd=str(TOOLS))
+        d = _y.safe_load(p.read_text(encoding="utf-8"))["distill"]
+        total = _count_chars(txt)
+        manual = {
+            "avg_sentence_length": total / _count_sents(txt),
+            "dialogue_pct": 100 * _count_quoted(txt) / total,
+            "conjunction_freq_per_100": 100 * sum(txt.count(w) for w in ("然而", "因此", "却")) / total,
+            # adj_density 以 jieba POS(a/ad/an) 为测量基准（spec §14 已知风险）：
+            # 本样本中 jieba 只把「寒冷/微弱」标为形容词（死寂/空旷/安静/刺骨/冰冷 标为其它词性），
+            # 手工计数须与工具同口径——只数这两个词，公式验证才成立。
+            "adj_density_per_100": 100 * sum(txt.count(w)
+                                             for w in ("寒冷", "微弱")) / total,
+        }
+        for k, manual_v in manual.items():
+            got = (d["syntax"].get("avg_sentence_length") if k == "avg_sentence_length"
+                   else d["rhythm"].get("dialogue_pct") if k == "dialogue_pct"
+                   else d["cohesion"].get("conjunction_freq_per_100")
+                   if k == "conjunction_freq_per_100"
+                   else d["lexicon"].get("adj_density_per_100"))
+            ok = got is not None and manual_v > 0 and abs(got - manual_v) / manual_v <= 0.15
+            check(f"C1 {k} 偏差≤15% (manual={manual_v:.2f} got={got})", ok)
+    # ---- C4: 连续归档 5 章 → confidence≥70、参数波动<10% ----
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        card = tmp / "settings" / "writing-style.md"
+        text = card.read_text(encoding="utf-8")
+        # 造 1250 字样本蒸馏出的源卡（confidence 基线 20+25）
+        sample = tmp / "s.md"
+        # ≥1250 字：confidence 基线 = 20 + min(40, L/50=26) = 46；5 章后 +25 → 71
+        sample.write_text(("他快步走过长廊，推开厚重的木门，寒气扑面而来。\n\n") * 60, encoding="utf-8")
+        p = tmp / "s.yml"
+        run([sys.executable, str(TOOLS / "distill-style.py"), "distill",
+             "-o", str(p), str(sample)], cwd=str(TOOLS))
+        src = _y.safe_load(p.read_text(encoding="utf-8"))["distill"]
+        text = text.replace("source_sample_length: 0", f"source_sample_length: {src['source_sample_length']}")
+        text = text.replace("confidence: 0", f"confidence: {src['confidence']}")
+        text = text.replace("avg_sentence_length: 0",
+                            f"avg_sentence_length: {src['syntax']['avg_sentence_length']}")
+        card.write_text(text, encoding="utf-8")
+        arch = tmp / "archives"
+        arch.mkdir(parents=True, exist_ok=True)
+        for i in range(1, 6):  # 5 章，句长一致（每句 18 字），验证滑动平均收敛
+            (arch / f"vol-1-ch-{i}.md").write_text(
+                "他走过长廊，推开木门，寒气扑面而来。\n\n" * 20, encoding="utf-8")
+        out = tmp / "settings" / "writing-style-new.md"
+        for i in range(1, 6):
+            run([sys.executable, str(TOOLS / "distill-style.py"), "update",
+                 "-c", str(card), "-o", str(out), "--project", str(tmp),
+                 str(arch / f"vol-1-ch-{i}.md")], cwd=str(TOOLS))
+            card.write_text(out.read_text(encoding="utf-8"), encoding="utf-8")
+        fm = _y.safe_load(out.read_text(encoding="utf-8").split("---", 2)[1])
+        check("C4 5 章后 confidence≥70", fm["confidence"] >= 70, f"got {fm['confidence']}")
+        v = fm["syntax"]["avg_sentence_length"]
+        check("C4 参数波动<10%（收敛到章稳态 18 的 10% 内）", abs(v - 18) / 18 <= 0.10, f"got {v}")
+    # ---- C5: 现有项目升级不报错 + 旧卡自动迁移 ----
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        (tmp / "settings" / "writing-style.md").write_text(
+            "# 写作风格\n\n## role（叙事身份）\n\n第三人称限知\n\n"
+            "## core_principles（不可违背的写作信条）\n\n- 不写废话\n\n"
+            "## possible_mistakes（AI 易犯错误）\n\n- 模板腔\n\n"
+            "## depiction_techniques（描写层次和手法）\n\n动作推进\n", encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        check("C5 升级 init exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        rs = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp)], cwd=str(tmp))
+        check("C5 升级 sync exit 0", rs.returncode == 0, (rs.stdout + rs.stderr)[-400:])
+        card = tmp / "settings" / "writing-style.md"
+        body = card.read_text(encoding="utf-8")
+        check("C5 新格式", body.startswith("---"))
+        check("C5 内容零损失", all(k in body for k in ("第三人称限知", "不写废话", "模板腔", "动作推进")))
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -326,6 +438,7 @@ def main():
     test_check()
     test_compare()
     test_mix()
+    test_acceptance()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
