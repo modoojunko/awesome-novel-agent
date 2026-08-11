@@ -283,6 +283,19 @@ def test_check():
         check("手动档跳过量化校验", "跳过量化校验" in rc.stdout, rc.stdout[-300:])
 
 
+def test_compare():
+    print("[unit] compare-style")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        card = tmp / "settings" / "writing-style.md"
+        t = card.read_text(encoding="utf-8").replace("avg_sentence_length: 0", "avg_sentence_length: 15")
+        (tmp / "b.md").write_text(t, encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "compare-style.py"), str(card), str(tmp / "b.md")], cwd=str(TOOLS))
+        check("compare exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("输出维度变化表", "avg_sentence_length" in r.stdout and "差值" in r.stdout)
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -291,6 +304,7 @@ def main():
     test_e2e_init_deploy()
     test_update()
     test_check()
+    test_compare()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
