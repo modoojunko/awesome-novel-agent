@@ -252,16 +252,35 @@ def test_check():
         tmp = Path(td)
         init_project(tmp)
         card = tmp / "settings" / "writing-style.md"
+        body = tmp / "body.md"
+        body.write_text("他缓缓推开门，寒风扑面而来，院子里一片死寂。\n\n" * 20, encoding="utf-8")
+
+        # 场景 A：正常容差 → 偏差表 + exit 0/1 合法
         text = card.read_text(encoding="utf-8").replace(
             "confidence: 0", "confidence: 80").replace(
             "avg_sentence_length: 0", "avg_sentence_length: 25")
         card.write_text(text, encoding="utf-8")
-        body = tmp / "body.md"
-        body.write_text("他缓缓推开门，寒风扑面而来，院子里一片死寂。\n\n" * 20, encoding="utf-8")
         r = run([sys.executable, str(TOOLS / "distill-style.py"), "check",
                  "-c", str(card), str(body)], cwd=str(TOOLS))
         check("check exit 0/1 皆合法（有 FAIL 为 1）", r.returncode in (0, 1))
         check("check 输出偏差表", "风格偏差表" in r.stdout)
+
+        # 场景 B：极端期望（avg_sentence_length=60）→ 实测必超 2×tol → FAIL → returncode 1
+        card.write_text(card.read_text(encoding="utf-8").replace(
+            "avg_sentence_length: 25", "avg_sentence_length: 60"), encoding="utf-8")
+        rb = run([sys.executable, str(TOOLS / "distill-style.py"), "check",
+                  "-c", str(card), str(body)], cwd=str(TOOLS))
+        check("FAIL 场景 returncode=1", rb.returncode == 1, (rb.stdout + rb.stderr)[-300:])
+        check("FAIL 场景含 -> FAIL", "-> FAIL" in rb.stdout, rb.stdout[-300:])
+        check("FAIL 场景计数=1", "不通过维度数：1" in rb.stdout, rb.stdout[-300:])
+
+        # 场景 C：手动档（confidence≤20，tol=0）→ 跳过量化校验，returncode 0
+        card.write_text(card.read_text(encoding="utf-8").replace(
+            "confidence: 80", "confidence: 15"), encoding="utf-8")
+        rc = run([sys.executable, str(TOOLS / "distill-style.py"), "check",
+                  "-c", str(card), str(body)], cwd=str(TOOLS))
+        check("手动档 returncode=0", rc.returncode == 0, (rc.stdout + rc.stderr)[-300:])
+        check("手动档跳过量化校验", "跳过量化校验" in rc.stdout, rc.stdout[-300:])
 
 
 def main():
