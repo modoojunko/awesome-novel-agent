@@ -437,6 +437,38 @@ def test_acceptance():
         check("C5 内容零损失", all(k in body for k in ("第三人称限知", "不写废话", "模板腔", "动作推进")))
 
 
+def test_review_fix_mix():
+    print("[review-fix] #2/#9/#36-mix 混卡修复")
+    import yaml as _y
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        def mk_card(name, ssl, conf):
+            dims = {"profile_version": "1.0", "scene_type": "general", "confidence": conf,
+                    "last_updated": "", "source_sample_length": ssl, "locked": [],
+                    "lexicon": {"adj_density_per_100": 2.0, "adv_density_per_100": 1.0,
+                                "four_phrase_freq_per_100": 1.0, "name_pronoun_ratio": 1.0},
+                    "syntax": {"avg_sentence_length": 20.0}, "rhythm": {"dialogue_pct": 30.0},
+                    "cohesion": {"conjunction_freq_per_100": 2.0, "transition_sentence_ratio": 20.0},
+                    "verb_style": {"action_verb_ratio": 0.5, "mental_verb_ratio": 0.3, "state_verb_ratio": 0.2}}
+            c = tmp / name
+            c.write_text("---\n" + _y.safe_dump(dims, allow_unicode=True, sort_keys=False) + "---\n# 卡\n", encoding="utf-8")
+            return c
+        a = mk_card("a.md", 1000, 50)
+        b = mk_card("b.md", 2000, 60)
+        out = tmp / "mix.md"
+        r = run([sys.executable, str(TOOLS / "mix-style.py"), str(a), str(b), "0.5", "0.5", "-o", str(out)])
+        fm = parse_fm(out)
+        # #2 mix 输出含 source_sample_length = 加权均值
+        check("#2 mix 输出含 source_sample_length", fm is not None and fm.get("source_sample_length") == 1500,
+              str(fm and fm.get("source_sample_length")))
+        # #9 旧卡（正文两处 ---）→ 优雅报错非崩溃
+        legacy = tmp / "legacy.md"
+        legacy.write_text("# 旧卡\n\n## role\n\n第一人称限知\n\n---\n- 套路化\n\n---\n\n其他\n", encoding="utf-8")
+        r2 = run([sys.executable, str(TOOLS / "mix-style.py"), str(legacy), str(a), "0.5", "0.5", "-o", str(tmp / "m2.md")])
+        check("#9 mix 旧卡优雅报错", r2.returncode == 2 and "error" in r2.stderr.lower() and "Traceback" not in r2.stderr,
+              f"rc={r2.returncode} stderr={r2.stderr}")
+
+
 def test_review_fix_metrics():
     print("[review-fix] #3/#4/#5/#36 测量正确性")
     mod = _load_tool("distill-style")
@@ -567,6 +599,7 @@ def main():
     test_review_fix_check_zero_expectation()
     test_review_fix_update_locked_and_checkpoint()
     test_review_fix_check_scene_card()
+    test_review_fix_mix()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 

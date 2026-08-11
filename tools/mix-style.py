@@ -24,8 +24,19 @@ NUMERIC = {"adj_density_per_100", "adv_density_per_100", "four_phrase_freq_per_1
 
 def load(path: str):
     text = Path(path).read_text(encoding="utf-8")
+    if not text.lstrip().startswith("---"):
+        return None, text
     parts = text.split("---", 2)
-    return (yaml.safe_load(parts[1]), parts[2]) if yaml and len(parts) == 3 else (None, text)
+    if len(parts) != 3 or not yaml:
+        return None, text
+    try:
+        fm = yaml.safe_load(parts[1])
+    except yaml.YAMLError as e:
+        print(f"[warn] 风格卡 YAML 解析失败 {path}: {e}", file=sys.stderr)
+        return None, text
+    if not isinstance(fm, dict):
+        return None, text
+    return fm, parts[2]
 
 
 def main(argv=None) -> int:
@@ -56,6 +67,9 @@ def main(argv=None) -> int:
             else:
                 merged[dim][k] = [va, vb]  # 定性：两边保留，待 LLM 合并
     merged["profile_version"] = "1.0"
+    merged["source_sample_length"] = int(
+        (fa.get("source_sample_length", 0) * wA + fb.get("source_sample_length", 0) * wB) / total
+    )
     merged["scene_type"] = fa.get("scene_type", "general")
     merged["confidence"] = min(100, int((fa.get("confidence", 0) * wA + fb.get("confidence", 0) * wB) / total))
     merged["last_updated"] = fa.get("last_updated", "")
