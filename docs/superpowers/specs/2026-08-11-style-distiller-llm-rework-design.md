@@ -8,7 +8,7 @@
 
 核心使用场景（作者确认）：拿作者 1-3 章（约 1 万字）正文 → 蒸馏出**特征卡** → 特征卡被渲染成**生成提示词** → 生成 agent 按提示词写出接近作者文风的正文 → 生成正文被**验收**，不符则带反馈重写（抽卡）。
 
-**目标**：改用 LLM 直接做特征提取（弃 jieba），把「验收」从脚本数值对比改为「用生成提示词逐条指令遵循检查」，并新增「验收不过 → 反馈重写」的抽卡闭环。卡片一旦蒸馏即冻结，机器生成内容永不回写卡片。
+**目标**：改用 LLM 直接做特征提取（弃 jieba），蒸馏方法论 = **三阶段 13 模板逆向工程**（拆解 1-4 → 量化 5-8 → 建模 9-13，作者提供），产出量化表 + 建模规则并收敛为特征卡；把「验收」从脚本数值对比改为「用生成提示词逐条指令遵循检查」，并新增「验收不过 → 反馈重写」的抽卡闭环。卡片一旦蒸馏即冻结，机器生成内容永不回写卡片。
 
 **不做**：确定性统计引擎（jieba POS 计数）、增量滑动平均更新、题材基线、compare/mix 工具、C1 人工计数对照验收。
 
@@ -23,6 +23,8 @@
 | 抽卡 | 验收违反 → 违反报告喂回 writer 带反馈重写，novel-agent 调度级，≤3 次 |
 | 卡生命周期 | **冻结**：一次蒸馏到位；归档后不动卡；机器生成章永不回写；重蒸馏仅作者主动触发 |
 | 场景卡 | 保留：通用卡 + 分场景卡（战斗/对话等），LLM 按段落类型聚合提取，inherits/override |
+| 蒸馏方法论 | 三阶段 13 模板（拆解 1-4 → 量化 5-8 → 建模 9-13）；模板 1-4 为 LLM 分析过程稿不落盘 |
+| 分析稿持久化 | 白名单内扩 `settings/style-profiles/analysis/`（量化表 + 建模规则全文），卡保持收敛精简 |
 | 退役 | compare-style、mix-style、题材基线、F5 增量更新、check 退出码契约、C1 |
 | 验收主标准 | C6 作者盲测正确率 ≥ 70% |
 
@@ -32,7 +34,7 @@
 
 | 角色 | 职责 | 产物 |
 |------|------|------|
-| **style-distiller** | 产卡：LLM 读样本 → 特征卡（主卡 + 场景卡） | `settings/writing-style.md` + `settings/style-profiles/*` + 备份 `.style-versions/` |
+| **style-distiller** | 产卡：LLM 读样本 → 三阶段 13 模板（拆解/量化/建模）→ 特征卡（主卡 + 场景卡）+ 分析稿 | `settings/writing-style.md` + `settings/style-profiles/*` + `settings/style-profiles/analysis/` + 备份 `.style-versions/` |
 | **prompt-crafter** | 注入：卡 → 生成提示词（案例 2 格式） | 渲染后的风格参数提示词（写入 `prompts/` 或随 order 传递） |
 | **writer** | 生成：按风格参数提示词写正文 | `*.draft.md` |
 | **anti-ai** | 验收：用同一份风格参数提示词逐条检查正文 → 违反报告 | `archives/*.anti-ai.md` 报告 |
@@ -40,10 +42,12 @@
 
 **关键约束**：生成提示词（案例 2）是**唯一操作规格**——writer 生成与 anti-ai 验收用同一份文字，天然同源，避免「提取→对比数值」的两次测量噪声。
 
+**卡可见性（数据流）**：卡 = 项目相对路径，已声明在各 agent 定义的 `knowledge:` 清单（prompt-crafter 现有 `settings/writing-style.md` + `settings/style-profiles/`）。流转：novel-agent 下发 `prompt-craft-order.md`（目标章节 + scene_type）→ prompt-crafter 按 scene_type 用 Read 加载主卡 + 对应场景卡（inherits/override 叠加）→ 按渲染规则产案例 2 提示词 → 写 `prompts/vol-{N}-ch-{M}-prompt.md` → writer 生成与 anti-ai 验收读取**同一份**。分析稿（§5.4）不进任何 agent 的加载清单，仅留档，不参与运行时读取。
+
 ### 3.2 主循环
 
 ```
-① style-distiller：样本(1-3章) → [feature-extract 模板] → 特征卡（案例1 格式）
+① style-distiller：样本(1-3章) → 三阶段 13 模板（拆解→量化→建模）→ 特征卡（案例1 收敛格式）+ 分析稿
 ② prompt-crafter：卡 → 渲染 → 风格参数提示词（案例2 格式）
 ③ writer：用提示词写正文
 ④ anti-ai：用同一份提示词逐条验收正文
@@ -63,7 +67,7 @@
 
 ## 4. F1：卡片数据结构（案例 1 维度，锁定）
 
-卡 = 案例 1 结构，字段一字不改。主卡 `scene_type: general`；场景卡同结构 + `inherits` + `override`。
+卡 = 案例 1 结构，字段一字不改。卡 = **量化维（模板 5-8 收敛）** + **声音层（模板 9-13 建模规则收敛）**。主卡 `scene_type: general`；场景卡同结构 + `inherits` + `override`。完整推导档（量化表 + 建模规则全文）见 §5.4 分析稿。
 
 ```yaml
 profile_version: "1.0"
@@ -180,25 +184,37 @@ few_shot_examples:
 - **客观数值**：密度/占比/长度（`5.8`、`48`），LLM 按字段客观定义输出精确值。
 - **类别枚举**：有限集合取值（`tag_style: mixed`、`strength: medium`、`perspective: third_limited`、`bridge_style: action`、`inner_monologue_style: direct`）。枚举是分类不是打分，属客观。
 - **分布**：`sentence_length_dist` / `metaphor_preference` / `sensory_dist` / `name_pronoun_ratio` 为百分比分布，和应为 100（±1 容忍）。
-- **声音层**：`hard_constraints` / `soft_guidance` / `few_shot_examples` 为 LLM 提炼的自由文本，不进验收数值对比。
+- **声音层**：`hard_constraints` / `soft_guidance` / `few_shot_examples` 由阶段三建模规则（模板 9-13：句式卡/行为树/对话模式/节奏模型/锚点）收敛而来，自由文本，不进验收数值对比。
 
-## 5. F2：LLM 特征提取（蒸馏）
+## 5. F2：LLM 特征提取（蒸馏方法论：三阶段 13 模板）
 
-### 5.1 提取模板
+蒸馏 = 三阶段 13 模板逆向工程（作者提供，方法论锁定）：
 
-新建 `knowledge/style-distill/prompt-templates/feature-extract.md`（取代旧 distill-prompt.md）。模板必须包含：
+| 阶段 | 模板 | 产出 | 归属 |
+|------|------|------|------|
+| 一 拆解 | 1 文本分层 / 2 段落节奏 / 3 句子级结构 / 4 情绪表达 | 逐段/逐句/逐情绪标注表 | LLM 分析过程稿（不落盘） |
+| 二 量化 | 5 频次 / 6 五层占比 / 7 情绪通道 / 8 词汇 | 量化数据表 | 持久化分析稿 + 收敛进卡量化维 |
+| 三 建模 | 9 句式卡 / 10 行为树 / 11 对话模式 / 12 节奏模型 / 13 结构锚点 | 建模规则卡 | 持久化分析稿 + 收敛进卡声音层 |
 
-- 案例 1 完整字段清单 + 每个字段的**客观定义**（如「adj_density_per_100 = 每 100 字中形容词数」），保证 LLM 输出一致、可复现。
-- 类别枚举的封闭取值集合（防 LLM 自造值）。
-- 分布字段「和为 100」的约束。
-- 输出格式：完整 YAML 卡。
+### 5.1 方法论模板
+
+新建 `knowledge/style-distill/prompt-templates/feature-extract.md`（取代旧 distill-prompt.md），内容 = 13 个模板的完整定义：
+
+- 模板 1-4：分层/段落节奏/句子结构/情绪表达的标注口径 + 封闭取值集合（句型/主语/动词/情绪通道选项，按作者模板原样）。
+- 模板 5-8：频次/五层占比/情绪通道/词汇的统计口径 + 每项客观定义；分布约束（五层占比总计 ≤110% 容忍、情绪通道和 =100%）。
+- 模板 9-13：句式卡（S-01 内心独白起手式）/行为树/对话模式（D-01 直球-语塞）/节奏模型（循环单元 + 关键参数）/结构锚点模型的**结构公式与规则格式**（作者示例为格式范本）。
+- 输出格式：量化表（模板 5-8）+ 建模规则卡（模板 9-13）+ 收敛卡（案例 1 格式）。
 
 ### 5.2 主卡提取流程
 
 ```
 样本(.md/.txt，≥1500 字，不足向 novel-agent 说明)
- → style-distiller 读 feature-extract.md → LLM 读样本 → 输出完整卡（案例 1 格式）
- → 校验 schema（check-agents 同款校验）→ 写 settings/writing-style.md
+ → 阶段一 拆解（模板 1-4）：逐段分层/段落节奏/逐句结构/情绪通道标注（LLM 内部推理，不落盘）
+ → 阶段二 量化（模板 5-8）：频次/五层占比/情绪通道/词汇 → 量化表
+ → 阶段三 建模（模板 9-13）：句式卡/行为树/对话模式/节奏模型/锚点 → 建模规则
+ → 收敛：量化表 → 卡量化维（案例 1 九维）；建模规则 → 卡声音层（hard_constraints/soft_guidance/few_shot_examples）
+ → 校验 schema → 写 settings/writing-style.md（收敛卡）
+ → 写 settings/style-profiles/analysis/general.md（量化表 + 建模规则全文，推导档留痕）
  → 备份旧卡到 settings/.style-versions/v{N}_{YYYY-MM-DD}.md
  → confidence 由 LLM 按样本质量/一致性给（0-100；0 = 手动设定）
 ```
@@ -208,14 +224,32 @@ few_shot_examples:
 ```
 样本按段落分类场景（复用 6 类）→ 每类聚合子样本
  → 子样本 ≥ 阈值（800 字）才产该场景卡；不足跳过
- → LLM 参照主卡，只输出该场景显著差异维度（override）
+ → 同 5.2 三阶段跑该场景子样本（阶段三侧重场景差异规则：战斗句式/对话模式等）
+ → 收敛为 override（只写差异维度）+ 场景声音层
  → 写 settings/style-profiles/{scene_type}.md（inherits: writing-style.md + override）
+     + settings/style-profiles/analysis/{scene_type}.md（该场景量化表 + 建模规则）
 ```
 
-### 5.4 幂等与备份
+### 5.4 存储布局（白名单内扩）
 
-- 重复蒸馏同一样本不产生多余备份（以当日版本为准，与现行为一致）。
-- 卡内 `last_updated` 写当日日期。
+```
+settings/
+  writing-style.md                    # 主卡（收敛：量化维 + 声音层）
+  style-profiles/
+    dialogue.md fight.md …            # 场景卡（差异维 + 声音层）
+    analysis/                         # 新增：蒸馏分析稿
+      general.md                      # 主卡推导档（量化表 + 建模规则全文）
+      dialogue.md fight.md …          # 各场景推导档
+  .style-versions/                    # 版本备份（卡 + 对应分析稿同版本备份）
+```
+
+- 分析稿 = 完整推导档；卡 = 收敛参考物。**生成/验收从卡出发渲染案例 2，不直接读分析稿**。
+- 白名单扩展：写入面从「卡三处」扩为「卡三处 + `settings/style-profiles/analysis/`」，蒸馏流程只写这四处。
+
+### 5.5 幂等与备份
+
+- 重复蒸馏同一样本不产生多余备份（以当日版本为准）。
+- 卡与对应分析稿同版本备份到 `.style-versions/`；卡内 `last_updated` 写当日日期。
 
 ## 6. F3：生成注入（prompt-crafter）
 
@@ -233,6 +267,8 @@ few_shot_examples:
 | `few_shot_examples` | 「风格参考例句」按 type 分组透传 |
 | — | prompt 固定含「严格匹配上述风格参数，偏差不超过 20%」生成目标 |
 | — | prompt 固定含「剧情上下文」「写作要求（直接写正文/字数）」占位 |
+
+建模规则（模板 9-13）先收敛进卡声音层（§4），渲染时从卡读取，不直接读分析稿：句式卡 → few_shot_examples；节奏参数/锚点 → hard_constraints；对话模式/行为树 → hard_constraints + soft_guidance。结构化全文留档在分析稿（§5.4）。
 
 ### 6.2 类别枚举 → 中文映射表（渲染用）
 
@@ -270,6 +306,7 @@ perspective: first_person / second_person / third_limited / third_omniscient
 过程：LLM 逐条对照提示词检查正文
   · 数值/占比条：「对话约 48%」→ 本章对话是否明显偏离（偏离即违反，不要求数值）
   · 硬性规则条：逐条判定（如「禁止'宛如'」→ 查是否出现）
+  · 建模规则条：节奏参数（「对话密集区≥4轮后必须独白缓冲」「纯叙述≤3句」）、对话模式（D-01~）、锚点（章首/章尾语义闭环）逐条判定
   · 软引导条：整体基调是否吻合
 输出：违反报告（.anti-ai.md）
   · 逐条：条号 + 原文要求 + 正文表现 + 违反与否 + 建议
@@ -318,8 +355,10 @@ writer 生成一版
 | 测试 | 内容 |
 |------|------|
 | schema 合法性 | feature-extract 输出即案例 1 结构合法（9 维键、类型、枚举值、分布和=100） |
+| 13 模板方法论 schema | 量化表（模板 5-8）键完整；建模规则（模板 9-13）格式正确（句式卡含结构公式、对话模式含轮次结构、节奏模型含关键参数） |
 | 渲染正确性 | 卡值 → 案例 2 区间/中文映射正确（5.8 → "5-6 个"；mixed → "标签混合使用"） |
-| 验收判定 | 构造卡 + 构造正文 → 违反报告正确（PASS/FAIL、逐条判定） |
+| 建模规则渲染 | 句式卡 →【风格参考例句】、节奏参数/锚点 →【硬性规则】、对话模式 →【对话风格】映射正确 |
+| 验收判定 | 构造卡 + 构造正文 → 违反报告正确（PASS/FAIL、逐条判定，含数值/占比/建模规则/软引导四类检查项） |
 | 抽卡装配 | 违反报告正确装配进重写提示词；round 计数上限 3；超限取最优 |
 | 场景卡 | 段落分类 → 聚合 → 场景卡 override 叠加主卡正确 |
 | 迁移 | 旧卡 → 新 schema 零丢失 |
@@ -338,7 +377,7 @@ LLM 输出的非确定性由「schema 校验 + 模板一致性」兜底，不依
 
 ## 12. 实施顺序
 
-1. **Phase 1**：feature-extract 模板 + style-distiller 产卡（主卡 + 场景卡）+ schema 校验
+1. **Phase 1**：13 模板方法论（feature-extract 模板）+ style-distiller 三阶段产卡（主卡 + 场景卡 + 分析稿）+ schema 校验
 2. **Phase 2**：prompt-crafter 渲染（卡 → 案例 2）+ 枚举映射表
 3. **Phase 3**：anti-ai 验收 + 违反报告 + 抽卡闭环（novel-agent 调度）
 4. **Phase 4**：退役清理（distill/compare/mix/jieba/增量/题材基线）+ 测试重写 + CI 更新
@@ -353,4 +392,4 @@ LLM 输出的非确定性由「schema 校验 + 模板一致性」兜底，不依
 | 验收误判 | 验收用与生成同一份提示词（同源）；违反报告逐条可人工复核 |
 | 抽卡不收敛 | round ≤3 + 超限取最优 + 报告留人工裁决 |
 | 声音层信息丢失 | 硬约束/软引导/few-shot 原样透传，渲染不压缩 |
-| 成本 | 每次蒸馏/验收各 1 次 LLM 调用，抽卡 ≤3；生成场景本就在线 |
+| 成本 | 模板 1-4 拆解全量标注 token 大 → 定为 LLM 内部推理不落盘；量化/建模各 1 次调用；抽卡 ≤3 |
