@@ -214,12 +214,42 @@ def test_e2e_init_deploy():
         check("场景卡已部署", (tmp / "settings" / "style-profiles" / "dialogue.md").exists())
 
 
+def test_update():
+    print("[unit] 增量滑动平均")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        card = tmp / "settings" / "writing-style.md"
+        # 造一份带数值的旧卡
+        text = card.read_text(encoding="utf-8")
+        text = text.replace("avg_sentence_length: 0", "avg_sentence_length: 20")
+        card.write_text(text, encoding="utf-8")
+        ch = tmp / "archives" / "vol-1-ch-1.md"
+        ch.parent.mkdir(parents=True, exist_ok=True)
+        ch.write_text("他快速出拳，拳风猎猎。\n\n她退后半步，眼神冰冷。\n\n" * 8, encoding="utf-8")
+        out = tmp / "settings" / "writing-style-new.md"
+        r = run([sys.executable, str(TOOLS / "distill-style.py"), "update",
+                 "-c", str(card), "-o", str(out), "--project", str(tmp), str(ch)], cwd=str(TOOLS))
+        check("update exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        import yaml as _y
+        fm = _y.safe_load(out.read_text(encoding="utf-8").split("---", 2)[1])
+        check("新卡 avg_sentence_length 介于 0-40",
+              0 < fm["syntax"]["avg_sentence_length"] < 40, str(fm["syntax"]))
+        check("备份存在", list((tmp / "settings" / ".style-versions").glob("v1_*.md")))
+        # 幂等：同章再跑，不新增备份
+        run([sys.executable, str(TOOLS / "distill-style.py"), "update",
+             "-c", str(card), "-o", str(out), "--project", str(tmp), str(ch)], cwd=str(TOOLS))
+        check("checkpoint 幂等（备份数不变）",
+              len(list((tmp / "settings" / ".style-versions").glob("v1_*.md"))) == 1)
+
+
 def main():
     test_card_schema()
     test_migration()
     test_distill()
     test_genre_baselines()
     test_e2e_init_deploy()
+    test_update()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 

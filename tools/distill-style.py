@@ -234,6 +234,87 @@ def cmd_distill(args) -> int:
     return 0
 
 
+# ------------------------------------------------------------ 卡片读写 / 增量
+
+def load_card(path):
+    """解析风格卡 → (frontmatter dict, 正文)。非新格式返回 (None, 原文)。"""
+    text = Path(path).read_text(encoding="utf-8")
+    if not text.lstrip().startswith("---"):
+        return None, text
+    parts = text.split("---", 2)
+    if len(parts) != 3 or not yaml:
+        return None, text
+    return yaml.safe_load(parts[1]), parts[2]
+
+
+def dump_card(dims: dict, body: str) -> str:
+    if not yaml:
+        return body
+    fm = yaml.safe_dump(dims, allow_unicode=True, sort_keys=False, default_flow_style=False)
+    return f"---\n{fm}---\n{body}"
+
+
+def sliding_alpha(confidence: int) -> float:
+    return 0.50 if confidence < 30 else 0.65 if confidence <= 60 else 0.75
+
+
+def chapter_count_from_fs(project: Path) -> int:
+    arch = project / "archives"
+    return sum(1 for f in arch.glob("vol-*.md")) if arch.is_dir() else 0
+
+
+def cmd_update(args) -> int:
+    dims, body = load_card(args.card)
+    if dims is None:
+        print(f"error: {args.card} 不是新格式风格卡（缺 frontmatter）", file=sys.stderr)
+        return 2
+    for ch in args.chapters:
+        partial = build_partial([ch])
+        alpha = sliding_alpha(dims.get("confidence", 0))
+        for dim, fields in (("lexicon", ("adj_density_per_100", "adv_density_per_100",
+                                         "four_phrase_freq_per_100", "name_pronoun_ratio")),
+                            ("syntax", ("avg_sentence_length", "single_sentence_paragraph_pct",
+                                        "avg_sentences_per_paragraph", "question_ratio", "exclamation_ratio")),
+                            ("rhythm", ("dialogue_pct",)),
+                            ("cohesion", ("conjunction_freq_per_100", "transition_sentence_ratio")),
+                            ("verb_style", ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio"))):
+            locked = set(dims.get("locked") or [])
+            for field in fields:
+                key = f"{dim}.{field}"
+                if key in locked:
+                    continue
+                old = (dims.get(dim) or {}).get(field)
+                new = (partial.get(dim) or {}).get(field)
+                if old is None or new is None:
+                    continue
+                dims[dim][field] = round(old * alpha + new * (1 - alpha), 2)
+        # 幂等 checkpoint（同章不重放）
+        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
+        if ck.exists():
+            continue
+        ck.parent.mkdir(parents=True, exist_ok=True)
+        ck.write_text("done\n", encoding="utf-8")
+    # 备份旧版
+    vers = Path(args.card).parent / ".style-versions"
+    vers.mkdir(parents=True, exist_ok=True)
+    maxn = 0
+    for f in vers.glob("v*_*.md"):
+        m = re.match(r"v(\d+)_", f.name)
+        if m:
+            maxn = max(maxn, int(m.group(1)))
+    import datetime
+    stamp = datetime.date.today().isoformat()
+    (vers / f"v{maxn + 1}_{stamp}.md").write_text(
+        Path(args.card).read_text(encoding="utf-8"), encoding="utf-8")
+    # 置信度重算 + 写卡
+    dims["confidence"] = compute_confidence(dims.get("source_sample_length", 0),
+                                            chapter_count_from_fs(Path(args.project)))
+    dims["last_updated"] = datetime.date.today().isoformat()
+    Path(args.out).write_text(dump_card(dims, body), encoding="utf-8")
+    print(f"update: 客观维度滑动平均更新 {len(args.chapters)} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="distill-style.py", description="文风蒸馏统计引擎")
     sub = ap.add_subparsers(dest="mode", required=True)
@@ -241,10 +322,17 @@ def main(argv=None) -> int:
     d.add_argument("-o", "--out", required=True, help="partial YAML 输出路径")
     d.add_argument("-e", "--evidence", help="证据 markdown 输出路径（可选）")
     d.add_argument("samples", nargs="+", help="样本文件（.md/.txt）")
-    # update / check 子命令在 Phase 3 / Phase 4 追加
+    u = sub.add_parser("update", help="增量：客观维度滑动平均 + 备份 + 置信度重算")
+    u.add_argument("-c", "--card", required=True, help="当前风格卡路径")
+    u.add_argument("-o", "--out", required=True, help="新卡输出路径")
+    u.add_argument("--project", required=True, help="项目根（.agent/style-update checkpoint 与 archives 计数用）")
+    u.add_argument("chapters", nargs="+", help="已归档定稿章节")
+    # check / compare / mix 子命令在 Phase 4 / Phase 5 追加
     args = ap.parse_args(argv)
     if args.mode == "distill":
         return cmd_distill(args)
+    if args.mode == "update":
+        return cmd_update(args)
     ap.error(f"未知模式: {args.mode}")
 
 
