@@ -49,6 +49,8 @@ DEPLOYED_PATTERNS = [
     re.compile(r"^\.claude/knowledge/(plot-craft|scene-craft|character-craft|title-craft)/"),
     re.compile(r"^settings/character-setting/"),               # 每角色一个文件
     re.compile(r"^settings/(world-setting|genre-setting|writing-style|timeline|foreshadowing)\.md$"),
+    re.compile(r"^settings/style-profiles/"),               # 分场景风格卡（每场景一个文件）
+    re.compile(r"^settings/\.style-versions/"),             # 蒸馏版本快照目录（updater 归档时创建）
     re.compile(r"^\.agent/"),                                  # 运行时状态
     re.compile(r"^story\.md$"),
     re.compile(r"^volumes/"), re.compile(r"^chapters/"), re.compile(r"^prompts/"), re.compile(r"^archives/"),
