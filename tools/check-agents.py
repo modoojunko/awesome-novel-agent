@@ -50,7 +50,7 @@ DEPLOYED_PATTERNS = [
     re.compile(r"^settings/character-setting/"),               # 每角色一个文件
     re.compile(r"^settings/(world-setting|genre-setting|writing-style|timeline|foreshadowing)\.md$"),
     re.compile(r"^settings/style-profiles/"),               # 分场景风格卡（每场景一个文件）
-    re.compile(r"^settings/\.style-versions/"),             # 蒸馏版本快照目录（updater 归档时创建）
+    re.compile(r"^settings/\.style-versions/"),             # 蒸馏版本快照目录（style-distiller 蒸馏备份时创建）
     re.compile(r"^\.agent/"),                                  # 运行时状态
     re.compile(r"^story\.md$"),
     re.compile(r"^volumes/"), re.compile(r"^chapters/"), re.compile(r"^prompts/"), re.compile(r"^archives/"),
@@ -131,6 +131,66 @@ def _is_deployed(rel: str) -> bool:
     return False
 
 
+STYLE_CARD_SCENE_TYPES = {"general", "dialogue", "fight", "environment",
+                          "inner-mono", "transition", "group-scene"}
+STYLE_CARD_DIMS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expression",
+                   "narrative", "dialogue_style", "cohesion", "verb_style"]
+
+
+def check_style_card(path: Path) -> list:
+    errors = []
+    is_scene = path.name != "writing-style.md"   # 场景卡为 override 风格（只写差异），主卡为全量 9 维度
+    text = path.read_text(encoding="utf-8")
+    parts = text.split("---", 2)
+    if len(parts) != 3:
+        return [f"{path.name}: 风格卡缺 frontmatter（需两对 ---）"]
+    try:
+        fm = yaml.safe_load(parts[1])
+    except Exception as e:
+        return [f"{path.name}: 卡片 frontmatter YAML 解析失败: {e}"]
+    if not isinstance(fm, dict):
+        return [f"{path.name}: 卡片 frontmatter 不是 map"]
+    for k in ("profile_version", "scene_type", "confidence", "last_updated"):
+        if k not in fm:
+            errors.append(f"{path.name}: 卡片缺 {k}")
+    st = fm.get("scene_type")
+    if st not in STYLE_CARD_SCENE_TYPES:
+        errors.append(f"{path.name}: scene_type={st!r} 不在枚举 {sorted(STYLE_CARD_SCENE_TYPES)}")
+    conf = fm.get("confidence")
+    if not isinstance(conf, int) or not (0 <= conf <= 100):
+        errors.append(f"{path.name}: confidence 需为 0-100 整数（当前 {conf!r}）")
+    if is_scene:
+        ov = fm.get("override")
+        if not isinstance(ov, dict):
+            errors.append(f"{path.name}: 场景卡需 override 字段（dict，只写与主卡的差异维度）")
+        else:
+            for dim in ov:
+                if dim not in STYLE_CARD_DIMS:
+                    errors.append(f"{path.name}: override 出现未知维度 {dim!r}")
+    else:
+        for dim in STYLE_CARD_DIMS:
+            if dim not in fm:
+                errors.append(f"{path.name}: 卡片缺维度 {dim}")
+    locked = fm.get("locked")
+    if locked is not None and not isinstance(locked, list):
+        errors.append(f"{path.name}: locked 需为列表")
+    inh = fm.get("inherits")
+    if inh:
+        # 继承目标与卡同级于 templates/settings/（场景卡 inherits: "writing-style.md"）
+        target = ROOT / "templates" / "settings" / str(inh)
+        if not target.exists():
+            errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {target.relative_to(ROOT)}）")
+    return errors
+
+
+def check_style_cards() -> list:
+    errors = []
+    base = ROOT / "templates" / "settings"
+    for p in [base / "writing-style.md"] + sorted((base / "style-profiles").glob("*.md")):
+        errors.extend(check_style_card(p))
+    return errors
+
+
 def main() -> int:
     if not AGENTS_DIR.is_dir():
         print("⚠️  agents/ 目录不存在")
@@ -153,6 +213,8 @@ def main() -> int:
     for s in missing_skills:
         print(f"  ❌ skills 引用缺失: skills/{s}")
         all_errors.append(f"skills/{s}")
+
+    all_errors.extend(check_style_cards())
 
     if all_errors:
         print(f"\n共 {len(all_errors)} 个问题")
