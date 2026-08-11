@@ -35,6 +35,10 @@ knowledge:
     description: 文笔技法（始终加载到 输出·写作规范）
   - path: .claude/knowledge/scene-craft/pov/universal.md
     description: 视角切换（始终加载到 输出·写作规范）
+  - path: settings/style-profiles/
+    description: 分场景风格卡（场景类型识别后按需加载）
+  - path: .claude/knowledge/distilled-style-spec.md
+    description: 蒸馏风格卡格式规范
 ---
 
 # prompt-crafter
