@@ -296,6 +296,26 @@ def test_compare():
         check("输出维度变化表", "avg_sentence_length" in r.stdout and "差值" in r.stdout)
 
 
+def test_mix():
+    print("[unit] mix-style")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        a = tmp / "settings" / "writing-style.md"
+        t = a.read_text(encoding="utf-8").replace("avg_sentence_length: 0", "avg_sentence_length: 10")
+        a.write_text(t, encoding="utf-8")
+        b = tmp / "b.md"
+        b.write_text(t.replace("avg_sentence_length: 10", "avg_sentence_length: 30"), encoding="utf-8")
+        out = tmp / "mix.md"
+        r = run([sys.executable, str(TOOLS / "mix-style.py"), str(a), str(b), "0.5", "0.5",
+                 "-o", str(out)], cwd=str(TOOLS))
+        check("mix exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        import yaml as _y
+        fm = _y.safe_load(out.read_text(encoding="utf-8").split("---", 2)[1])
+        check("加权平均 10/30 → 20", fm["syntax"]["avg_sentence_length"] == 20.0,
+              str(fm["syntax"]["avg_sentence_length"]))
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -305,6 +325,7 @@ def main():
     test_update()
     test_check()
     test_compare()
+    test_mix()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
