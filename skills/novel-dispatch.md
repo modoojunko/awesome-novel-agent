@@ -14,8 +14,8 @@ novel-agent **只做三件事**：
 | phase | 该谁干 | order 文件 |
 |-------|--------|-----------|
 | setup | updater | `setting-update-order.md` |
-| setup | style-distiller | style-distill-order.md（作者提供风格样本时触发） |
-| 手动 | style-distiller | style-distill-order.md / style-update-order.md（作者主动触发重蒸馏/调参数/混风格） |
+| setup | style-distiller | `style-distill-order.md`（作者提供风格样本时触发） |
+| 手动 | style-distiller | `style-distill-order.md` / `style-update-order.md`（作者主动触发重蒸馏/调参数/混风格） |
 | outline | volume-planner | `volume-plan-order.md` |
 | outline | chapter-planner | `chapter-plan-order.md` |
 | draft | prompt-crafter | `prompt-craft-order.md` |
@@ -23,7 +23,7 @@ novel-agent **只做三件事**：
 | anti-ai | anti-ai | `anti-ai-order.md` |
 | review | reader | `reader-review-order.md` |
 | archive | updater | `archive-order.md` |
-| archive | style-distiller | style-update-order.md（每次归档后增量蒸馏） |
+| archive | style-distiller | `style-update-order.md`（每次归档后增量蒸馏） |
 | rewrite（归档后重写某章） | updater | `rollback-order.md`（撤销该章归档追加，status 回 outline，重新规划编写） |
 | finished | 无（终态） | 无——完本退出，不调度 |
 | （卷完成后触发） | updater | `memory-sweep-order.md`（记忆兜底：格式验证/查重/压缩/永久记忆升降级） |

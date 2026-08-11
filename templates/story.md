@@ -2,7 +2,7 @@
 
 ## 元信息
 
-- **skill_version:** 4.0
+- **skill_version:** 4.13.0
 - **题材：** {genre}
 - **标签：** {tags}
 - **状态：** 设定中

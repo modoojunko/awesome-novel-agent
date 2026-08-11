@@ -54,7 +54,7 @@
 
 ## 项目结构与模块组织
 
-- `agents/` — 8 个写作 agent 定义（novel-agent 总指挥 + 7 个子 agent），Markdown + frontmatter。
+- `agents/` — 9 个写作 agent 定义（novel-agent 总指挥 + 8 个子 agent），Markdown + frontmatter。
 - `skills/` — 各 agent 的 SOP 指令，按 `{环节}-{动作}.md` 命名。
 - `knowledge/` — 知识库：`genre-example/` 题材档案、`anti-ai/` 反 AI 规则、`format-specs/` 格式规范、`{plot|scene|character|title}-craft/` 创作方法论。
 - `templates/` — 项目初始化模板（`settings/`、`migration/` 旧项目迁移）。

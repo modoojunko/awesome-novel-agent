@@ -1,7 +1,7 @@
 # awesome-novel-skill 架构文档
 
 > 面向开发者理解实现细节。面向使用者的内容见 [README.md](./README.md)。
-> 当前版本：v4.11.1
+> 当前版本：v4.13.0
 
 ---
 
@@ -41,7 +41,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 | 角色 | 职责 |
 |-----|------|
 | **novel-agent** | 顶层总指挥（`@novel-agent` 加载进主 AI）。检测 phase、写 order 文件、通过 Agent 工具调度子 agent。**不直接代劳子 agent 的工作，不用 Bash，不写任何内容文件** |
-| **子 Agent × 7** | volume-planner / chapter-planner / prompt-crafter / writer / anti-ai / reader / updater。各自负责一个环节，由 novel-agent 调度，完成后将 order 标记 `status: DONE` |
+| **子 Agent × 8** | volume-planner / chapter-planner / prompt-crafter / writer / anti-ai / reader / updater / style-distiller。各自负责一个环节，由 novel-agent 调度，完成后将 order 标记 `status: DONE` |
 
 > **写作基底规范**（`knowledge/format-specs/writing-base.md`，部署为 `.claude/knowledge/writing-base.md`，非 agent，不可调度）——永久加载、不可篡改。
 > writer 的写作 sub-agent 动笔前先加载此基底，再叠加章节提示词；与基底冲突时以基底为准。
@@ -57,6 +57,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 | `anti-ai` | Gate A-F 管线检测 + 量化评分定级 + 逐项清除 | novel-agent |
 | `reader` | 深度评审（可选，作者需要时调度） | novel-agent |
 | `updater` | 归档 lore-keeping + 设定变更 + 记忆兜底 | novel-agent |
+| `style-distiller` | 风格蒸馏（脚本统计 + LLM 语义 → 写风格主卡/场景卡/版本快照） | novel-agent |
 
 ### 1.5 调度架构
 
@@ -67,13 +68,15 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   ├── 写 order 文件到 .agent/task/{type}-order.md（只含输入/输出路径，不含执行步骤）
   ├── 通过 Agent 工具调度子 agent
   │     ├── setup   → updater          （setting-update-order.md）
+  │     ├── setup   → style-distiller  （style-distill-order.md，作者提供风格样本时）
   │     ├── outline → volume-planner   （volume-plan-order.md）
   │     ├── outline → chapter-planner  （chapter-plan-order.md）
   │     ├── draft   → prompt-crafter   （prompt-craft-order.md）
   │     ├── draft   → writer           （writing-order.md）
   │     ├── anti-ai → anti-ai          （anti-ai-order.md）
   │     ├── review  → reader           （reader-review-order.md，可选）
-  │     └── archive → updater          （archive-order.md / memory-sweep-order.md）
+  │     ├── archive → updater          （archive-order.md / memory-sweep-order.md）
+  │     └── archive → style-distiller  （style-update-order.md，每次归档后增量）
   ├── 子 agent 完成后将 order 覆盖为 status: DONE
   └── 检测到 order 标记 DONE → 推进下一阶段
 ```
@@ -183,7 +186,7 @@ tools/           # init.py（初始化）、sync-project.py（同步更新）
 
 - **Claude Code**：init.py 部署 agent 定义到 `.claude/agents/`，知识到 `.claude/knowledge/`，建 `.claude/memory/` 动态记忆桩
 - **OpenCode**：init.py 同时部署到 `.opencode/agents/`，OpenCode 自动发现 `@novel-agent` 等
-- **Codex**：init.py 部署 8 个自定义 agent 为 `.codex/agents/*.toml`（TOML 转换产物，引用改写为 `.codex/knowledge|memory`），独立工具为 `.codex/skills/<name>/SKILL.md`；novel-agent 用 `spawn_agent` 调度子 agent
+- **Codex**：init.py 部署 9 个自定义 agent 为 `.codex/agents/*.toml`（TOML 转换产物，引用改写为 `.codex/knowledge|memory`），独立工具为 `.codex/skills/<name>/SKILL.md`；novel-agent 用 `spawn_agent` 调度子 agent
 - **安装**：`install.sh` / `install.ps1` 将 skill 装到用户级 skills 目录
 
 ---
@@ -337,5 +340,5 @@ Phase 4  报告   字数变化 + 修改统计 + 前后对比
 - **`.agent/archiving/{chapter}.done`** — 归档完成 checkpoint，重派时从断点继续，防 append 重放重复
 - **`.claude/memory/*.md`** — 追加写入，不覆盖
 - **novel-agent** — 不用 Bash、不写内容文件、不越权代劳、绝不访问项目外路径
-- **设定写入** — settings/ 必须经 updater（setting-update 模式），novel-agent 不得直接写
+- **设定写入** — settings/ 必须经 updater（setting-update 模式），novel-agent 不得直接写。例外：style-distiller 拥有 settings/writing-style.md、settings/style-profiles/、settings/.style-versions/ 专属写白名单，其余 settings 仍归 updater
 - **作家本地记录优先于 references defaults**

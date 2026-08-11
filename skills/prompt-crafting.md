@@ -13,7 +13,7 @@ Step 4: 验收自检
 
 ## Step 1: 读取输入源
 
-> 8 类文件（含写作记忆/永久记忆）。
+> 9 类文件（含写作记忆/永久记忆）。
 
 1. **writing-style.md（主卡）** → 提取正文定性层四字段（core_principles, possible_mistakes, depiction_techniques）+ 量化层 9 大维度 + confidence。confidence=0 → 只注入定性层；否则按容差档渲染「写作风格约束」块（见注入模板）
 2. **volume.md** → 提取前一章的章名、结尾画面、情绪落点

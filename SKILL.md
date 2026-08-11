@@ -1,6 +1,6 @@
 ---
 name: awesome-novel
-description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成从设定到归档的完整写作流程。入口检测 → 初始化/迁移 → 交 novel-agent 调度。适用场景：从零写新小说、导入已有小说。
+description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成从设定到归档的完整写作流程。入口检测 → 初始化/迁移 → 交 novel-agent 调度。适用场景：从零写新小说、导入已有小说。
 ---
 
 # Novel — 小说创作工作流
@@ -20,7 +20,7 @@ description: 和 AI 协作写小说的工作流系统。8 个 agent 协作完成
 
 ## Codex 集成说明
 
-本 skill 也支持 Codex。skill 本体**用户级安装**到 `~/.codex/skills/awesome-novel/`；`init.py --platform codex` 初始化小说项目时，把 8 个自定义 agent 部署为项目级 `.codex/agents/*.toml`（Codex 官方 TOML 格式，含 `name`/`description`/`developer_instructions`）：
+本 skill 也支持 Codex。skill 本体**用户级安装**到 `~/.codex/skills/awesome-novel/`；`init.py --platform codex` 初始化小说项目时，把 9 个自定义 agent 部署为项目级 `.codex/agents/*.toml`（Codex 官方 TOML 格式，含 `name`/`description`/`developer_instructions`）：
 - `@novel-agent` — 总指挥 agent（TOML 名 `novel-agent`）
 - `@volume-planner`、`@chapter-planner` 等 — 子 agent（TOML 名与源 agent 一致）
 - **独立工具** — `memory-recording`、`roleplay-sandbox` 部署为 `.codex/skills/<name>/SKILL.md`
@@ -170,7 +170,7 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 
 ### Step 6: 验收
 
-- [ ] story.md 存在，skill_version = 4.0
+- [ ] story.md 存在，skill_version = 4.13.0
 - [ ] settings/world-setting.md 存在且已填充
 - [ ] settings/writing-style.md 存在且已填充
 - [ ] settings/genre-setting.md 存在
@@ -200,7 +200,7 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 | 场景 | 处理 |
 |------|------|
 | `story.yaml` 存在 → `story.md` 不存在 | 旧版 2.x → 执行自动迁移流程 |
-| `story.md` 存在但 `skill_version` < 4.0 | 待升级 → 执行自动迁移流程 |
+| `story.md` 存在但 `skill_version` < 4.13.0 | 待升级 → 执行自动迁移流程 |
 | `story.md` 存在且版本匹配 | 已有项目 → @novel-agent |
 | 两者都不存在 | 全新项目 → init.py → @novel-agent |
 | `init.py` 不可用 | 手动创建目录结构 + 复制 `templates/` 文件 |
@@ -241,11 +241,11 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 │   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
 │   └── memory/          # 写作动态记忆
 ├── .reasonix/           # Reasonix 用（平台三，四选一）
-    ├── skills/          # 10 个 SKILL.md（agents 即 skills）
+    ├── skills/          # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
     └── memory/          # 写作动态记忆
 └── .codex/              # Codex 用（平台四，四选一）
-    ├── agents/          # 8 个自定义 agent（TOML）
+    ├── agents/          # 9 个自定义 agent（TOML）
     ├── skills/          # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
     └── memory/          # 写作动态记忆

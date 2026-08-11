@@ -2,7 +2,7 @@
 
 ## Codex 指引
 
-本项目的小说写作流程由 8 个 agent 协作完成，定义在 `.codex/agents/` 下（TOML 自定义 agent）。
+本项目的小说写作流程由 9 个 agent 协作完成，定义在 `.codex/agents/` 下（TOML 自定义 agent）。
 
 **开始写作：** 在 Codex 中通过 `@novel-agent` 或 `spawn_agent` 调用 novel-agent 进入写作循环。
 
@@ -22,7 +22,7 @@
 - `prompts/` — 提示词
 - `archives/` — 正文
 - `.agent/` — 状态追踪 + agent 通信（order 文件）
-- `.codex/agents/` — 8 个自定义 agent 定义（novel-agent, volume-planner, chapter-planner 等）
+- `.codex/agents/` — 9 个自定义 agent 定义（novel-agent, volume-planner, chapter-planner 等）
 - `.codex/skills/` — 独立交互工具（memory-recording、roleplay-sandbox）
 - `.codex/memory/` — 写作动态记忆（各环节作者反馈，持续积累）
 - `.codex/knowledge/` — 反 AI 规则、文风偏好、永久记忆、题材参考材料

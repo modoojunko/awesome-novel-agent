@@ -104,7 +104,7 @@ cd <小说项目路径> && reasonix code
 
 > **OpenCode 用户注意：** 安装路径为 `~/.config/opencode/skills/awesome-novel/`，初始化后 agent 定义部署在项目 `.opencode/agents/` 下，OpenCode 自动发现。详情见下方 [OpenCode 集成](#opencode) 说明。
 
-> **Codex 用户注意：** skill 安装到 `~/.codex/skills/awesome-novel/`，初始化后 8 个自定义 agent 以 TOML 形式部署在项目 `.codex/agents/` 下，Codex 自动发现。详情见下方 [Codex 集成](#codex-集成) 说明。
+> **Codex 用户注意：** skill 安装到 `~/.codex/skills/awesome-novel/`，初始化后 9 个自定义 agent 以 TOML 形式部署在项目 `.codex/agents/` 下，Codex 自动发现。详情见下方 [Codex 集成](#codex-集成) 说明。
 
 > **看到这个项目觉得有用？** 顺手点个 Star，这样它会出现在你的 GitHub 首页，让更多人发现。
 > {: .prompt-info }
@@ -121,7 +121,7 @@ skill 会自动检测目录状态：新目录会先和你确认，然后运行 `
 
 Reasonix 用户在项目目录运行 `reasonix code` 后，输入 `@novel-agent` 进入写作流程。
 
-Agent 会引导你完成后续步骤。系统由 8 个 AI Agent 协作驱动，自动检测进度、调度任务，你只需确认方向和审阅内容。
+Agent 会引导你完成后续步骤。系统由 9 个 AI Agent 协作驱动，自动检测进度、调度任务，你只需确认方向和审阅内容。
 
 ```
 novel-agent（总指挥 — 顶层入口，由 @novel-agent 加载）
@@ -168,11 +168,11 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 │   ├── status.md         # 进度标记（phase/volume/chapter）
 │   └── task/             # 子 agent 间 order 文件
 ├── .opencode/            # OpenCode 用（四选一，由 init.py --platform 决定）
-│   ├── agents/           # 8 个 Agent 定义（初始化时部署）
+│   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆
 ├── .claude/              # Claude Code 用（四选一）
-│   ├── agents/           # 8 个 Agent 定义（初始化时部署）
+│   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆（各环节作者反馈）
 │       ├── volume-memory.md
@@ -180,11 +180,11 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 │       ├── prompt-memory.md
 │       └── writing-memory.md
 ├── .reasonix/            # Reasonix 用（四选一）
-    ├── skills/           # 10 个 SKILL.md（agents 即 skills）
+    ├── skills/           # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
 └── .codex/               # Codex 用（四选一）
-    ├── agents/           # 8 个自定义 agent（TOML，初始化时部署）
+    ├── agents/           # 9 个自定义 agent（TOML，初始化时部署）
     ├── skills/           # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
@@ -222,6 +222,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 ### 自动做的事（Agent 维护）
 
+- **蒸馏文风**（style-distiller）：导入参考样本或利用已归档章节，自动提炼量化文风参数（句长/对话占比/形容词密度等），写入风格主卡与场景卡并按场景稀疏注入提示词；归档后增量校准，越写越贴合你的风格
 - **去 AI 味**（prompt-crafter + writer + anti-ai）：提示词组装时注入反 AI 规则，正文生成时自查，独立 anti-ai agent 做 Gate A-F 管线检测和量化评分定级
 - **动态记忆**（多 agent + updater）：各 agent 在对话中实时记录你的写作偏好和反馈（正反案例），归档时 updater 兜底清理、去重压缩。高频使用的规则自动晋升为永久记忆（`.claude/knowledge/permanent-memory.md`），越写越懂你
 - **记伏笔**（updater）：归档时自动扫描未兑现/新埋的钩子，检测陈旧度和集中收束风险
@@ -351,7 +352,8 @@ awesome-novel-skill/
 │   ├── writer.md        # 写手
 │   ├── anti-ai.md       # 反 AI 编辑
 │   ├── reader.md        # 测试读者
-│   └── updater.md       # 档案管理员
+│   ├── updater.md       # 档案管理员
+│   └── style-distiller.md# 风格蒸馏师
 ├── skills/               # Agent 技能 SOP + 交互式工具
 ├── knowledge/            # 知识库（→ 项目 .claude/knowledge/）
 │   ├── format-specs/    # 格式规范
@@ -429,7 +431,7 @@ OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义
 
 本 skill 也支持 Reasonix（DeepSeek 专属终端 AI agent，借助字节稳定前缀缓存优化推理成本）。
 
-与 Claude Code / OpenCode 不同，Reasonix 的 skill 是**项目级部署**——每个小说项目初始化时生成 `.reasonix/skills/`（10 个 SKILL.md，agents 即 skills），不装到全局。
+与 Claude Code / OpenCode 不同，Reasonix 的 skill 是**项目级部署**——每个小说项目初始化时生成 `.reasonix/skills/`（11 个 SKILL.md，agents 即 skills），不装到全局。
 
 ### 安装框架源码
 
@@ -459,7 +461,7 @@ Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，�
 
 ```
 .reasonix/
-├── skills/               # 10 个 SKILL.md（agents 即 skills）
+├── skills/               # 11 个 SKILL.md（agents 即 skills）
 │   ├── novel-agent/SKILL.md
 │   ├── writer/SKILL.md
 │   ├── volume-planner/SKILL.md
@@ -486,7 +488,7 @@ Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，�
 python ~/.codex/skills/awesome-novel/tools/init.py <小说项目路径> --genre <编号> --platform codex
 ```
 
-初始化后 8 个自定义 agent 以 Codex 官方 TOML 格式部署到项目 `.codex/agents/*.toml`（`name` / `description` / `developer_instructions`），独立交互工具（memory-recording、roleplay-sandbox）部署为 `.codex/skills/<name>/SKILL.md`，反 AI 规则、文风偏好、格式规范与写作记忆分别落在 `.codex/knowledge/`、`.codex/memory/`。
+初始化后 9 个自定义 agent 以 Codex 官方 TOML 格式部署到项目 `.codex/agents/*.toml`（`name` / `description` / `developer_instructions`），独立交互工具（memory-recording、roleplay-sandbox）部署为 `.codex/skills/<name>/SKILL.md`，反 AI 规则、文风偏好、格式规范与写作记忆分别落在 `.codex/knowledge/`、`.codex/memory/`。
 
 ### 开始写作
 
@@ -496,7 +498,7 @@ python ~/.codex/skills/awesome-novel/tools/init.py <小说项目路径> --genre 
 
 ```
 .codex/
-├── agents/               # 8 个自定义 agent（TOML）
+├── agents/               # 9 个自定义 agent（TOML）
 │   ├── novel-agent.toml
 │   ├── writer.toml
 │   ├── volume-planner.toml
