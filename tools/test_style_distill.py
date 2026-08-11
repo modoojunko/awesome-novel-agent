@@ -149,9 +149,50 @@ def test_migration():
                 check(f"bullet 变体无占位符 {tok}", tok not in body3)
 
 
+def test_distill():
+    print("[unit] distill 统计引擎")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        sample = tmp / "sample.md"
+        sample.write_text(
+            "他缓缓推开门，寒风扑面而来，院子里一片死寂。"
+            "他握紧拳头，指节发白，心里默默算着时间。"
+            "“你终于来了。”她说，声音很轻。"
+            "他点点头，没有回答，只是又看了一眼那条通往山下的路。",
+            encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "distill-style.py"), "distill",
+                 "-o", str(tmp / "p.yml"), "-e", str(tmp / "e.md"), str(sample)], cwd=str(TOOLS))
+        check("distill exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        p = tmp / "p.yml"
+        check("partial 已写", p.exists())
+        import yaml as _y
+        data = _y.safe_load(p.read_text(encoding="utf-8"))["distill"]
+        check("含 sample_length", data["source_sample_length"] > 0)
+        check("含 confidence", 0 < data["confidence"] <= 100)
+        check("lexicon 含四个字段",
+              all(k in data["lexicon"] for k in ("adj_density_per_100", "adv_density_per_100",
+                                                 "four_phrase_freq_per_100", "preferred_words")))
+        check("syntax 含 avg_sentence_length", data["syntax"]["avg_sentence_length"] > 0)
+        check("rhythm 含 dialogue_pct", "dialogue_pct" in data["rhythm"])
+        check("对话占比>0", data["rhythm"]["dialogue_pct"] > 0)
+        # 确定性：跑两次结果一致
+        r2 = run([sys.executable, str(TOOLS / "distill-style.py"), "distill",
+                  "-o", str(tmp / "p2.yml"), str(sample)], cwd=str(TOOLS))
+        d2 = _y.safe_load((tmp / "p2.yml").read_text(encoding="utf-8"))["distill"]
+        check("确定性（两次一致）", data["syntax"] == d2["syntax"], f"{data['syntax']} vs {d2['syntax']}")
+        # 置信度公式
+        check("confidence 1500字≈20+30=50", compute_conf(1500) == 50)
+        check("confidence 封顶 100", compute_conf(10 ** 6, 8) == 100)
+
+
+def compute_conf(length, chapters=0):
+    return min(100, 20 + min(40, int(length / 50)) + min(40, chapters * 5))
+
+
 def main():
     test_card_schema()
     test_migration()
+    test_distill()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
