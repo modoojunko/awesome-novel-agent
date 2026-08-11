@@ -2075,6 +2075,7 @@ def test_mix():
         init_project(tmp)
         a = tmp / "settings" / "writing-style.md"
         t = a.read_text(encoding="utf-8").replace("avg_sentence_length: 0", "avg_sentence_length: 10")
+        a.write_text(t, encoding="utf-8")  # 必须写回：卡 A 用于混卡的应是 10 而非模板的 0
         b = tmp / "b.md"
         b.write_text(t.replace("avg_sentence_length: 10", "avg_sentence_length: 30"), encoding="utf-8")
         out = tmp / "mix.md"
