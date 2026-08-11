@@ -148,6 +148,9 @@ def cohesion_stats(text, tokens):
 
 
 def verb_style_stats(tokens):
+    # 无 jieba 时 POS 不可用，三个比例记 None（与 lexicon 的 adj/adv 一致，避免 0.0 假测量）
+    if not HAS_JIEBA:
+        return {"action_verb_ratio": None, "mental_verb_ratio": None, "state_verb_ratio": None}
     verbs = [w for w, p in tokens if p in VERB_TAGS]
     n = max(len(verbs), 1)
     action = [w for w in verbs if w not in MENTAL_VERBS and w not in STATE_VERBS]
