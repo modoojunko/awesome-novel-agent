@@ -1787,7 +1787,7 @@ git commit -m "feat: distill-style.py check 模式（Gate G 容差校验）"
 
 ## 触发
 Phase 1 扫描阶段，对每章正文跑 `python tools/distill-style.py check -c settings/writing-style.md <正文>`
-（客观维度）。语义维度（rhetoric/emotion/narrative/dialogue_style 等）由 anti-ai LLM 按风格卡估算对比。
+（客观维度）。语义维度（rhetoric/emotion_expression/narrative/dialogue_style 等）由 anti-ai LLM 按风格卡估算对比。
 
 ## 分级
 - **通过**：客观维度全在容差内，语义维度无明显偏离。
@@ -1808,17 +1808,17 @@ Phase 1 扫描阶段，对每章正文跑 `python tools/distill-style.py check -
 ```markdown
 **Gate G：风格偏差（可选，读 `settings/writing-style.md` 主卡 + 对应场景卡）**
 - Bash 调 `python tools/distill-style.py check -c settings/writing-style.md <正文>` → 读偏差表
-- LLM 按风格卡估算语义维度（rhetoric/emotion/narrative/dialogue_style）对比
+- LLM 按风格卡估算语义维度（rhetoric/emotion_expression/narrative/dialogue_style）对比
 - 按 gate-g-checklist 分级：通过 / 警告（作者确认）/ 不通过（局部重写建议）
 - 命中 boundary-cases Gate G 豁免组 → SKIP 标注
 ```
 
 - [ ] **Step 3: 改 skills/anti-ai.md Phase 2 诊断表 + 报告**
 
-诊断表（6 项量化指标表）加第 7 行：
+诊断表（原 6 项量化指标表，加第 7 行后共 7 项；须同步本文件内其它「6 项」计数与定级规则引用为 7 项，并给 Gate G 补定级映射说明——Gate G 独立判定（通过/警告/不通过），不并入 A-F 的轻/中/重档位）加第 7 行：
 
 ```markdown
-| 风格偏差维度数 | <2 | 2-3 | ≥4 |
+| 风格偏差维度数 | Gate G 偏差维度数 | <2 | 2-3 | ≥4 |
 ```
 
 Phase 4 报告格式（约 L241-266）末尾加一行：
