@@ -38,3 +38,11 @@
 2. confidence 0-100；容差档标注正确
 3. banned_words 与 anti-ai 禁用词无重复
 4. 备份文件存在；幂等：重复跑同一样本不产生多余备份（以当日版本为准）
+
+## 五、增量蒸馏（style-update-order）
+1. 读 order inputs（当前主卡 + 最新归档章节列表）。
+2. Bash 调：`python tools/distill-style.py update -c settings/writing-style.md -o settings/writing-style.md --project . <归档章节...>`
+   （update 内部做：客观维度滑动平均、locked 跳过、备份到 .style-versions、置信度重算、.agent/style-update/{chapter}.done 幂等。）
+3. 语义档重估条件（满足任一）：confidence < 60 / 距上次语义重估 ≥5 章 / order 标注语义重估。此时按蒸馏 prompt 段 2 跑语义维度并写卡。
+4. 增量只动量化数值，不碰正文定性层（与 updater 的 [writer-preference] 学习分工：updater 继续写 .claude/knowledge/writer-style.md，style-distiller 不动它）。
+5. 高频定性条目若作者确认升华，才写进卡片 banned_words / hard_constraints。

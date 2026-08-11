@@ -193,6 +193,9 @@ knowledge:
     │      │     → 若 last_volume_completed = true 且重写后已归档数 < 规划数 → 清除该标记
     │      │     → 重置章节状态为空 → phase→outline, step→chapter-planning（重新规划该章）
     │      └── 继续下一章 → 走下方卷完成判定
+    │    ↓ 归档完成后 → 写 style-update-order.md（inputs: settings/writing-style.md + 本次归档章节；outputs: 主卡 + .style-versions）
+    │      → 调 style-distiller（增量：脚本档每章跑客观维度滑动平均；语义档由 style-distiller 按置信度<60 / 累计5章 / 作者要求重估）
+    │      → DONE 后再继续卷完成判定
     │    ↓ **卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
