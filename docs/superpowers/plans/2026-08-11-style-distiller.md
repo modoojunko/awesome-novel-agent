@@ -434,9 +434,9 @@ git commit -m "docs: 蒸馏风格卡格式规范 distilled-style-spec.md"
 **Interfaces:**
 - Consumes: 新格式主卡结构（Task 2）
 - Produces:
-  - `init.migrate_writing_style(project_path)` — 旧 4 字段卡 → 新格式（confidence=0，备份旧版到 `settings/.style-versions/v0_migrated.md`）
+  - `init.migrate_writing_style(project_path)` — 旧 4 字段卡 → 新格式（confidence=0，备份旧版到 `settings/.style-versions/v0_migrated.md`）；**在 main() 最前（create_skeleton 之前）调用**
   - `init.deploy_tools(project_path)` — 拷贝仓库 `tools/distill-style.py`（及后续 compare/mix）到项目 `tools/`
-  - seed_settings_from_genre 产新格式主卡
+  - `create_skeleton` 改为**跳过已存在文件**（只补缺失）；`seed_settings_from_genre` 对已填卡（无 `{...}` 占位符）**跳过覆盖** —— 保证 re-init/升级不破坏用户与迁移产物
 
 - [ ] **Step 1: 加新格式主卡写入辅助函数**
 
@@ -495,29 +495,51 @@ verb_style: {{ action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, 
     path.write_text(content, encoding="utf-8")
 ```
 
-- [ ] **Step 2: 重写 seed_settings_from_genre 的 writing-style 部分**
+- [ ] **Step 2: 重写 seed_settings_from_genre 的 writing-style 部分（含「已填卡跳过」守卫）**
 
-把该函数里写 `settings/writing-style.md` 的整段（旧 4 字段 Markdown 拼接）替换为调用 `_write_new_style_card`：
+把该函数里写 `settings/writing-style.md` 的整段（现为 style_out 列表构造 + write_text，旧 4 字段 Markdown）替换为：先判「已填卡跳过」，再调用 `_write_new_style_card`。复用该函数内已算好的 `role` / `blueprint` / `taboo` 变量（`role = _md_section(text, "叙事者角色") or "（待设定）"`、`blueprint = _md_section(text, "文风蓝图") or "（待设定）"`、`taboo = _md_bullets(_md_section(text, "类型禁忌"))`，约 line 471-472 / 446）：
 
 ```python
     # writing-style.md → 新格式（frontmatter 量化层 + 正文定性层）
-    role = _md_section(content, "叙事者角色")
-    blueprint = _md_section(content, "文风蓝图")
-    taboos = _md_bullets(content, "类型禁忌")
-    _write_new_style_card(
-        project_path / "settings" / "writing-style.md",
-        role=role or "{role}",
-        principles=[blueprint] if blueprint else [],
-        mistakes=taboos,
-        depiction=blueprint or "{depiction_techniques}",
-    )
+    # 守卫：卡已存在且无未填充 {...} 占位符 → 已有实质内容（迁移产物/作者编辑），不覆盖
+    style_card = project_path / "settings" / "writing-style.md"
+    if style_card.exists() and "{" not in style_card.read_text(encoding="utf-8"):
+        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）")
+    else:
+        _write_new_style_card(
+            style_card,
+            role=role or "{role}",
+            principles=[blueprint] if blueprint else [],
+            mistakes=taboo,
+            depiction=blueprint or "{depiction_techniques}",
+        )
 ```
 
-> 注意：`_md_section` 对「文风蓝图」返回整段文本（既当 core_principles 又当 depiction_techniques，与现状一致）；`_md_bullets` 返回列表。若现有函数签名不同，按 init.py 现状适配。
+> 注意：`_md_section` 对「文风蓝图」返回整段文本（既当 core_principles 又当 depiction_techniques，与现状一致）；`taboo` 已是 list。若现有变量名/签名不同，按 init.py 现状适配。
 
-- [ ] **Step 3: 新增 migrate_writing_style()**
+- [ ] **Step 3: create_skeleton 跳过已存在文件**
 
-在 main() 调用区附近新增，并在 main() 里 `deploy_knowledge` 之后、`seed_settings_from_genre` 之前调用：
+`create_skeleton` 现用 `shutil.copy2` 无条件把 `templates/` 拷到项目，re-init 会把用户/迁移后的 `writing-style.md` 覆盖掉（测试 `test_migration` 第二段必失败）。改为目标已存在时跳过——只补缺失文件，与函数注释「创建缺失的文件和目录」一致：
+
+```python
+    if SOURCE_TEMPLATES.exists():
+        for item in SOURCE_TEMPLATES.rglob("*"):
+            if item.is_file() and item.name != ".gitkeep":
+                rel_path = item.relative_to(SOURCE_TEMPLATES)
+                if rel_path.parts[0] == "migration":
+                    continue
+                target = project_path / rel_path
+                if target.exists():
+                    continue          # 已存在不覆盖（升级/迁移不破坏用户工作）
+                target.parent.mkdir(parents=True, exist_ok=True)
+                # …原有 codex/CLAUDE.md 特判分支保持不变…
+```
+
+> 影响面：新建项目（target 全不存在）行为不变；已有项目 re-init 改为只补缺失文件。`test_platforms` 用全新临时目录，不受影响。
+
+- [ ] **Step 4: 新增 migrate_writing_style()（main() 最前、create_skeleton 之前调用）**
+
+在 main() 调用区附近新增；调用点放在 main() **最前**（`create_skeleton` 之前）——必须赶在模板拷贝与题材预填之前迁移旧卡，否则旧卡内容先被覆盖、迁移无从谈起。提取旧卡用**带后缀的完整标题**（旧卡是 `## role（叙事身份）` 等，`_md_section`/`_md_bullets` 的标题正则需精确匹配）：
 
 ```python
 def migrate_writing_style(project_path: Path) -> None:
@@ -529,10 +551,11 @@ def migrate_writing_style(project_path: Path) -> None:
     text = card.read_text(encoding="utf-8")
     if text.lstrip().startswith("---"):          # 已是新格式
         return
-    role = _md_section(text, "role") or "{role}"
-    principles = _md_bullets(text, "core_principles")
-    mistakes = _md_bullets(text, "possible_mistakes")
-    depiction = _md_section(text, "depiction_techniques") or "{depiction_techniques}"
+    # 旧标题带中文后缀（如 "## role（叙事身份）"），按完整标题提取
+    role = _md_section(text, "role（叙事身份）") or "{role}"
+    principles = _md_bullets(_md_section(text, "core_principles（不可违背的写作信条）"))
+    mistakes = _md_bullets(_md_section(text, "possible_mistakes（AI 易犯错误）"))
+    depiction = _md_section(text, "depiction_techniques（描写层次和手法）") or "{depiction_techniques}"
     vers = project_path / "settings" / ".style-versions"
     vers.mkdir(parents=True, exist_ok=True)
     (vers / "v0_migrated.md").write_text(text, encoding="utf-8")
@@ -540,7 +563,7 @@ def migrate_writing_style(project_path: Path) -> None:
     print("  ✅ 旧 4 字段 writing-style.md 已迁移到新格式（confidence=0，旧版已备份）")
 ```
 
-- [ ] **Step 4: 新增 deploy_tools() + 骨架目录加 tools**
+- [ ] **Step 5: 新增 deploy_tools() + 骨架目录加 tools**
 
 在 `create_skeleton` 的 dirs 列表加 `"tools"`，并新增函数（main() 在 deploy_agents 之后调用）：
 
@@ -562,12 +585,12 @@ def deploy_tools(project_path: Path) -> None:
         print(f"  ✅ 已部署风格工具脚本到 tools/（{n} 个）")
 ```
 
-- [ ] **Step 5: 运行测试，确认迁移绿**
+- [ ] **Step 6: 运行测试，确认迁移绿**
 
 Run: `python tools/test_style_distill.py`
-Expected: `[unit] 卡片 frontmatter schema` 与 `[unit] 旧 4 字段卡迁移` 两段全 ok（init 产新格式、6 卡部署、迁移保内容、备份）。
+Expected: `[unit] 卡片 frontmatter schema` 与 `[unit] 旧 4 字段卡迁移` 两段全 ok（init 产新格式、6 卡部署、迁移保内容、备份 v0_migrated）。
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add tools/init.py
@@ -2343,6 +2366,7 @@ git commit -m "docs: style-distiller 实施计划 + spec 实施状态"
 ## 自检记录
 
 - **验收覆盖：** Spec §13 六项 → 验收标准节逐项映射。C1/C4/C5 固化为 `test_style_distill.py::test_acceptance`（Task 18，纳入 CI）；C2/C3 为 Task 18 验收运行步骤（LLM 生成 + check）；C6 为作者盲测（内容任务，收尾前补）。C1 的形容词密度依赖 jieba POS 打标，属 spec §14 已知风险（偏差超阈值 → 置信度/容差/人工校准兜底）。
+- **迁移机制修正（2026-08-11 实施前发现）**：原 Task 4 有 2 个缺陷——(1) `create_skeleton` 的 `copy2` 无条件覆盖 + `seed_settings_from_genre` 无条件重写，使 re-init 时旧卡在 migrate 运行前即被销毁；(2) `_md_section(text, "role")` 正则精确匹配不中带中文后缀的旧标题 `## role（叙事身份）`。已修正为：migrate 前置到 main() 最前 + create_skeleton 跳过已存在文件 + seed 跳过已填卡 + 按完整旧标题提取。此修正使 `test_migration` 全绿、C5 验收可达。
 - **Spec 覆盖：** §4（卡片格式）→ Task 1-4；§5（蒸馏引擎）→ Task 5/6；§6（prompt-crafter 注入）→ Task 7；§7（F4 场景卡 + 题材基线）→ Task 10；§8（F5 增量）→ Task 11/12；§9（F6 Gate G）→ Task 13/14；§10（F7/F8）→ Task 15/16；§11（工程清单：init/sync/check-agents/test_platforms/requirements/CI/agents/novel-agent/skills/knowledge/templates/docs）→ Task 4/8/9/12/14/17/19；§13 验收标准 → Task 18 + 各 task 测试；§14 风险（jieba 降级、注入占空间、增量漂移、迁移零损失）→ Task 5 降级、Task 7 稀疏注入、Task 11 α+locked+备份、Task 4 迁移映射。
 - **占位符扫描：** 无 TBD/TODO；所有代码步骤给了完整实现。唯一「待填充」是题材基线数值（P1 占位，内容由作者蒸馏/盲测填充，属内容任务非代码任务）。
 - **类型一致性：** `build_partial(texts)->dict`、`compute_confidence(int,int)->int`、`tolerance_for(int)->float`、`load_card(path)->(dict|None,str)`、`dump_card(dict,str)->str`、`sliding_alpha(int)->float`、CLI `distill/update/check` 三个子命令，Task 5/11/13 签名一致；卡片 9 大维度键名在模板（Task 2）、spec（Task 3）、脚本（Task 5/11/13）、check-agents（Task 17）四处一致。
