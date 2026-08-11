@@ -236,11 +236,14 @@ def test_update():
         check("新卡 avg_sentence_length 介于 0-40",
               0 < fm["syntax"]["avg_sentence_length"] < 40, str(fm["syntax"]))
         check("备份存在", list((tmp / "settings" / ".style-versions").glob("v1_*.md")))
-        # 幂等：同章再跑，不新增备份
+        first = out.read_text(encoding="utf-8")
+        # 幂等：同章再跑，checkpoint 跳过 → 输出字节不变 + 不新增备份
         run([sys.executable, str(TOOLS / "distill-style.py"), "update",
              "-c", str(card), "-o", str(out), "--project", str(tmp), str(ch)], cwd=str(TOOLS))
-        check("checkpoint 幂等（备份数不变）",
-              len(list((tmp / "settings" / ".style-versions").glob("v1_*.md"))) == 1)
+        check("checkpoint 幂等（重复 run 输出字节不变）",
+              out.read_text(encoding="utf-8") == first, (out.read_text(encoding="utf-8")[-200:], first[-200:]))
+        check("checkpoint 幂等（不新增备份）",
+              len(list((tmp / "settings" / ".style-versions").glob("v*_*.md"))) == 1)
 
 
 def main():

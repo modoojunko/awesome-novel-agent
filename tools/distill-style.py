@@ -268,7 +268,12 @@ def cmd_update(args) -> int:
     if dims is None:
         print(f"error: {args.card} 不是新格式风格卡（缺 frontmatter）", file=sys.stderr)
         return 2
+    processed = 0
     for ch in args.chapters:
+        # 幂等 checkpoint（同章不重放）：有 .done 标记则整章跳过，避免就地更新时重复叠加该章统计
+        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
+        if ck.exists():
+            continue
         partial = build_partial([ch])
         alpha = sliding_alpha(dims.get("confidence", 0))
         for dim, fields in (("lexicon", ("adj_density_per_100", "adv_density_per_100",
@@ -288,12 +293,12 @@ def cmd_update(args) -> int:
                 if old is None or new is None:
                     continue
                 dims[dim][field] = round(old * alpha + new * (1 - alpha), 2)
-        # 幂等 checkpoint（同章不重放）
-        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
-        if ck.exists():
-            continue
         ck.parent.mkdir(parents=True, exist_ok=True)
         ck.write_text("done\n", encoding="utf-8")
+        processed += 1
+    if not processed:
+        print("update: 无新章节（checkpoint 全跳过），卡未改动")
+        return 0
     # 备份旧版
     vers = Path(args.card).parent / ".style-versions"
     vers.mkdir(parents=True, exist_ok=True)
@@ -311,7 +316,7 @@ def cmd_update(args) -> int:
                                             chapter_count_from_fs(Path(args.project)))
     dims["last_updated"] = datetime.date.today().isoformat()
     Path(args.out).write_text(dump_card(dims, body), encoding="utf-8")
-    print(f"update: 客观维度滑动平均更新 {len(args.chapters)} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
+    print(f"update: 客观维度滑动平均更新 {processed} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
     return 0
 
 
