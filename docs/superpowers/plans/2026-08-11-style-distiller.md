@@ -1509,7 +1509,12 @@ def cmd_update(args) -> int:
     if dims is None:
         print(f"error: {args.card} 不是新格式风格卡（缺 frontmatter）", file=sys.stderr)
         return 2
+    processed = 0
     for ch in args.chapters:
+        # 幂等 checkpoint（同章不重放）：有 .done 标记则整章跳过，避免就地更新时重复叠加该章统计
+        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
+        if ck.exists():
+            continue
         partial = build_partial([ch])
         alpha = sliding_alpha(dims.get("confidence", 0))
         for dim, fields in (("lexicon", ("adj_density_per_100", "adv_density_per_100",
@@ -1529,12 +1534,12 @@ def cmd_update(args) -> int:
                 if old is None or new is None:
                     continue
                 dims[dim][field] = round(old * alpha + new * (1 - alpha), 2)
-        # 幂等 checkpoint（同章不重放）
-        ck = Path(args.project) / ".agent" / "style-update" / f"{Path(ch).stem}.done"
-        if ck.exists():
-            continue
         ck.parent.mkdir(parents=True, exist_ok=True)
         ck.write_text("done\n", encoding="utf-8")
+        processed += 1
+    if not processed:
+        print("update: 无新章节（checkpoint 全跳过），卡未改动")
+        return 0
     # 备份旧版
     vers = Path(args.card).parent / ".style-versions"
     vers.mkdir(parents=True, exist_ok=True)
@@ -1552,7 +1557,7 @@ def cmd_update(args) -> int:
                                             chapter_count_from_fs(Path(args.project)))
     dims["last_updated"] = datetime.date.today().isoformat()
     Path(args.out).write_text(dump_card(dims, body), encoding="utf-8")
-    print(f"update: 客观维度滑动平均更新 {len(args.chapters)} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
+    print(f"update: 客观维度滑动平均更新 {processed} 章，confidence={dims['confidence']}，备份 v{maxn + 1}")
     return 0
 ```
 
@@ -1595,11 +1600,14 @@ def test_update():
         check("新卡 avg_sentence_length 介于 0-40",
               0 < fm["syntax"]["avg_sentence_length"] < 40, str(fm["syntax"]))
         check("备份存在", list((tmp / "settings" / ".style-versions").glob("v1_*.md")))
-        # 幂等：同章再跑，不新增备份
+        first = out.read_text(encoding="utf-8")
+        # 幂等：同章再跑，checkpoint 跳过 → 输出字节不变 + 不新增备份
         run([sys.executable, str(TOOLS / "distill-style.py"), "update",
              "-c", str(card), "-o", str(out), "--project", str(tmp), str(ch)], cwd=str(TOOLS))
-        check("checkpoint 幂等（备份数不变）",
-              len(list((tmp / "settings" / ".style-versions").glob("v1_*.md"))) == 1)
+        check("checkpoint 幂等（重复 run 输出字节不变）",
+              out.read_text(encoding="utf-8") == first, (out.read_text(encoding="utf-8")[-200:], first[-200:]))
+        check("checkpoint 幂等（不新增备份）",
+              len(list((tmp / "settings" / ".style-versions").glob("v*_*.md"))) == 1)
 ```
 
 - [ ] **Step 3: 跑测试绿**
