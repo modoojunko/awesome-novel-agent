@@ -987,7 +987,7 @@ knowledge:
 
 - 主卡蒸馏：`settings/writing-style.md`（confidence 重算）
 - 场景卡蒸馏：`settings/style-profiles/{scene_type}.md`（override 只写差异）
-- 增量更新：对归档章节跑脚本档，语义档低频重估，备份 + locked 跳过
+- 增量更新：对归档章节跑客观档，语义档低频重估，备份 + locked 跳过
 - 只读 `archives/`、`chapters/`、作者提供的样本；只写风格三件套，**不碰**其他 settings（归 updater）
 
 ## 二、写白名单（唯一例外）
@@ -1641,7 +1641,7 @@ git commit -m "feat: distill-style.py update 模式（滑动平均 + 备份 + lo
 
 ```markdown
    ├─ 归档完成后 → 写 style-update-order.md（inputs: settings/writing-style.md + 本次归档章节；outputs: 主卡 + .style-versions）
-   │   → 调 style-distiller（增量：脚本档每章跑客观维度滑动平均；语义档由 style-distiller 按置信度<60 / 累计5章 / 作者要求重估）
+   │   → 调 style-distiller（增量：客观档每章跑客观维度滑动平均；语义档由 style-distiller 按置信度<60 / 累计5章 / 作者要求重估）
    │   → DONE 后再继续卷完成判定
 ```
 
@@ -1837,11 +1837,11 @@ Phase 4 报告格式（约 L241-266）末尾加一行：
     description: 写作风格主卡（Gate G 校验基线）
   - path: settings/style-profiles/
     description: 分场景风格卡（Gate G 场景差异基线）
-  - path: .claude/knowledge/gate-g-checklist.md
+  - path: knowledge/style-distill/prompt-templates/gate-g-checklist.md
     description: Gate G 检查清单
 ```
 
-（`gate-g-checklist.md` 由 deploy_knowledge 从 knowledge/style-distill/ 部署到 `.claude/knowledge/`——若现有 deploy_knowledge 不递归该目录，则把 checklist 放 `knowledge/anti-ai/` 或按实际部署逻辑放置，任选其一保证项目内可达。）
+（checklist 走仓库路径引用——与 style-distiller 引用 `knowledge/style-distill/prompt-templates/` 同模式。check-agents 的 `_is_deployed` 对 `knowledge/` 前缀按仓库路径校验（必须真实存在），而 `.claude/knowledge/gate-g-checklist.md` 会命中 DEPLOYED_PATTERNS 却无部署源（deploy_knowledge 只平铺 format-specs/anti-ai/，不递归 style-distill/），会假绿。故用仓库路径。）
 
 - [ ] **Step 5: 改 boundary-cases.md**
 
@@ -2104,14 +2104,9 @@ git commit -m "feat: mix-style.py 混卡（数值加权平均 + 定性合并）�
 - Consumes: 卡片 schema、inherits 约定
 - Produces: `check-agents.py` 校验 style-distiller frontmatter + 卡片 YAML 合法 + inherits 引用存在
 
-- [ ] **Step 1: DEPLOYED_PATTERNS 补风格资产**
+- [ ] **Step 1: 确认 style-profiles/.style-versions 白名单已在（Task 6 提前加入）**
 
-在 `DEPLOYED_PATTERNS`（L46-55）追加：
-
-```python
-    re.compile(r"^settings/style-profiles/"),          # 分场景风格卡（含 genre-baselines/）
-    re.compile(r"^settings/\.style-versions/"),        # 蒸馏版本快照
-```
+两条 `DEPLOYED_PATTERNS`（`settings/style-profiles/`、`settings/.style-versions/`）已在 Task 6 因 CI 门禁提前加入（L52-53），**勿重复追加**。只需确认存在，并把 `settings/.style-versions/` 行的注释归属由「updater 归档时创建」改为「style-distiller 蒸馏备份时创建」。
 
 - [ ] **Step 2: 加卡片 YAML / inherits 校验函数**
 
@@ -2126,6 +2121,7 @@ STYLE_CARD_DIMS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expressio
 
 def check_style_card(path: Path) -> list:
     errors = []
+    is_scene = path.name != "writing-style.md"   # 场景卡为 override 风格（只写差异），主卡为全量 9 维度
     text = path.read_text(encoding="utf-8")
     parts = text.split("---", 2)
     if len(parts) != 3:
@@ -2145,17 +2141,27 @@ def check_style_card(path: Path) -> list:
     conf = fm.get("confidence")
     if not isinstance(conf, int) or not (0 <= conf <= 100):
         errors.append(f"{path.name}: confidence 需为 0-100 整数（当前 {conf!r}）")
-    for dim in STYLE_CARD_DIMS:
-        if dim not in fm:
-            errors.append(f"{path.name}: 卡片缺维度 {dim}")
+    if is_scene:
+        ov = fm.get("override")
+        if not isinstance(ov, dict):
+            errors.append(f"{path.name}: 场景卡需 override 字段（dict，只写与主卡的差异维度）")
+        else:
+            for dim in ov:
+                if dim not in STYLE_CARD_DIMS:
+                    errors.append(f"{path.name}: override 出现未知维度 {dim!r}")
+    else:
+        for dim in STYLE_CARD_DIMS:
+            if dim not in fm:
+                errors.append(f"{path.name}: 卡片缺维度 {dim}")
     locked = fm.get("locked")
     if locked is not None and not isinstance(locked, list):
         errors.append(f"{path.name}: locked 需为列表")
     inh = fm.get("inherits")
     if inh:
-        target = ROOT / "templates" / str(inh)
-        if not target.exists() and not (ROOT / str(inh)).exists():
-            errors.append(f"{path.name}: inherits 引用不存在: {inh}")
+        # 继承目标与卡同级于 templates/settings/（场景卡 inherits: "writing-style.md"）
+        target = ROOT / "templates" / "settings" / str(inh)
+        if not target.exists():
+            errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {target.relative_to(ROOT)}）")
     return errors
 
 

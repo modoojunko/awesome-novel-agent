@@ -31,7 +31,7 @@ knowledge:
 
 - 主卡蒸馏：`settings/writing-style.md`（confidence 重算）
 - 场景卡蒸馏：`settings/style-profiles/{scene_type}.md`（override 只写差异）
-- 增量更新：对归档章节跑脚本档，语义档低频重估，备份 + locked 跳过
+- 增量更新：对归档章节跑客观档，语义档低频重估，备份 + locked 跳过
 - 只读 `archives/`、`chapters/`、作者提供的样本；只写风格三件套，**不碰**其他 settings（归 updater）
 
 ## 二、写白名单（唯一例外）
