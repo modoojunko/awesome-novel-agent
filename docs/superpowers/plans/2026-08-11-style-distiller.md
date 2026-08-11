@@ -774,6 +774,9 @@ def cohesion_stats(text, tokens):
 
 
 def verb_style_stats(tokens):
+    # 无 jieba 时 POS 不可用，三个比例记 None（与 lexicon 的 adj/adv 一致，避免 0.0 假测量）
+    if not HAS_JIEBA:
+        return {"action_verb_ratio": None, "mental_verb_ratio": None, "state_verb_ratio": None}
     verbs = [w for w, p in tokens if p in VERB_TAGS]
     n = max(len(verbs), 1)
     action = [w for w in verbs if w not in MENTAL_VERBS and w not in STATE_VERBS]
@@ -2372,6 +2375,7 @@ git commit -m "docs: style-distiller 实施计划 + spec 实施状态"
 
 - **验收覆盖：** Spec §13 六项 → 验收标准节逐项映射。C1/C4/C5 固化为 `test_style_distill.py::test_acceptance`（Task 18，纳入 CI）；C2/C3 为 Task 18 验收运行步骤（LLM 生成 + check）；C6 为作者盲测（内容任务，收尾前补）。C1 的形容词密度依赖 jieba POS 打标，属 spec §14 已知风险（偏差超阈值 → 置信度/容差/人工校准兜底）。
 - **迁移机制修正（2026-08-11 实施前 + Task 4 review 发现）**：原 Task 4 有 3 个缺陷——(1) `create_skeleton` 的 `copy2` 无条件覆盖 + `seed_settings_from_genre` 无条件重写，使 re-init 时旧卡在 migrate 运行前即被销毁；(2) `_md_section(text, "role")` 正则精确匹配不中带中文后缀的旧标题 `## role（叙事身份）`；(3) 提取 `core_principles`/`possible_mistakes` 用 `_md_bullets` 但旧 seed 写的是**裸段落**（非 bullet），`_md_bullets` 返回 `[]` → 迁移卡留 `- {principle_1}` 占位符 → 既丢旧内容（迁移非零损失），又被 seed 守卫（占位符 token 判定）误判为未填而在同一 run 内覆盖迁移产物。已修正为：migrate 前置到 main() 最前 + create_skeleton 跳过已存在文件 + seed 跳过已填卡 + 按完整旧标题提取 + **段落回退（抽不到 bullet 时保留整段原文）**。测试 fixture 须用段落式 `core_principles`（贴合真实旧卡）+ 迁移后 re-init 幂等断言。此修正使 `test_migration` 全绿、C5 验收可达。
+- **verb_style 无 jieba 假测量修正（2026-08-11 Task 5 review 发现）**：brief 原 `verb_style_stats` 缺 HAS_JIEBA 守卫，无 jieba 时 verbs=[] → 三比例记 0.0（假测量），违反全局约束「需 POS 的项记 None」；已改为无 jieba 时返回 None，与 lexicon 的 adj/adv 一致（后续 check/compare 不消费假 0.0）。
 - **Spec 覆盖：** §4（卡片格式）→ Task 1-4；§5（蒸馏引擎）→ Task 5/6；§6（prompt-crafter 注入）→ Task 7；§7（F4 场景卡 + 题材基线）→ Task 10；§8（F5 增量）→ Task 11/12；§9（F6 Gate G）→ Task 13/14；§10（F7/F8）→ Task 15/16；§11（工程清单：init/sync/check-agents/test_platforms/requirements/CI/agents/novel-agent/skills/knowledge/templates/docs）→ Task 4/8/9/12/14/17/19；§13 验收标准 → Task 18 + 各 task 测试；§14 风险（jieba 降级、注入占空间、增量漂移、迁移零损失）→ Task 5 降级、Task 7 稀疏注入、Task 11 α+locked+备份、Task 4 迁移映射。
 - **占位符扫描：** 无 TBD/TODO；所有代码步骤给了完整实现。唯一「待填充」是题材基线数值（P1 占位，内容由作者蒸馏/盲测填充，属内容任务非代码任务）。
 - **类型一致性：** `build_partial(texts)->dict`、`compute_confidence(int,int)->int`、`tolerance_for(int)->float`、`load_card(path)->(dict|None,str)`、`dump_card(dict,str)->str`、`sliding_alpha(int)->float`、CLI `distill/update/check` 三个子命令，Task 5/11/13 签名一致；卡片 9 大维度键名在模板（Task 2）、spec（Task 3）、脚本（Task 5/11/13）、check-agents（Task 17）四处一致。
