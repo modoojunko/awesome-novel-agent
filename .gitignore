@@ -4,3 +4,5 @@ docs/
 tools/__pycache__/
 video/
 video-script-input.md
+.venv/
+.superpowers/
