@@ -233,6 +233,10 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
     return rewrite_refs(text, platform)
 
 
+# 根级脚手架（平台 agent 配置/模板生成物）随模板刷新；settings/ 等用户内容保留不覆盖
+_GENERATED_SCAFFOLD = {"CLAUDE.md", "AGENTS.md", "AGENTS.codex.md"}
+
+
 def create_skeleton(project_path: Path, platform: Platform):
     """创建项目目录结构"""
     dirs = [
@@ -258,8 +262,8 @@ def create_skeleton(project_path: Path, platform: Platform):
                 if rel_path.parts[0] == "migration":
                     continue
                 target = project_path / rel_path
-                if target.exists():
-                    continue          # 已存在不覆盖（升级/迁移不破坏用户工作）
+                if target.exists() and item.name not in _GENERATED_SCAFFOLD:
+                    continue          # 已存在不覆盖（settings/ 等用户内容），脚手架文件随模板刷新
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if platform.key == "codex" and item.name == "CLAUDE.md":
                     # Codex 项目不生成 CLAUDE.md（Codex 只读 AGENTS.md）
@@ -444,8 +448,8 @@ def _write_new_style_card(path: Path, role: str, principles: list, mistakes: lis
     """写新格式写作风格卡（frontmatter 量化层 + 正文定性层）。
     confidence=0 → 提示词只走定性层，直到首次蒸馏。"""
     prefix = "> [auto-seeded] 由 init.py 按题材预填，量化层留空，首次蒸馏后由 style-distiller 填充。\n\n" if seeded else ""
-    principles_txt = "\n".join(f"- {p}" for p in principles) if principles else "- {principle_1}"
-    mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else "- {mistake_1}"
+    principles_txt = "\n".join(f"- {p}" for p in principles) if principles else ("" if not seeded else "- {principle_1}")
+    mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else ("" if not seeded else "- {mistake_1}")
     content = f"""---
 profile_version: "1.0"
 scene_type: general
@@ -553,7 +557,7 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
     role = _md_section(text, "叙事者角色") or "（待设定）"
     blueprint = _md_section(text, "文风蓝图") or "（待设定）"
     style_card = project_path / "settings" / "writing-style.md"
-    _STYLE_CARD_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}")
+    _STYLE_CARD_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}", "（待设定）")
     filled = style_card.exists() and not any(
         tok in style_card.read_text(encoding="utf-8") for tok in _STYLE_CARD_PLACEHOLDERS
     )
@@ -581,14 +585,15 @@ def migrate_writing_style(project_path: Path) -> None:
         return
     # 旧标题带中文后缀（如 "## role（叙事身份）"），按完整标题提取
     # 段落回退：旧 seed 把 core_principles/possible_mistakes 写成裸段落（非 bullet），
-    # _md_bullets 抽不到 bullet 会返回 [] → 迁移卡留 "{principle_1}" 占位符 → 既丢旧内容，
-    # 又被 seed 守卫误判为未填而在同一 run 内覆盖迁移产物。抽不到 bullet 时保留整段原文。
-    role = _md_section(text, "role（叙事身份）") or "{role}"
+    # _md_bullets 抽不到 bullet 会返回 []，抽不到时保留整段原文（零损失）。
+    # 缺节（_md_section 返回空）回退空串而非 {role}/{depiction_techniques} 占位符——
+    # 占位符会被 seed 守卫误判为未填而在同一 run 内覆盖迁移产物。
+    role = _md_section(text, "role（叙事身份）") or ""
     _core = _md_section(text, "core_principles（不可违背的写作信条）")
     _mist = _md_section(text, "possible_mistakes（AI 易犯错误）")
     principles = _md_bullets(_core) or ([_core.strip()] if _core.strip() else [])
     mistakes = _md_bullets(_mist) or ([_mist.strip()] if _mist.strip() else [])
-    depiction = _md_section(text, "depiction_techniques（描写层次和手法）") or "{depiction_techniques}"
+    depiction = _md_section(text, "depiction_techniques（描写层次和手法）") or ""
     vers = project_path / "settings" / ".style-versions"
     vers.mkdir(parents=True, exist_ok=True)
     (vers / "v0_migrated.md").write_text(text, encoding="utf-8")

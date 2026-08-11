@@ -437,6 +437,48 @@ def test_acceptance():
         check("C5 内容零损失", all(k in body for k in ("第三人称限知", "不写废话", "模板腔", "动作推进")))
 
 
+def test_review_fix_migration_no_clobber():
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        (tmp / "settings" / ".style-versions").mkdir(parents=True)
+        # 旧卡缺 depiction_techniques 节（常见手写旧卡）
+        old = tmp / "settings" / "writing-style.md"
+        old.write_text("# 写作风格\n\n## role（叙事身份）\n\n第一人称限知\n\n## core_principles（不可违背的写作信条）\n\n不水字数\n\n## possible_mistakes（AI 易犯错误）\n\n注水\n", encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        card = (tmp / "settings" / "writing-style.md").read_text(encoding="utf-8")
+        # #1 迁移产物保留作者内容、无占位 token、未被题材默认覆盖
+        check("#1 缺节迁移保留 role", "第一人称限知" in card, card[:200])
+        check("#1 迁移无占位符", "{role}" not in card and "{depiction_techniques}" not in card and "{principle_1}" not in card,
+              card[:200])
+        check("#1 缺节不触发 seed 覆盖", "不水字数" in card, card[:300])
+
+def test_review_fix_seed_daishou():
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        (tmp / "settings").mkdir(parents=True)
+        old = tmp / "settings" / "writing-style.md"
+        old.write_text("# 写作风格\n\n## role（叙事身份）\n\n（待设定）\n\n## core_principles（不可违背的写作信条）\n\n（待设定）\n\n## possible_mistakes（AI 易犯错误）\n\n（待设定）\n", encoding="utf-8")
+        run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        card = (tmp / "settings" / "writing-style.md").read_text(encoding="utf-8")
+        # #15：migrate 产出含（待设定）→ seed 守卫须识别为未填 → genre 默认（xianxia 叙事者角色）生效
+        check("#15（待设定）被识别为未填", "（待设定）" not in card and "仙侠小说作家" in card, card[:300])
+
+def test_review_fix_scaffold_refresh():
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp)
+        claude = tmp / "CLAUDE.md"
+        claude.write_text("stale scaffold content", encoding="utf-8")
+        ws = tmp / "settings" / "writing-style.md"
+        # 作者在已迁移的新格式卡上追加内容（保留 frontmatter，否则 migrate 会当旧卡重迁）
+        ws.write_text(ws.read_text(encoding="utf-8") + "\n<!-- 作者编辑标记：保留 -->\n", encoding="utf-8")
+        run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        # #14 脚手架随模板刷新；用户内容保留（create_skeleton 只刷新根级脚手架，不覆盖 settings/）
+        new_claude = claude.read_text(encoding="utf-8")
+        check("#14 脚手架刷新", "stale scaffold content" not in new_claude, new_claude[:80])
+        check("#14 用户内容保留", "作者编辑标记：保留" in ws.read_text(encoding="utf-8"), ws.read_text(encoding="utf-8")[:80])
+
+
 def test_review_fix_mix():
     print("[review-fix] #2/#9/#36-mix 混卡修复")
     import yaml as _y
@@ -600,6 +642,9 @@ def main():
     test_review_fix_update_locked_and_checkpoint()
     test_review_fix_check_scene_card()
     test_review_fix_mix()
+    test_review_fix_migration_no_clobber()
+    test_review_fix_seed_daishou()
+    test_review_fix_scaffold_refresh()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 
