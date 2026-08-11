@@ -96,9 +96,12 @@ def test_migration():
         n = len(list((tmp / "settings" / "style-profiles").glob("*.md")))
         check("6 张场景卡已部署", n == 6, f"实际 {n}")
         # 旧格式 → 迁移 → 新格式
+        # 注意：旧 init seed 的 core_principles 是裸段落（文风蓝图整段，非 bullet），必须按真实旧卡
+        # 形状构造。若写成 bullet，段落回退（migrate_writing_style）与 seed 守卫在同一 run 内不会被
+        # 真正触发，迁移零损失与 re-init 幂等两条验收线都会形同虚设。
         old = tmp / "settings" / "writing-style.md"
         old.write_text("# 写作风格\n\n## role（叙事身份）\n\n第一人称\n\n"
-                       "## core_principles（不可违背的写作信条）\n\n- 不写废话\n\n"
+                       "## core_principles（不可违背的写作信条）\n\n不写废话，惜墨如金\n\n"
                        "## possible_mistakes（AI 易犯错误）\n\n- 套路化\n\n"
                        "## depiction_techniques（描写层次和手法）\n\n感官描写\n",
                        encoding="utf-8")
@@ -108,10 +111,42 @@ def test_migration():
         check("迁移后含 frontmatter", fm is not None)
         body = wsf.read_text(encoding="utf-8")
         check("迁移保留叙事身份内容", "第一人称" in body)
-        check("迁移保留硬约束内容", "不写废话" in body)
+        check("迁移保留硬约束内容", "不写废话，惜墨如金" in body)
         check("迁移保留易错内容", "套路化" in body)
         check("迁移保留描写手法内容", "感官描写" in body)
         check("迁移备份旧版", (tmp / "settings" / ".style-versions" / "v0_migrated.md").exists())
+
+        # re-init 幂等：第二次 init 不能覆盖/污染迁移产物（seed 守卫必须跳过已迁移卡），
+        # 且旧内容全保留、4 个占位符 token 一个都不出现。
+        r2 = run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        check("re-init 迁移卡 exit 0", r2.returncode == 0, (r2.stdout + r2.stderr)[-400:])
+        body2 = wsf.read_text(encoding="utf-8")
+        check("re-init 迁移卡仍含 frontmatter", body2.startswith("---"))
+        for tok in ("第一人称", "不写废话，惜墨如金", "套路化", "感官描写"):
+            check(f"re-init 迁移卡保留旧内容（{tok}）", tok in body2)
+        for tok in ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}"):
+            check(f"re-init 迁移卡无占位符 {tok}", tok not in body2)
+        check("re-init 不重复迁移（备份仍为旧版原文）",
+              (tmp / "settings" / ".style-versions" / "v0_migrated.md")
+              .read_text(encoding="utf-8").startswith("# 写作风格\n\n## role（叙事身份）"))
+
+        # bullet 变体：手工编写的旧卡可能用 `- ` bullet，段落回退不得破坏它（幂等性同样成立）
+        with tempfile.TemporaryDirectory() as td2:
+            tmp2 = Path(td2)
+            init_project(tmp2)
+            wsf2 = tmp2 / "settings" / "writing-style.md"
+            wsf2.write_text("# 写作风格\n\n## role（叙事身份）\n\n第三人称\n\n"
+                            "## core_principles（不可违背的写作信条）\n\n- 不水字数\n- 节奏快\n\n"
+                            "## possible_mistakes（AI 易犯错误）\n\n- 空话套话\n\n"
+                            "## depiction_techniques（描写层次和手法）\n\n白描\n",
+                            encoding="utf-8")
+            r3 = run([sys.executable, str(TOOLS / "init.py"), str(tmp2), "--genre", "1"])
+            check("bullet 变体迁移 exit 0", r3.returncode == 0, (r3.stdout + r3.stderr)[-400:])
+            body3 = wsf2.read_text(encoding="utf-8")
+            for tok in ("第三人称", "不水字数", "节奏快", "空话套话", "白描"):
+                check(f"bullet 变体迁移保留（{tok}）", tok in body3)
+            for tok in ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}"):
+                check(f"bullet 变体无占位符 {tok}", tok not in body3)
 
 
 def main():

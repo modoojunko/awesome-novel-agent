@@ -580,9 +580,14 @@ def migrate_writing_style(project_path: Path) -> None:
     if text.lstrip().startswith("---"):          # 已是新格式
         return
     # 旧标题带中文后缀（如 "## role（叙事身份）"），按完整标题提取
+    # 段落回退：旧 seed 把 core_principles/possible_mistakes 写成裸段落（非 bullet），
+    # _md_bullets 抽不到 bullet 会返回 [] → 迁移卡留 "{principle_1}" 占位符 → 既丢旧内容，
+    # 又被 seed 守卫误判为未填而在同一 run 内覆盖迁移产物。抽不到 bullet 时保留整段原文。
     role = _md_section(text, "role（叙事身份）") or "{role}"
-    principles = _md_bullets(_md_section(text, "core_principles（不可违背的写作信条）"))
-    mistakes = _md_bullets(_md_section(text, "possible_mistakes（AI 易犯错误）"))
+    _core = _md_section(text, "core_principles（不可违背的写作信条）")
+    _mist = _md_section(text, "possible_mistakes（AI 易犯错误）")
+    principles = _md_bullets(_core) or ([_core.strip()] if _core.strip() else [])
+    mistakes = _md_bullets(_mist) or ([_mist.strip()] if _mist.strip() else [])
     depiction = _md_section(text, "depiction_techniques（描写层次和手法）") or "{depiction_techniques}"
     vers = project_path / "settings" / ".style-versions"
     vers.mkdir(parents=True, exist_ok=True)
