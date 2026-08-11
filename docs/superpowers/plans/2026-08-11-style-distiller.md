@@ -1393,6 +1393,17 @@ git commit -m "feat: novel-agent setup 蒸馏调度点 + style-distill-order 协
 5. 定性节（描写层次/技法）由 LLM 按该场景样本提炼；few-shot 取该场景标志句。
 ```
 
+- [ ] **Step 1.5: style-distill.md 补「题材基线」节**
+
+在「三、防重复 / 防冲突」之前插入：
+
+```markdown
+## 二点五、题材基线（无样本 / 低 confidence 兜底 + 混风格素材）
+- 三层：`genre-baselines/{genre}/base.md`（题材基础卡，P1 数值由标杆作品样本蒸馏填充）、`delta.md`（与基础卡的题材偏移，frontmatter 带 `baseline_for: {genre}`，只写偏移维度）、`benchmark.md`（作者认可的标杆卡，盲测正确率 ≥70%）。
+- 何时用：作者无样本 → 用 `{genre}/base.md` 兜底（confidence=0，见主卡）；增量更新缺语义 → 参照 `benchmark.md` 校准；混风格 → 把 `delta.md` 偏移叠加到目标主卡（mix-style 组合）。
+- 不写入：基线卡只读素材，蒸馏结果落到主卡/场景卡，不覆盖 `genre-baselines/`。
+```
+
 - [ ] **Step 2: 题材基线三层模板**
 
 创建 `templates/settings/style-profiles/genre-baselines/` 下三个题材目录（xianxia/urban/suspense），每目录三个文件（`base.md` 基础卡、`delta.md` 题材偏移、`benchmark.md` 标杆卡占位）。以 `xianxia/base.md` 为例：
