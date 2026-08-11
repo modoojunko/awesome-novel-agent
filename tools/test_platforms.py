@@ -7,7 +7,7 @@
 覆盖：
 - 单元：platforms 模块（配置/检测/引用改写/yaml 预检）
 - 单元：check-python.py 版本门槛（安装阶段 fail-fast）
-- E2E：init.py 各平台布局 + 引用改写 + reasonix 10 个 skill + codex TOML agent（含 tomllib 解析）
+- E2E：init.py 各平台布局 + 引用改写 + reasonix 11 个 skill + codex TOML agent（含 tomllib 解析）
 - E2E：sync-project.py 各平台同步 + --check
 - E2E：install.sh 全新 HOME 首次安装（F1 回归）+ 版本门槛 fail-fast（P-ver 回归）+ pyyaml 安装门槛 fail-fast（Y-ver 回归）+ 缺 pyyaml 负向场景（F5 回归）
 """
@@ -194,13 +194,13 @@ def test_init_layout():
             for a in absents:
                 check(f"{key} 无 {a}", not (tmp / a).exists())
 
-    # reasonix 10 个 skill
+    # reasonix 11 个 skill
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "reasonix")
         names = ["novel-agent", "writer", "volume-planner", "chapter-planner",
-                 "prompt-crafter", "anti-ai", "reader", "updater",
-                 "memory-recording", "roleplay-sandbox"]  # 与 deploy_reasonix_skills 的 10 个 skill 名对应（spec 契约）
+                 "prompt-crafter", "anti-ai", "reader", "updater", "style-distiller",
+                 "memory-recording", "roleplay-sandbox"]  # 与 deploy_reasonix_skills 的 11 个 skill 名对应（spec 契约）
         for n in names:
             check(f"reasonix skill {n}", (tmp / ".reasonix/skills" / n / "SKILL.md").exists())
         w = (tmp / ".reasonix/skills/writer/SKILL.md").read_text(encoding="utf-8")
@@ -225,7 +225,7 @@ def test_init_layout():
         tmp = Path(td)
         init_project(tmp, "claude")
         n = len(list((tmp / ".claude/agents").glob("*.md")))
-        check(f"claude agents 数量=8", n == 8, f"实际 {n}")  # agents/ 源有 8 个 .md（spec 契约）
+        check(f"claude agents 数量=9", n == 9, f"实际 {n}")  # agents/ 源有 9 个 .md（spec 契约）
 
     # opencode agent 引用改写
     with tempfile.TemporaryDirectory() as td:
@@ -240,7 +240,7 @@ def test_init_layout():
         tmp = Path(td)
         init_project(tmp, "codex")
         n = len(list((tmp / ".codex/agents").glob("*.toml")))
-        check("codex agents 数量=8", n == 8, f"实际 {n}")
+        check("codex agents 数量=9", n == 9, f"实际 {n}")
         w = (tmp / ".codex/agents/writer.toml").read_text(encoding="utf-8")
         check("codex writer TOML 字段",
               'name = "writer"' in w and "description" in w

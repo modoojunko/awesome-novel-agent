@@ -219,7 +219,7 @@ def _convert_inline_skill(text: str, name: str) -> str:
 
 
 def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（10 个），引用改写为平台路径。
+    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
 
     仅 reasonix 平台调用（agents=None）。产物引用 platform.root/knowledge、memory。
     """
@@ -240,6 +240,7 @@ def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) 
         "anti-ai": ["anti-ai"],
         "reader": ["reader-review"],
         "updater": ["updater-archive", "updater-setting", "updater-rollback"],
+        "style-distiller": ["style-distill"],
     }
     for agent_name, sops in exec_agents.items():
         agent_file = agents_dir / f"{agent_name}.md"
@@ -494,7 +495,7 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
 
 
 def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成 <project>/<platform.root>/agents/<name>.toml（8 个），引用改写为平台路径。
+    """生成 <project>/<platform.root>/agents/<name>.toml（9 个），引用改写为平台路径。
 
     仅 codex 平台调用。Claude agent frontmatter → Codex TOML，与 sync 保持一致。
     """
@@ -538,7 +539,7 @@ def _convert_codex_inline_skill(text: str, name: str) -> str:
 def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform) -> None:
     """生成独立交互工具为 Codex skill（<project>/<platform.root>/skills/<name>/SKILL.md）。
 
-    仅 codex 平台调用。8 个 agent 走 .codex/agents/*.toml（deploy_codex_agents），
+    仅 codex 平台调用。9 个 agent 走 .codex/agents/*.toml（deploy_codex_agents），
     此处只部署不进调度链的独立工具（memory-recording、roleplay-sandbox）。
     """
     if platform.key != "codex":
