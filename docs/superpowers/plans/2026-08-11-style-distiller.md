@@ -1389,7 +1389,7 @@ git commit -m "feat: novel-agent setup 蒸馏调度点 + style-distill-order 协
 1. 对样本按段落判定场景类型（对话/战斗/环境/心理/过渡/群像）。
 2. 每类聚合出子样本（≥800 字才蒸馏该卡；不足则跳过该场景卡）。
 3. 对每类子样本跑 `distill-style.py distill` → 得该场景客观维度。
-4. 与主卡对比：差异显著（相对差 > 容差）的维度写进 `style-profiles/{scene_type}.md` 的 override，其余留空。
+4. 与主卡对比：差异显著（相对差 > 容差）的维度写进 `settings/style-profiles/{scene_type}.md` 的 override，其余留空。
 5. 定性节（描写层次/技法）由 LLM 按该场景样本提炼；few-shot 取该场景标志句。
 ```
 
@@ -1399,9 +1399,9 @@ git commit -m "feat: novel-agent setup 蒸馏调度点 + style-distill-order 协
 
 ```markdown
 ## 二点五、题材基线（无样本 / 低 confidence 兜底 + 混风格素材）
-- 三层：`genre-baselines/{genre}/base.md`（题材基础卡，P1 数值由标杆作品样本蒸馏填充）、`delta.md`（与基础卡的题材偏移，frontmatter 带 `baseline_for: {genre}`，只写偏移维度）、`benchmark.md`（作者认可的标杆卡，盲测正确率 ≥70%）。
-- 何时用：作者无样本 → 用 `{genre}/base.md` 兜底（confidence=0，见主卡）；增量更新缺语义 → 参照 `benchmark.md` 校准；混风格 → 把 `delta.md` 偏移叠加到目标主卡（mix-style 组合）。
-- 不写入：基线卡只读素材，蒸馏结果落到主卡/场景卡，不覆盖 `genre-baselines/`。
+- 三层：`settings/style-profiles/genre-baselines/{genre}/base.md`（题材基础卡，P1 数值由标杆作品样本蒸馏填充）、`delta.md`（与基础卡的题材偏移，frontmatter 带 `baseline_for: {genre}`，只写偏移维度）、`benchmark.md`（作者认可的标杆卡，盲测正确率 ≥70%）。
+- 何时用：作者无样本 → 用 `settings/style-profiles/genre-baselines/{genre}/base.md` 兜底（confidence=0，见主卡）；增量更新缺语义 → 参照 `benchmark.md` 校准；混风格 → 把 `delta.md` 偏移叠加到目标主卡（mix-style 组合）。
+- 不写入：基线卡只读素材，蒸馏结果落到主卡/场景卡，不覆盖 `genre-baselines/` 目录。
 ```
 
 - [ ] **Step 2: 题材基线三层模板**
@@ -1546,8 +1546,7 @@ def cmd_update(args) -> int:
     import datetime
     stamp = datetime.date.today().isoformat()
     (vers / f"v{maxn + 1}_{stamp}.md").write_text(
-        dump_card(*load_card(args.card)) if False else Path(args.card).read_text(encoding="utf-8"),
-        encoding="utf-8")
+        Path(args.card).read_text(encoding="utf-8"), encoding="utf-8")
     # 置信度重算 + 写卡
     dims["confidence"] = compute_confidence(dims.get("source_sample_length", 0),
                                             chapter_count_from_fs(Path(args.project)))
