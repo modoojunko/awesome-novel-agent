@@ -162,7 +162,7 @@ def main():
     else:
         deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署平台 skills（reasonix 生成 10 个 SKILL.md；codex 只部署独立工具）
+    # Step 3.5: 部署平台 skills（reasonix 生成 11 个 SKILL.md；codex 只部署独立工具）
     if platform.key == "reasonix":
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
     elif platform.key == "codex":
