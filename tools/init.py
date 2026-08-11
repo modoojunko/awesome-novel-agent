@@ -150,6 +150,9 @@ def main():
     else:
         print(f"题材: {GENRE_LABELS.get(genre, genre)}（{genre}）")
 
+    # Step 1.5: 旧 4 字段 writing-style.md → 新格式（必须先于模板拷贝/题材预填，否则旧卡被覆盖）
+    migrate_writing_style(project_path)
+
     # Step 2: 创建骨架
     create_skeleton(project_path, platform)
 
@@ -164,6 +167,9 @@ def main():
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
     elif platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
+
+    # Step 3.6: 部署风格工具脚本到项目 tools/（style-distiller / anti-ai 用）
+    deploy_tools(project_path)
 
     # Step 4: 按题材继承记忆
     deploy_memory(project_path, genre)
@@ -237,6 +243,7 @@ def create_skeleton(project_path: Path, platform: Platform):
         "sandbox",
         "archives",
         ".agent/task",
+        "tools",
         str(platform.memory_dir(project_path)),
         str(platform.knowledge_dir(project_path)),
     ]
@@ -251,6 +258,8 @@ def create_skeleton(project_path: Path, platform: Platform):
                 if rel_path.parts[0] == "migration":
                     continue
                 target = project_path / rel_path
+                if target.exists():
+                    continue          # 已存在不覆盖（升级/迁移不破坏用户工作）
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if platform.key == "codex" and item.name == "CLAUDE.md":
                     # Codex 项目不生成 CLAUDE.md（Codex 只读 AGENTS.md）
@@ -300,6 +309,24 @@ def deploy_agents(project_path: Path, platform: Platform):
                 content = rewrite_refs(content, platform)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
+
+
+_DEPLOY_TOOLS = ["distill-style.py", "compare-style.py", "mix-style.py"]  # 现有文件才拷，缺省跳过
+
+
+def deploy_tools(project_path: Path) -> None:
+    """拷贝风格工具脚本到项目 tools/（style-distiller / anti-ai 用 Bash 调）。"""
+    src = SKILL_HOME / "tools"
+    dst = project_path / "tools"
+    dst.mkdir(parents=True, exist_ok=True)
+    n = 0
+    for name in _DEPLOY_TOOLS:
+        f = src / name
+        if f.exists():
+            (dst / name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+            n += 1
+    if n:
+        print(f"  ✅ 已部署风格工具脚本到 tools/（{n} 个）")
 
 
 def deploy_memory(project_path: Path, genre: str):
@@ -412,6 +439,58 @@ def _md_bullets(sec: str) -> list:
     ]
 
 
+def _write_new_style_card(path: Path, role: str, principles: list, mistakes: list,
+                          depiction: str, seeded: bool = True) -> None:
+    """写新格式写作风格卡（frontmatter 量化层 + 正文定性层）。
+    confidence=0 → 提示词只走定性层，直到首次蒸馏。"""
+    prefix = "> [auto-seeded] 由 init.py 按题材预填，量化层留空，首次蒸馏后由 style-distiller 填充。\n\n" if seeded else ""
+    principles_txt = "\n".join(f"- {p}" for p in principles) if principles else "- {principle_1}"
+    mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else "- {mistake_1}"
+    content = f"""---
+profile_version: "1.0"
+scene_type: general
+source_sample_length: 0
+confidence: 0
+last_updated: ""
+locked: []
+
+lexicon: {{ adj_density_per_100: 0, adv_density_per_100: 0, four_phrase_freq_per_100: 0, preferred_words: [], banned_words: [], name_pronoun_ratio: 0 }}
+syntax: {{ avg_sentence_length: 0, sentence_length_dist: {{}}, single_sentence_paragraph_pct: 0, avg_sentences_per_paragraph: 0, question_ratio: 0, exclamation_ratio: 0 }}
+rhythm: {{ dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct: 0, narration_pct: 0 }}
+rhetoric: {{ metaphor_density_per_100: 0, metaphor_preference: "", sensory_dist: "" }}
+emotion_expression: {{ direct_pct: 0, action_physiology_pct: 0, environment_projection_pct: 0 }}
+narrative: {{ perspective: "", focal_character: "", inner_monologue_style: "" }}
+dialogue_style: {{ tag_style: "", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0, direct_address_freq_per_100: 0 }}
+cohesion: {{ conjunction_freq_per_100: 0, transition_sentence_ratio: 0, paragraph_bridge_style: "" }}
+verb_style: {{ action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, strength: "" }}
+---
+
+# 写作风格
+
+{prefix}## 叙事身份（原 role）
+
+{role}
+
+## 硬约束（原 core_principles）
+
+{principles_txt}
+
+## AI 易犯错误（原 possible_mistakes）
+
+{mistakes_txt}
+
+## 描写层次和手法（原 depiction_techniques）
+
+{depiction}
+
+## few-shot 例句
+
+- （蒸馏后由 style-distiller 填入标志性例句）
+"""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform):
     """按题材预填 settings/genre-setting.md + writing-style.md 的默认值。
 
@@ -467,37 +546,49 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
         "\n".join(genre_out) + "\n", encoding="utf-8"
     )
 
-    # writing-style.md：叙事者角色 + 文风蓝图作为核心信条，禁忌作为易犯错误
+    # writing-style.md → 新格式（frontmatter 量化层 + 正文定性层）
+    # 守卫：卡已存在且正文无未填充 {...} 占位符 → 已有实质内容（迁移产物/作者编辑），不覆盖。
+    # 注：frontmatter 量化层恒含 `{ ... }` 内联字典，不能以 `"{" in text` 判未填；
+    #     须按正文占位符 token（{role}/{principle_1}/{mistake_1}/{depiction_techniques}）判断。
     role = _md_section(text, "叙事者角色") or "（待设定）"
     blueprint = _md_section(text, "文风蓝图") or "（待设定）"
-    style_out = [
-        "# 写作风格",
-        "",
-        f"> [auto-seeded] init.py 从 genre-example/{genre}.md 生成，设定阶段请与作者逐项确认。",
-        "",
-        "## role（叙事身份）",
-        "",
-        role,
-        "",
-        "## core_principles（不可违背的写作信条）",
-        "",
-        blueprint,
-        "",
-        "## possible_mistakes（AI 易犯错误）",
-        "",
-    ]
-    style_out += [f"- {t}" for t in taboo] or ["- （待设定）"]
-    style_out += [
-        "",
-        "## depiction_techniques（描写层次和手法）",
-        "",
-        blueprint if blueprint and blueprint != "（待设定）" else "（设定阶段填写）",
-        "",
-    ]
-    (project_path / "settings" / "writing-style.md").write_text(
-        "\n".join(style_out) + "\n", encoding="utf-8"
+    style_card = project_path / "settings" / "writing-style.md"
+    _STYLE_CARD_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}")
+    filled = style_card.exists() and not any(
+        tok in style_card.read_text(encoding="utf-8") for tok in _STYLE_CARD_PLACEHOLDERS
     )
+    if filled:
+        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）")
+    else:
+        _write_new_style_card(
+            style_card,
+            role=role or "{role}",
+            principles=[blueprint] if blueprint else [],
+            mistakes=taboo,
+            depiction=blueprint or "{depiction_techniques}",
+        )
     print(f"  ✅ 已按题材预填 settings/genre-setting.md + writing-style.md 默认值（{genre}）")
+
+
+def migrate_writing_style(project_path: Path) -> None:
+    """旧 4 字段 writing-style.md → 新格式（仅当旧格式：无 frontmatter）。
+    旧版备份到 settings/.style-versions/v0_migrated.md。"""
+    card = project_path / "settings" / "writing-style.md"
+    if not card.exists():
+        return
+    text = card.read_text(encoding="utf-8")
+    if text.lstrip().startswith("---"):          # 已是新格式
+        return
+    # 旧标题带中文后缀（如 "## role（叙事身份）"），按完整标题提取
+    role = _md_section(text, "role（叙事身份）") or "{role}"
+    principles = _md_bullets(_md_section(text, "core_principles（不可违背的写作信条）"))
+    mistakes = _md_bullets(_md_section(text, "possible_mistakes（AI 易犯错误）"))
+    depiction = _md_section(text, "depiction_techniques（描写层次和手法）") or "{depiction_techniques}"
+    vers = project_path / "settings" / ".style-versions"
+    vers.mkdir(parents=True, exist_ok=True)
+    (vers / "v0_migrated.md").write_text(text, encoding="utf-8")
+    _write_new_style_card(card, role, principles, mistakes, depiction, seeded=False)
+    print("  ✅ 旧 4 字段 writing-style.md 已迁移到新格式（confidence=0，旧版已备份）")
 
 
 def write_status(project_path: Path):
