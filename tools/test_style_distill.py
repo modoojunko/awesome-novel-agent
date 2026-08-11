@@ -655,6 +655,25 @@ def test_review_fix_check_scene_card():
               f"rc={r.returncode}\n{r.stdout}\n{r.stderr}")
 
 
+def test_review_fix_inherits_scene_to_scene():
+    mod = _load_tool("check-agents")
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        settings = tmp / "templates" / "settings"
+        sp = settings / "style-profiles"
+        sp.mkdir(parents=True)
+        # 主卡
+        (settings / "writing-style.md").write_text("---\nprofile_version: \"1.0\"\nscene_type: general\nconfidence: 0\nlast_updated: \"\"\nsource_sample_length: 0\nlocked: []\nlexicon: {}\nsyntax: {}\nrhythm: {}\nrhetoric: {}\nemotion_expression: {}\nnarrative: {}\ndialogue_style: {}\ncohesion: {}\nverb_style: {}\n---\n# 风格\n", encoding="utf-8")
+        def scene(name, inherits):
+            (sp / name).write_text(f'---\nprofile_version: "1.0"\nscene_type: general\nconfidence: 0\nlast_updated: ""\nsource_sample_length: 0\nlocked: []\ninherits: "{inherits}"\noverride: {{rhythm: {{dialogue_pct: 80}}}}\n---\n# {name}\n', encoding="utf-8")
+        scene("fight.md", "writing-style.md")
+        scene("duel.md", "fight.md")     # 场景间继承
+        # 用 importlib 载入 check-agents 直接调 check_style_card（传临时路径）
+        errs = mod.check_style_card(sp / "duel.md")
+        check("#11 场景间继承不误报", not any("inherits" in e for e in errs), str(errs))
+
+
 def main():
     test_card_schema()
     test_migration()
@@ -670,6 +689,7 @@ def main():
     test_review_fix_check_zero_expectation()
     test_review_fix_update_locked_and_checkpoint()
     test_review_fix_check_scene_card()
+    test_review_fix_inherits_scene_to_scene()
     test_review_fix_mix()
     test_review_fix_migration_no_clobber()
     test_review_fix_seed_daishou()

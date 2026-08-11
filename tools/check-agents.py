@@ -46,7 +46,7 @@ VALID_TOOLS = {
 DEPLOYED_PATTERNS = [
     re.compile(r"^\.claude/knowledge/(anti-ai|writer-style|genre-example|permanent-memory)\.md$"),
     re.compile(r"^\.claude/knowledge/[a-z-]+\.md$"),          # format-specs 平铺产物
-    re.compile(r"^\.claude/knowledge/(plot-craft|scene-craft|character-craft|title-craft)/"),
+    re.compile(r"^\.claude/knowledge/(plot-craft|scene-craft|character-craft|title-craft|style-distill)/"),
     re.compile(r"^settings/character-setting/"),               # 每角色一个文件
     re.compile(r"^settings/(world-setting|genre-setting|writing-style|timeline|foreshadowing)\.md$"),
     re.compile(r"^settings/style-profiles/"),               # 分场景风格卡（每场景一个文件）
@@ -181,17 +181,24 @@ def check_style_card(path: Path) -> list:
                 errors.append(f"{path.name}: locked 含未知维度 {dim!r}（spec §13-5#3）")
     inh = fm.get("inherits")
     if inh:
-        # 继承目标与卡同级于 templates/settings/（场景卡 inherits: "writing-style.md"）
-        target = ROOT / "templates" / "settings" / str(inh)
-        if not target.exists():
-            errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {target.relative_to(ROOT)}）")
+        # 继承目标：场景卡继承主卡（style-profiles/../writing-style.md）或同级场景卡
+        candidates = [path.parent / str(inh), path.parent.parent / str(inh)]
+        if not any(c.exists() for c in candidates):
+            try:
+                rels = "、".join(str(c.relative_to(ROOT)) for c in candidates)
+            except ValueError:
+                rels = "、".join(str(c) for c in candidates)  # 路径不在 ROOT 下（测试/外部调用）
+            errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {rels}）")
     return errors
 
 
 def check_style_cards() -> list:
-    errors = []
     base = ROOT / "templates" / "settings"
-    for p in [base / "writing-style.md"] + sorted((base / "style-profiles").glob("*.md")):
+    main = base / "writing-style.md"
+    if not main.exists():
+        return ["templates/settings/writing-style.md 不存在（旧布局仓库？）"]
+    errors = []
+    for p in [main] + sorted((base / "style-profiles").glob("*.md")):
         errors.extend(check_style_card(p))
     return errors
 
