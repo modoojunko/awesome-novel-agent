@@ -15,7 +15,7 @@ knowledge:
     description: 写作风格主卡（Gate G 校验基线）
   - path: settings/style-profiles/
     description: 分场景风格卡（Gate G 场景差异基线）
-  - path: knowledge/style-distill/prompt-templates/gate-g-checklist.md
+  - path: .claude/knowledge/style-distill/prompt-templates/gate-g-checklist.md
     description: Gate G 检查清单
 ---
 

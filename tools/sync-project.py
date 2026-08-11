@@ -410,13 +410,16 @@ def sync_style_assets(project: Path) -> int:
     升级/迁移不破坏用户已编辑的写作风格卡与项目 tools/。
     """
     count = 0
-    src_cards = TEMPLATE_SETTINGS_DIR / "style-profiles"
-    if src_cards.exists():
-        dst = project / "settings" / "style-profiles"
-        dst.mkdir(parents=True, exist_ok=True)
-        for f in src_cards.glob("*.md"):
-            if not (dst / f.name).exists():
-                (dst / f.name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
+    # 递归部署整个 templates/settings/ 树（主卡 + 场景卡 + genre-baselines）：
+    # 只补缺失文件（不覆盖已有），与 init.py 的 deploy_tools/seed 守卫同语义。
+    src_settings = TEMPLATE_SETTINGS_DIR
+    if src_settings.exists():
+        for f in src_settings.rglob("*.md"):
+            rel = f.relative_to(src_settings)
+            dst = project / "settings" / rel
+            if not dst.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
                 count += 1
     dst_tools = project / "tools"
     dst_tools.mkdir(parents=True, exist_ok=True)

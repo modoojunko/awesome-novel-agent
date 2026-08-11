@@ -479,6 +479,35 @@ def test_review_fix_scaffold_refresh():
         check("#14 用户内容保留", "作者编辑标记：保留" in ws.read_text(encoding="utf-8"), ws.read_text(encoding="utf-8")[:80])
 
 
+def test_review_fix_sync_deploys():
+    print("[review-fix] #12 sync 递归部署风格资产")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        (tmp / "settings").mkdir(parents=True)
+        (tmp / "settings" / "style-profiles").mkdir(parents=True)
+        (tmp / "tools").mkdir(parents=True)
+        (tmp / ".agent").mkdir(parents=True)
+        (tmp / ".agent" / "status.md").write_text("# 项目状态\n", encoding="utf-8")  # sync 要求有效项目
+        (tmp / "archives").mkdir(parents=True)
+        # 先建一个「缺主卡/缺 genre-baselines」的存量项目
+        (tmp / "settings" / "style-profiles" / "dialogue.md").write_text("x", encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp)])
+        # #12 递归部署：主卡 + genre-baselines 到项目
+        check("#12 sync 部署主卡", (tmp / "settings" / "writing-style.md").exists(), r.stdout + r.stderr)
+        check("#12 sync 部署 genre-baselines",
+              (tmp / "settings" / "style-profiles" / "genre-baselines" / "xianxia" / "base.md").exists(),
+              r.stdout + r.stderr)
+
+
+def test_review_fix_init_deploys_style_distill():
+    print("[review-fix] #13 init 部署 style-distill 知识")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        run([sys.executable, str(TOOLS / "init.py"), str(tmp), "--genre", "1"])
+        p = tmp / ".claude" / "knowledge" / "style-distill" / "prompt-templates" / "distill-prompt.md"
+        check("#13 init 部署 style-distill 知识", p.exists(), str(p))
+
+
 def test_review_fix_mix():
     print("[review-fix] #2/#9/#36-mix 混卡修复")
     import yaml as _y
@@ -645,6 +674,8 @@ def main():
     test_review_fix_migration_no_clobber()
     test_review_fix_seed_daishou()
     test_review_fix_scaffold_refresh()
+    test_review_fix_sync_deploys()
+    test_review_fix_init_deploys_style_distill()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
 

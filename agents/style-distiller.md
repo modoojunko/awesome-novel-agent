@@ -19,7 +19,7 @@ knowledge:
     description: 作家文风偏好（只读基线，不写入）
   - path: .claude/knowledge/distilled-style-spec.md
     description: 蒸馏风格卡格式规范（frontmatter schema + 9 维度）
-  - path: knowledge/style-distill/prompt-templates/
+  - path: .claude/knowledge/style-distill/
     description: 蒸馏 prompt 模板目录
 ---
 

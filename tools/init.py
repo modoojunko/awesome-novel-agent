@@ -412,6 +412,14 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
             count += file_count
             print(f"  ✅ 已部署 {dir_name}/ ({file_count} 个文件)")
 
+    # style-distill 提示词模板（蒸馏段 2 / Gate G 清单 / 注入模板）
+    style_distill_src = SKILL_HOME / "knowledge" / "style-distill"
+    if style_distill_src.exists():
+        dst = knowledge_dir / "style-distill"
+        shutil.copytree(style_distill_src, dst, dirs_exist_ok=True)
+        count += sum(1 for _ in style_distill_src.rglob("*") if _.is_file())
+        print("  ✅ 已部署 style-distill/ 提示词模板")
+
     print(f"  ✅ 已继承 {count} 个知识文件")
 
 

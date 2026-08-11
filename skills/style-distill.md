@@ -8,7 +8,7 @@
 - 读 partial.yml + evidence.md：拿到客观维度（lexicon/syntax/rhythm.dialogue_pct/cohesion/verb_style）与 few-shot 候选。
 
 ### 段 2：LLM 语义标注
-- 读 `knowledge/style-distill/prompt-templates/distill-prompt.md`，按模板补：rhetoric / emotion_expression / narrative / dialogue_style / rhythm 非对话占比 / verb_style.strength / cohesion.paragraph_bridge_style，以及 banned_words 定稿、preferred_words 去噪、few-shot 精选。
+- 读 `.claude/knowledge/style-distill/prompt-templates/distill-prompt.md`，按模板补：rhetoric / emotion_expression / narrative / dialogue_style / rhythm 非对话占比 / verb_style.strength / cohesion.paragraph_bridge_style，以及 banned_words 定稿、preferred_words 去噪、few-shot 精选。
 - 语义维度参考：样本原文 + 客观维度 + 既有卡（保留 locked 项）。
 
 ### 段 3：合并写卡 + 备份
@@ -42,7 +42,7 @@
 ## 五、增量蒸馏（style-update-order）
 1. 读 order inputs（当前主卡 + 最新归档章节列表）。
 2. Bash 调：`python tools/distill-style.py update -c settings/writing-style.md -o settings/writing-style.md --project . <归档章节...>`
-   （update 内部做：客观维度滑动平均、locked 跳过、备份到 .style-versions、置信度重算、.agent/style-update/{chapter}.done 幂等。）
+   （update 内部做：客观维度滑动平均、locked 跳过、备份到 .style-versions、置信度重算、.agent/style-update/{card}.{chapter}.done 幂等。）
 3. 语义档重估条件（满足任一）：confidence < 60 / 距上次语义重估 ≥5 章 / order 标注语义重估。此时按蒸馏 prompt 段 2 跑语义维度并写卡。
 4. 增量只动量化数值，不碰正文定性层（与 updater 的 [writer-preference] 学习分工：updater 继续写 .claude/knowledge/writer-style.md，style-distiller 不动它）。
 5. 高频定性条目若作者确认升华，才写进卡片 banned_words / hard_constraints。
