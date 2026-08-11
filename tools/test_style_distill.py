@@ -381,9 +381,9 @@ def test_acceptance():
         init_project(tmp)
         card = tmp / "settings" / "writing-style.md"
         text = card.read_text(encoding="utf-8")
-        # 造 1250 字样本蒸馏出的源卡（confidence 基线 20+25）
+        # 造 1380 字样本蒸馏出的源卡（confidence 基线 20+27=47）
         sample = tmp / "s.md"
-        # ≥1250 字：confidence 基线 = 20 + min(40, L/50=26) = 46；5 章后 +25 → 71
+        # 1380 字：confidence 基线 = 20 + min(40, L/50=27) = 47；5 章后 +25 → 72
         sample.write_text(("他快步走过长廊，推开厚重的木门，寒气扑面而来。\n\n") * 60, encoding="utf-8")
         p = tmp / "s.yml"
         run([sys.executable, str(TOOLS / "distill-style.py"), "distill",
