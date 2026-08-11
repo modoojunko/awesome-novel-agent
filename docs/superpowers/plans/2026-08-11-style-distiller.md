@@ -2268,8 +2268,11 @@ def test_acceptance():
             "avg_sentence_length": total / _count_sents(txt),
             "dialogue_pct": 100 * _count_quoted(txt) / total,
             "conjunction_freq_per_100": 100 * sum(txt.count(w) for w in ("然而", "因此", "却")) / total,
+            # adj_density 以 jieba POS(a/ad/an) 为测量基准（spec §14 已知风险）：
+            # 本样本中 jieba 只把「寒冷/微弱」标为形容词（死寂/空旷/安静/刺骨/冰冷 标为其它词性），
+            # 手工计数须与工具同口径——只数这两个词，公式验证才成立。
             "adj_density_per_100": 100 * sum(txt.count(w)
-                                             for w in ("寒冷", "死寂", "空旷", "安静", "刺骨", "冰冷", "微弱")) / total,
+                                             for w in ("寒冷", "微弱")) / total,
         }
         for k, manual_v in manual.items():
             got = (d["syntax"].get("avg_sentence_length") if k == "avg_sentence_length"
