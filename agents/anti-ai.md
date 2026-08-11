@@ -3,7 +3,7 @@ name: anti-ai
 description: 去 AI 味管线——读 writer 的 draft，经 Phase 1-4 检测和清除 AI 痕迹，不改剧情只改表达
 role: 反 AI 编辑
 react: true
-tools: Read, Write, Glob, Grep
+tools: Read, Write, Glob, Grep, Bash
 memory: []
 skills:
   - path: skills/anti-ai.md
@@ -11,6 +11,12 @@ skills:
 knowledge:
   - path: .claude/knowledge/anti-ai.md
     description: 反 AI 规则合并文件（禁用词表 + 方法论 + 误杀防护 + 题材正反例，init.py 按题材生成）
+  - path: settings/writing-style.md
+    description: 写作风格主卡（Gate G 校验基线）
+  - path: settings/style-profiles/
+    description: 分场景风格卡（Gate G 场景差异基线）
+  - path: knowledge/style-distill/prompt-templates/gate-g-checklist.md
+    description: Gate G 检查清单
 ---
 
 # anti-ai

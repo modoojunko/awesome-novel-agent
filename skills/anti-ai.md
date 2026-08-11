@@ -102,6 +102,12 @@ Gate E: 命中 X 处（按 E1-E5 分类）
 Gate F: 命中 X 处（按 F1-F4 分类）
 ```
 
+**Gate G：风格偏差（可选，读 `settings/writing-style.md` 主卡 + 对应场景卡）**
+- Bash 调 `python tools/distill-style.py check -c settings/writing-style.md <正文>` → 读偏差表
+- LLM 按风格卡估算语义维度（rhetoric/emotion/narrative/dialogue_style）对比
+- 按 gate-g-checklist 分级：通过 / 警告（作者确认）/ 不通过（局部重写建议）
+- 命中 boundary-cases Gate G 豁免组 → SKIP 标注
+
 ---
 
 ## Phase 2：诊断
@@ -116,6 +122,7 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 | 对话标签密度 | Gate E2 命中数 / 对话句数 | <10% | 10%-25% | >25% |
 | 平均段落句数 | 总句数 / 总段落数 | 2.5-4 | 4-5.5 | >5.5 或 <2 |
 | 重复描写密度 | Gate C6 命中数 / 千字 | <1 | 1-3 | >3 |
+| 风格偏差维度数 | <2 | 2-3 | ≥4 |
 
 ### 定级规则
 
@@ -261,6 +268,7 @@ Gate F 修改：X 处
 总计：X 处修改
 定级：轻/中/重
 收敛轮数：X
+风格偏差：X 处（按维度列）
 ```
 
 ### 前后对比
