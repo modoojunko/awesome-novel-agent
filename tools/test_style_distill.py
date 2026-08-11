@@ -189,6 +189,14 @@ def compute_conf(length, chapters=0):
     return min(100, 20 + min(40, int(length / 50)) + min(40, chapters * 5))
 
 
+def test_genre_baselines():
+    print("[unit] 题材基线模板")
+    for g in ("xianxia", "urban", "suspense"):
+        for layer in ("base", "delta", "benchmark"):
+            f = REPO / "templates" / "settings" / "style-profiles" / "genre-baselines" / g / f"{layer}.md"
+            check(f"{g}/{layer} 存在", f.exists())
+
+
 def test_e2e_init_deploy():
     print("[e2e] init 部署 style-distiller")
     with tempfile.TemporaryDirectory() as td:
@@ -210,6 +218,7 @@ def main():
     test_card_schema()
     test_migration()
     test_distill()
+    test_genre_baselines()
     test_e2e_init_deploy()
     print(f"\n结果: {PASS} 通过, {FAIL} 失败")
     sys.exit(0 if FAIL == 0 else 1)
