@@ -179,7 +179,14 @@ knowledge:
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
     │                  → 推进章节状态=writing
-    ├── anti-ai → step=anti-ai → **读状态：章节状态 > anti-ai？→ 已跳过该步**；否则 → anti-ai 去 AI 味 → order DONE 后推进章节状态=anti-ai
+    ├── anti-ai → step=anti-ai → 读状态：章节状态 > anti-ai？→ 已跳过；
+    │     否则 → 派 anti-ai 验收（读 prompts 同源提示词 → 违反报告 PASS/FAIL）
+    │           order DONE 后读 .anti-ai.md 的验收节 verdict：
+    │           ├── FAIL 且 round < 3 → 写 rewrite-order（writing-order.md 带
+    │           │     rewrite_of + round + violations 字段，violations = 违反报告全文落 .agent/task/{chapter}-violations.md）
+    │           │     → 派 writer 重写 → writer DONE 后重派 anti-ai 再验收（round+1）
+    │           ├── FAIL 且 round == 3 → 取违反最少稿（比较各轮违反条数），报告留作者人工裁决，推进章节状态=anti-ai
+    │           └── PASS → 推进章节状态=anti-ai
     ├── review → step=reviewing → **读状态：章节状态 > reviewing？→ 已跳过该步**；否则 → reader 评审 → order DONE 后推进章节状态=reviewing
     ├── archive → step=archiving → **读状态：章节状态 > archiving？→ 已跳过该步**；
     │            否则 → **先查 .done：`.agent/archiving/vol-{N}-ch-{M}.done` 存在？→ 归档已完成，直接推进章节状态=全部完成**；
@@ -193,9 +200,7 @@ knowledge:
     │      │     → 若 last_volume_completed = true 且重写后已归档数 < 规划数 → 清除该标记
     │      │     → 重置章节状态为空 → phase→outline, step→chapter-planning（重新规划该章）
     │      └── 继续下一章 → 走下方卷完成判定
-    │    ↓ 归档完成后 → 写 style-update-order.md（inputs: settings/writing-style.md + 本次归档章节；outputs: 主卡 + .style-versions）
-    │      → 调 style-distiller（增量：客观档每章跑客观维度滑动平均；语义档由 style-distiller 按置信度<60 / 累计5章 / 作者要求重估）
-    │      → DONE 后再继续卷完成判定
+    │    ↓ 卡冻结——归档后无风格增量；重蒸馏仅作者主动触发 style-distill-order
     │    ↓ **卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
