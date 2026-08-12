@@ -15,7 +15,7 @@ Step 4: 验收自检
 
 > 9 类文件（含写作记忆/永久记忆）。
 
-1. **writing-style.md（主卡）** → 提取正文定性层四字段（core_principles, possible_mistakes, depiction_techniques）+ 量化层 9 大维度 + confidence。confidence=0 → 只注入定性层；否则按容差档渲染「写作风格约束」块（见注入模板）
+1. **writing-style.md（主卡）** → 提取正文定性层四字段（core_principles, possible_mistakes, depiction_techniques）+ 量化层 9 大维度 + confidence。**双态**：confidence=0 → 只注入定性层（读主卡正文 → 定性四字段注入，现状不变）；confidence>0 → 按 rendering-rules.md 渲染案例 2（读主卡 + 场景卡 frontmatter → 量化节 + 声音层透传）
 2. **volume.md** → 提取前一章的章名、结尾画面、情绪落点
 3. **chapter.md** → 提取 memo, emotional_design, outline（场景分解）, payoff_plan
 4. **角色设定文件** → 读取涉及的角色，提取本章相关状态
@@ -23,7 +23,7 @@ Step 4: 验收自检
 6. **反 AI 规则文件**（`.claude/knowledge/anti-ai.md`）→ 疲劳词阈值、句式规则、元叙事禁止、题材反 AI 等注入输出·写作规范
 7. **写作记忆**（`.claude/memory/writing-memory.md`）→ 提取本章相关的作者文风/节奏/描写/对话偏好，注入背景信息·作者偏好记忆
 8. **永久记忆**（`.claude/knowledge/permanent-memory.md`）→ 提取高频沉淀的作者规则，与写作记忆合并去重后注入
-9. **style-profiles/ 场景卡** → 本章每个场景类型查 `settings/style-profiles/{scene_type}.md`，有则把该卡 override 合并进主卡量化层（仅该场景注入用）；无则主卡兜底
+9. **style-profiles/ 场景卡** → 本章每个场景类型查 `settings/style-profiles/{scene_type}.md`，有则把该卡 override 合并进主卡量化层（仅该场景注入用，confidence>0 渲染即按此 override 叠加）；无则主卡兜底
 **注意：前情上下文只读卷纲中的前章摘要，不读上一章全文。**
 
 **占位符守卫：** 若 `settings/writing-style.md` / `settings/genre-setting.md` 仍含未替换的 `{...}` 占位符（如 `{role}`、`{genre_id}`，即初始化后设定阶段未执行），**禁止把占位符原样注入 prompt**。改为从 `.claude/knowledge/genre-example.md` 提取对应题材的「叙事者角色/文风蓝图/类型禁忌/题材配置」作为默认风格注入，并在完成报告标注 `[设定未填写，已用 genre-example 默认兜底]`，提示 novel-agent 补做设定。
@@ -493,9 +493,12 @@ Step 4 融合输出：
 
 #### 写作风格约束
 
-（从主卡 + 本章场景卡按注入模板渲染）：本章涉及 {N} 种场景类型，按场景类型稀疏注入量化约束（「约 X（±Y%）」，Y 按主卡 confidence 容差档）与 1-2 条 few-shot。主卡兜底场景。confidence=0 时本子节不注入。banned_words / 硬约束归入「不可违反规则·红线约束」。
+**双态分支：**
 
-**分工：** 本子节只注入「多少」（量化数值 + few-shot），scene-craft 方法论只注入「怎么写」（场景写作指引子节），两者不并列重复。
+- **confidence=0（未蒸馏）→ 正文定性四字段注入：** 读主卡正文四字段（叙事身份 / 硬约束 / AI 易犯错误 / 描写层次）注入本节，节标题沿用「写作风格约束」，现状不变。
+- **confidence>0（已蒸馏）→ 案例 2 渲染：** 本节输出 `【词汇】【句式】【节奏】【修辞与感官】【情绪表达】【对话风格】【衔接】【视角】【硬性规则】【整体基调】【风格参考例句】【剧情上下文】【写作要求】`（案例 2 结构），渲染步骤按 rendering-rules.md（区间/枚举/稀疏注入矩阵，读取 tools/style_render.py 的 RANGE_TIERS / ENUM_ZH / SCENE_INJECTION）。banned_words / 硬约束归入「不可违反规则·红线约束」。
+
+**分工：** confidence>0 时量化节（【词汇】…【视角】）来自渲染规则，声音层（【硬性规则】【整体基调】【风格参考例句】）原样透传；scene-craft 方法论只注入「怎么写」（场景写作指引子节），两者不并列重复。
 
 #### 质感要求
 
@@ -528,7 +531,7 @@ Step 4 融合输出：
 |--------|------|
 | 结构完整 | 角色/任务指示/背景信息/案例/输入/输出 6 元素全部存在 |
 | 字段填充完整 | 各元素字段有值，无 `______` 占位符残留 |
-| writing-style 注入 | role/core_principles/possible_mistakes/depiction_techniques 四字段全部注入 |
+| writing-style 注入 | 双态：confidence=0 → 定性四字段注入（现状不变）；confidence>0 → 案例 2 十一节齐全（量化节按 rendering-rules 渲染；硬性规则/基调/例句透传；无声音层走 §6.0b 回退）；banned_words 与 anti-ai 禁用词去重后无重复；无占位符泄漏 |
 | 风格块与指引无重复 | 「写作风格约束」块与「场景写作指引」块无语义重复（量化约束不与方法论技法并列注入） |
 | banned_words 无重复 | 注入的 banned_words 与 anti-ai 禁用词合并去重后无重复出现 |
 | 硬性约束齐全 | 人设红线、世界观禁区、剧情红线全部存在 |

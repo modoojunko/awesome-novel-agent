@@ -7,7 +7,7 @@ tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/prompt-crafting.md
-    description: 4 层提示词组装 skill（填充规则 + 冲突检测 + 验收自检）
+    description: 4 层提示词组装 + 案例 2 风格参数渲染（rendering-rules）
   - path: skills/prompt-audit.md
     description: Prompt 独立审计 skill（9 维度验证：技法覆盖/溯源/可执行/转化/一致性/去AI/冲突裁定/规则去重/优先级重排，FAIL 打回）
   - path: skills/memory-recording.md
