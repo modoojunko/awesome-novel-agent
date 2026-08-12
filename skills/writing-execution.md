@@ -49,8 +49,7 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 
 ## Inputs
 - `.claude/knowledge/writing-base.md` — 写作基底（先读）
-- `prompts/vol-{N}-ch-{M}-prompt.md` — 主要输入（4 层提示词）
-- `settings/writing-style.md` — 写作风格方法论
+- `prompts/vol-{N}-ch-{M}-prompt.md` — 主要输入（4 层提示词，风格已渲染在内）
 - `settings/genre-setting.md` — 题材设定
 
 ## Outputs
