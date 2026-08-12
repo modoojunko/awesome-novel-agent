@@ -2,23 +2,24 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 把 style-distiller 从「jieba 统计 + LLM 语义」重构为「纯 LLM 三阶段 13 模板逆向工程」，产出案例 1 特征卡 + 分析稿；prompt-crafter 渲染案例 2 提示词作为生成与验收的唯一操作规格；anti-ai 改为指令遵循验收，novel-agent 调度 ≤3 次抽卡。
+**Goal:** 把 style-distiller 从「jieba 统计 + LLM 语义」重构为「纯 LLM 三阶段 13 模板逆向工程」，产出蒸馏卡 + 分析稿；prompt-crafter 双态渲染（未蒸馏=定性注入现状不变 / 蒸馏后=案例 2 蒸馏输出）作为生成与验收的唯一操作规格；anti-ai 改为指令遵循验收，novel-agent 调度 ≤3 次抽卡。
 
-**Architecture:** 产卡/注入/生成/验收四角色分离。style-distiller 跑 13 模板（拆解 1-4 → 量化 5-8 → 建模 9-13）收敛出卡（量化维 + 声音层）与分析稿；prompt-crafter 从卡渲染案例 2 提示词（写入 `prompts/`）；writer 用该提示词生成、anti-ai 用同一份提示词验收（PASS/FAIL + 违反报告）；FAIL → novel-agent 派 writer 带报告重写（≤3）。卡冻结：归档后无增量更新。
+**Architecture:** 产卡/注入/生成/验收四角色分离 + **双态向前兼容**。style-distiller（仅作者触发，有样本时）跑 13 模板（拆解 1-4 → 量化 5-8 → 建模 9-13）收敛出蒸馏卡（量化维 + 声音层）与分析稿；prompt-crafter 按卡内 `confidence` 分支渲染（0=未蒸馏 → 正文定性四字段注入，现状不动；>0=已蒸馏 → 案例 2 量化区间 + 声音层透传，写 `prompts/`）；writer 用该提示词生成、anti-ai 用同一份提示词验收（PASS/FAIL + 违反报告）；FAIL → novel-agent 派 writer 带报告重写（≤3）。卡冻结：归档后无增量更新。旧卡/未蒸馏项目零改动、零迁移。
 
 **Tech Stack:** Python 3.9+（无新增依赖，jieba 移除）、YAML、Claude Code agents/skills、纯 LLM 提取（无统计引擎）。
 
 ## Global Constraints
 
+- **双态卡 + 向前兼容（2026-08-12 作者确认）**：卡状态由 frontmatter `confidence` 判定（0=未蒸馏/手动；>0=已蒸馏），复用旧 prompt-crafting Step 1.1 既有判定，**无新标记字段**。未蒸馏卡 = 旧模板原样（9 维零值 + 正文定性四字段 + `locked`），prompt 注入走旧定性路径，**模板不改、init seed 不改、旧项目零改动、无批量迁移**。蒸馏卡 = 9 维填充 + 声音层（`hard_constraints`/`soft_guidance`/`few_shot_examples`）+ `profile_name` + `confidence>0`；增强字段（三维 name_pronoun / inner_monologue_pct / strength）**可选**——存在才校验、缺失不报错。
 - **卡冻结**：蒸馏一次到位；机器生成章永不回写卡；归档后不触发任何风格增量更新；重蒸馏仅作者主动触发（`style-distill-order.md`）。
 - **写白名单（style-distiller 唯一例外）**：`settings/writing-style.md`、`settings/style-profiles/*`、`settings/style-profiles/analysis/*`（新增）、`settings/.style-versions/*`。只写这四处，不碰其他 settings。
 - **13 模板归属**：模板 1-4 拆解为 LLM 内部推理过程稿，**不落盘**；模板 5-8 量化表 + 模板 9-13 建模规则**持久化到分析稿**并收敛进卡（量化维 + 声音层）。
-- **案例 1 卡字段**：`profile_version`、`profile_name`、`scene_type`、`source_sample_length`、`confidence`、`last_updated` + 9 大维度 + `hard_constraints`/`soft_guidance`/`few_shot_examples`。无 `locked`（增量退役）。
-- **类型规则**：客观数值精确值；类别枚举封闭集合（tag_style/strength/paragraph_bridge_style/inner_monologue_style/perspective）；百分比分布和=100（±1），五层占比总计 ≤110%。
-- **案例 2 = 唯一操作规格**：writer 生成与 anti-ai 验收读 `prompts/vol-{N}-ch-{M}-prompt.md` 同一份，天然同源。分析稿不进任何 agent 加载清单。
+- **蒸馏卡 schema（案例 1 结构）**：`profile_version`、`profile_name`、`scene_type`、`source_sample_length`、`confidence`、`last_updated` + 9 大维度（结构同旧模板）+ 声音层。`locked` 保留可接受（新流程为 no-op，不要求删除、不要求保留）。
+- **类型规则**：客观数值精确值；类别枚举封闭集合（tag_style/strength/paragraph_bridge_style/inner_monologue_style/perspective）；百分比分布和=100（±1），五层占比总计 ≤110%；**增强字段存在才校验**。
+- **案例 2 = 唯一操作规格**：writer 生成与 anti-ai 验收读 `prompts/vol-{N}-ch-{M}-prompt.md` 同一份，天然同源；未蒸馏态 prompt 含定性四字段（现状不变）。分析稿不进任何 agent 加载清单。
 - **抽卡**：FAIL → 违反报告喂 writer 重写，round ≤3；超限取违反最少稿，报告留作者人工裁决。
-- **退役**：`tools/distill-style.py`、`tools/compare-style.py`、`tools/mix-style.py`、jieba 依赖、F5 增量（`style-update-order`）、题材基线运行时、check 退出码契约（0/1/2）、C1、旧 test_style_distill 数字断言。
-- **保留**：`tools/init.py`、`tools/sync-project.py`、`tools/check-agents.py`、`tools/check-conflicts.py`、`tools/test_platforms.py`（schema/模板更新）。
+- **退役**：`tools/distill-style.py`、`tools/compare-style.py`、`tools/mix-style.py`、jieba 依赖、F5 增量（`style-update-order`）、题材基线运行时、check 退出码契约（0/1/2）、C1、`injection-template.md`（→ rendering-rules.md）、旧 test_style_distill 数字断言。**不退役**：旧定性注入路径（正文四字段 + confidence=0 分支）、旧卡模板、init 旧模板 seed。
+- **保留**：`tools/init.py`、`tools/sync-project.py`、`tools/check-agents.py`、`tools/check-conflicts.py`、`tools/test_platforms.py`（双态卡校验更新；模板/seed 不动）。
 - **测试**：模板/流程/schema 断言，不依赖 LLM 精确数值；`python tools/test_style_distill.py` 重写（保留文件名，CI 不变）。LLM 非确定性由 schema 校验 + 模板一致性兜底。
 - **C6 主验收**：作者盲测 ≥70%（作者内容任务，代码路径就绪即可）。
 - **docs/ 被 gitignore**：本计划文件提交需 `git add -f`；任务内代码提交正常。
@@ -90,9 +91,10 @@ A/B/C/D/E 各通道出现次数 + 占比（和 =100%）+ 典型示例。
 ### 模板 13：结构锚点模型
 章首锚点/章尾锚点/中段呼应的原文表现 + 功能 + 变化规则。
 
-## 收敛为案例 1 卡
+## 收敛为蒸馏卡（案例 1 结构，双态向前兼容）
 - 模板 5-8 量化表 → 卡量化维（lexicon/syntax/rhythm/rhetoric/emotion_expression/narrative/dialogue_style/cohesion/verb_style，九维结构见 distilled-style-spec）
 - 模板 9-13 建模规则 → 卡声音层（hard_constraints/soft_guidance/few_shot_examples）
+- **蒸馏卡 schema（2026-08-12 修正）**：frontmatter = 旧模板 9 维**结构不变**（只填值）+ **新增** `profile_name`、`hard_constraints`/`soft_guidance`/`few_shot_examples` + `confidence` 置 **>0**；`locked` 保留（no-op）。可选增强字段：`name_pronoun_ratio` 可写三维 `{name, he_she, i_you}`（和=100）或保持单值；`emotion_expression` 可加 `inner_monologue_pct`（缺省按 100-其余三项推断）；`verb_style.strength` 枚举 weak/medium/strong。**未蒸馏项目（无样本）不触发蒸馏，卡保持旧模板原样**。
 - 输出格式：量化表 + 建模规则 + 收敛卡（案例 1 格式 YAML）
 ```
 
@@ -118,111 +120,123 @@ git commit -m "feat: feature-extract 方法论模板（三阶段 13 模板定义
 
 ---
 
-### Task 2: 新卡 schema（模板 + check-agents 校验 + analysis/ 白名单）
+### Task 2: 双态卡 schema 校验（check-agents 放宽 + 蒸馏卡校验；模板不动）
 
 **Files:**
-- Modify: `templates/settings/writing-style.md`
-- Modify: `templates/settings/style-profiles/{dialogue,environment,fight,group-scene,inner-mono,transition}.md`
 - Modify: `tools/check-agents.py`
+- （**不改**）`templates/settings/writing-style.md`、`templates/settings/style-profiles/*.md`——旧模板原样保留（未蒸馏态零改动，向前兼容）
 
 **Interfaces:**
-- Consumes: Task 1 无；spec §4 案例 1 schema
-- Produces: 新 schema 的模板与校验 —— Task 3（style-distiller 技能）、Task 10（迁移）按此 schema 读写。`check_style_card` 的校验规则是本仓库卡 schema 的唯一权威。
+- Consumes: 无（spec §4 双态 schema）
+- Produces: `check_style_card` 双态校验——旧卡（未蒸馏）过校验保持现状 + 蒸馏卡（可选增强字段**存在才校验、缺失不报错**）。Task 3（style-distiller 写蒸馏卡）、Task 10（双态测试）按此规则读写/断言。`check_style_card` 的校验规则是本仓库卡 schema 的唯一权威。
 
-- [ ] **Step 1: 更新主卡模板为案例 1 schema**
+- [ ] **Step 1: 读现状模板，确认不动**
 
-编辑 `templates/settings/writing-style.md`，frontmatter 改为：
+Read `templates/settings/writing-style.md` + `templates/settings/style-profiles/*.md`：9 维零值 + 正文定性四字段 + `locked: []` 原样（本任务不修改模板；spec §4 未蒸馏态 = 旧模板原样）。
 
-```yaml
----
-profile_version: "1.0"
-profile_name: ""                        # 人类可读卡名，如 "都市校园轻小说-贺天然视角"（蒸馏时填）
-scene_type: general
-source_sample_length: 0
-confidence: 0
-last_updated: ""
+- [ ] **Step 2: 扩展 check_style_card 为双态校验**
 
-# 9 大维度（案例1 结构；0/空 = 未蒸馏，首次蒸馏后由 style-distiller 填充）
-lexicon: { adj_density_per_100: 0, adv_density_per_100: 0, four_phrase_freq_per_100: 0, preferred_words: [], banned_words: [], name_pronoun_ratio: { name: 0, he_she: 0, i_you: 0 } }
-syntax: { avg_sentence_length: 0, sentence_length_dist: {}, single_sentence_paragraph_pct: 0, avg_sentences_per_paragraph: 0, question_ratio: 0, exclamation_ratio: 0 }
-rhythm: { dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct: 0, narration_pct: 0 }
-rhetoric: { metaphor_density_per_100: 0, metaphor_preference: "", sensory_dist: "" }
-emotion_expression: { direct_pct: 0, action_physiology_pct: 0, environment_projection_pct: 0, inner_monologue_pct: 0 }
-narrative: { perspective: "", focal_character: "", inner_monologue_style: "" }
-dialogue_style: { tag_style: "", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0, direct_address_freq_per_100: 0 }
-cohesion: { conjunction_freq_per_100: 0, transition_sentence_ratio: 0, paragraph_bridge_style: "" }
-verb_style: { action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, strength: "" }
----
-```
+编辑 `tools/check-agents.py` 的 `check_style_card`，在现有校验（必填键 `profile_version/scene_type/confidence/last_updated/source_sample_length`、scene_type 枚举、confidence 0-100 整数、主卡 9 维齐全、场景卡 override、locked 可选列表、inherits 候选）基础上，**函数末尾追加**以下宽松校验（字段存在才校验、缺失不报错）：
 
-注意：删除 `locked: []`（增量退役）；`name_pronoun_ratio` 改为三维 dict；`emotion_expression` 增加 `inner_monologue_pct`；`verb_style` 增加 `strength`。正文（叙事身份/硬约束/AI易犯错误/描写层次和手法/few-shot）保留为**遗留定性层**：新渲染流只读 frontmatter（量化维 + 声音层），正文由 init.py 迁移/seed 继续维护、不参与蒸馏收敛（蒸馏结果全在 frontmatter + 分析稿），Task 8 将移除 writer 对正文四字段的读取。
-
-- [ ] **Step 2: 更新 6 张场景卡模板**
-
-每个 `templates/settings/style-profiles/{scene}.md`：frontmatter 加 `profile_name: ""`（check-agents 必填键对全部卡生效，含场景卡）；删除 `locked: []` 行；保留 `inherits: "writing-style.md"` + `override: {}`；正文注明「override 只写与主卡的差异维度（量化 override + 场景建模规则），分析稿见 style-profiles/analysis/{scene}.md」。
-
-- [ ] **Step 3: 更新 check-agents.py 卡 schema 校验**
-
-编辑 `tools/check-agents.py` 的 `check_style_card`：
-
-1. 必填键列表加 `profile_name`：
 ```python
-for k in ("profile_version", "profile_name", "scene_type", "confidence", "last_updated", "source_sample_length"):
-```
-2. `name_pronoun_ratio` 校验（仅主卡；模板全零占位不触发和校验）——在维度检查后追加：
-```python
+# --- 蒸馏卡可选增强字段（2026-08-12 双态：存在才校验，缺失兼容旧卡/未蒸馏卡） ---
+def _opt_pct(v):
+    return isinstance(v, (int, float)) and 0 <= v <= 100
+
 lex = fm.get("lexicon") if isinstance(fm.get("lexicon"), dict) else {}
 npr = lex.get("name_pronoun_ratio")
 if isinstance(npr, dict):
     keys = set(npr)
     if keys != {"name", "he_she", "i_you"}:
         errors.append(f"{path.name}: name_pronoun_ratio 键应为 name/he_she/i_you（当前 {sorted(keys)}）")
-    elif sum(npr.values()):          # 全零模板跳过；蒸馏后分布和应≈100
+    else:
         total = sum(v for v in npr.values() if isinstance(v, (int, float)))
-        if abs(total - 100) > 1:
-            errors.append(f"{path.name}: name_pronoun_ratio 三项和应≈100（当前 {npr}）")
-```
-3. 四个分布字段和=100 校验（仅主卡 `not is_scene`；全零/空占位跳过）——同样在维度检查后追加：
-```python
-_DIST_FIELDS = {"lexicon": ["name_pronoun_ratio"], "syntax": ["sentence_length_dist"],
-                "rhetoric": ["metaphor_preference", "sensory_dist"]}
-if not is_scene:
-    for dim, fields in _DIST_FIELDS.items():
-        d = fm.get(dim) if isinstance(fm.get(dim), dict) else {}
-        for f in fields:
-            sub = d.get(f)
-            if isinstance(sub, dict) and sub:
-                total = sum(v for v in sub.values() if isinstance(v, (int, float)))
-                if total and abs(total - 100) > 1:
-                    errors.append(f"{path.name}: {f} 分布和应≈100（当前 {round(total)}）")
-```
-4. `verb_style.strength` 枚举校验（仅主卡）：
-```python
-vs = fm.get("verb_style") if isinstance(fm.get("verb_style"), dict) else {}
-if vs.get("strength") not in ("", "weak", "medium", "strong"):
-    errors.append(f"{path.name}: verb_style.strength 应为 weak/medium/strong（当前 {vs.get('strength')!r}）")
-```
-5. 删除 `locked` 校验块（`locked` 字段已退役）：
-```python
-# 删除以下整块：
-#   locked = fm.get("locked")
-#   if locked is not None and not isinstance(locked, list): ...
-```
-6. `DEPLOYED_PATTERNS` 已含 `^settings/style-profiles/`（覆盖 analysis/ 子目录），无需改；确认注释更新为「含分析稿目录」。
+        if total and abs(total - 100) > 1:     # 全零 = 未填占位（等价旧单值 0），跳过和校验
+            errors.append(f"{path.name}: name_pronoun_ratio 三维和应≈100（当前 {npr}）")
 
-- [ ] **Step 4: 跑 check-agents 验证**
+em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
+if "inner_monologue_pct" in em and not _opt_pct(em["inner_monologue_pct"]):
+    errors.append(f"{path.name}: inner_monologue_pct 需为 0-100 数值（当前 {em['inner_monologue_pct']!r}）")
+
+vs = fm.get("verb_style") if isinstance(fm.get("verb_style"), dict) else {}
+if vs.get("strength") not in (None, "", "weak", "medium", "strong"):
+    errors.append(f"{path.name}: verb_style.strength 应为 weak/medium/strong（当前 {vs.get('strength')!r}）")
+
+for key in ("hard_constraints", "soft_guidance"):
+    v = fm.get(key)
+    if v is not None and not isinstance(v, list):
+        errors.append(f"{path.name}: {key} 需为列表")
+if fm.get("few_shot_examples") is not None and not isinstance(fm.get("few_shot_examples"), list):
+    errors.append(f"{path.name}: few_shot_examples 需为列表")
+
+rhy = fm.get("rhythm") if isinstance(fm.get("rhythm"), dict) else {}
+_FIVE = ("dialogue_pct", "action_pct", "environment_pct", "inner_thought_pct", "narration_pct")
+if all(f in rhy for f in _FIVE):
+    total5 = sum(rhy[f] for f in _FIVE if isinstance(rhy[f], (int, float)))
+    if total5 and total5 > 110:                  # 五层可重叠，上限 110%（spec §5.1）
+        errors.append(f"{path.name}: 五层占比总计应 ≤110%（当前 {round(total5)}）")
+
+_DIST = {"syntax": ["sentence_length_dist"], "rhetoric": ["metaphor_preference", "sensory_dist"]}
+for dim, fields in _DIST.items():
+    d = fm.get(dim) if isinstance(fm.get(dim), dict) else {}
+    for f in fields:
+        sub = d.get(f)
+        if isinstance(sub, dict) and sub:
+            total = sum(v for v in sub.values() if isinstance(v, (int, float)))
+            if total and abs(total - 100) > 1:
+                errors.append(f"{path.name}: {f} 分布和应≈100（当前 {round(total)}）")
+```
+
+**注意（不改的现状）**：必填键**不加** `profile_name`（旧卡没有）；**不删** `locked` 校验（旧卡保留 locked，蒸馏卡空列表也过）；**不要求**声音层/增强字段（未蒸馏卡缺省）。
+
+- [ ] **Step 3: 蒸馏卡样本过校验（临时验证）**
+
+用临时脚本验证蒸馏卡（旧模板结构 + 声音层 + 增强字段）过新校验：
+
+```bash
+python - <<'PY'
+import sys, tempfile, yaml
+from pathlib import Path
+sys.path.insert(0, "tools")
+import importlib.util
+spec = importlib.util.spec_from_file_location("ca", "tools/check-agents.py")
+ca = importlib.util.module_from_spec(spec); spec.loader.exec_module(ca)
+base = Path("templates/settings/writing-style.md").read_text(encoding="utf-8")
+fm = yaml.safe_load(base.split("---", 2)[1])          # 旧模板原 frontmatter
+# 蒸馏卡 = 原卡结构叠加声音层 + 增强字段 + confidence>0（style-distiller 收敛产物）
+fm["profile_name"] = "测试蒸馏卡"; fm["confidence"] = 75
+fm["lexicon"]["name_pronoun_ratio"] = {"name": 45, "he_she": 50, "i_you": 5}
+fm["rhetoric"]["metaphor_preference"] = {"weapon_metal": 5, "nature": 10, "body": 20, "abstract": 30, "other": 35}
+fm["rhetoric"]["sensory_dist"] = {"visual": 72, "auditory": 15, "tactile": 10, "olfactory": 2, "gustatory": 1}
+fm["emotion_expression"]["inner_monologue_pct"] = 35
+fm["verb_style"]["strength"] = "medium"
+fm["hard_constraints"] = ["内心独白必须用引号包裹"]
+fm["soft_guidance"] = ["整体基调：轻松吐槽向"]
+fm["few_shot_examples"] = [{"type": "inner_thought", "text": "好想死啊", "reason": "口头禅式吐槽"}]
+with tempfile.TemporaryDirectory() as d:
+    p = Path(d) / "writing-style.md"
+    p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+    errs = ca.check_style_card(p)
+    assert not errs, errs
+    print("蒸馏卡过校验 OK")
+PY
+```
+
+Expected: 打印 `蒸馏卡过校验 OK`。（说明：蒸馏卡 = 原模板 frontmatter 解析后叠加字段，结构不动只填值/加声音层。）
+
+- [ ] **Step 4: 验证旧模板仍过校验**
 
 Run:
 ```bash
 python tools/check-agents.py
 ```
-Expected: `✅ agent 定义全部通过`，exit 0（新 schema 模板过新校验）。
+Expected: `✅ agent 定义全部通过`，exit 0（旧模板未改过校验；新增校验对未蒸馏卡宽松跳过）。
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add templates/settings/writing-style.md templates/settings/style-profiles/ tools/check-agents.py
-git commit -m "feat: 新卡 schema（案例1：profile_name/三维name_pronoun/inner_monologue_pct/strength，去 locked）+ check-agents 校验"
+git add tools/check-agents.py
+git commit -m "feat: check-agents 双态卡校验（旧卡兼容 + 蒸馏卡可选增强字段存在才校验）"
 ```
 
 ---
@@ -234,7 +248,7 @@ git commit -m "feat: 新卡 schema（案例1：profile_name/三维name_pronoun/i
 - Modify: `agents/style-distiller.md`
 
 **Interfaces:**
-- Consumes: Task 1 的 `feature-extract.md`；Task 2 的新卡 schema
+- Consumes: Task 1 的 `feature-extract.md`；Task 2 的双态卡 schema
 - Produces: `skills/style-distill.md` 的蒸馏 SOP（不再调 distill-style.py / style-update-order / genre-baselines）—— Task 9 退役清理的 grep 依据；`agents/style-distiller.md` 的写白名单（含 analysis/）
 
 - [ ] **Step 1: 重写 skills/style-distill.md**
@@ -255,7 +269,7 @@ git commit -m "feat: 新卡 schema（案例1：profile_name/三维name_pronoun/i
    - 建模规则 → 卡声音层（hard_constraints / soft_guidance / few_shot_examples）
 7. 写 `settings/writing-style.md`（收敛卡）+ `settings/style-profiles/analysis/general.md`（量化表 + 建模规则全文）。
 8. 备份旧卡到 `settings/.style-versions/v{N}_{YYYY-MM-DD}.md`（N=现有最大+1，卡与分析稿同版本）。
-9. confidence：LLM 按样本质量/一致性给 0-100（0 = 手动设定）；`last_updated` 写当日。
+9. confidence：LLM 按样本质量/一致性给 **1-100（必须 >0）**——0 仅用于未蒸馏/手动卡（走定性注入分支，见 prompt-crafting Step 1.1）；蒸馏卡置 0 会静默退回定性注入、丢失量化渲染。`last_updated` 写当日。
 
 ## 二、场景卡蒸馏（style-distill-order 内）
 1. 对样本按段落分类场景（dialogue/fight/environment/inner-mono/transition/group-scene）。
@@ -323,7 +337,7 @@ git commit -m "feat: style-distiller 技能重写为三阶段 13 模板 LLM 蒸�
   - `enum_zh(key: str, value: str) -> str` —— 类别枚举 → 中文（spec §6.2 逐字对齐；`enum_zh("tag_style","mixed")` → `"标签混合使用"`）
   - `pct_zh(value: float) -> str` —— 占比 → 中文定性（48 → `"近一半"`）
   - `SCENE_INJECTION: dict` —— 场景稀疏注入矩阵（场景类型 → 注入维度）
-  - `render_card(card: dict) -> dict[str, list[str]]` —— 卡 → 案例 2 各节条目（Task 5 引用；测试断言输出）
+  - `render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]` —— 卡 → 案例 2 各节条目：按 `SCENE_INJECTION[scene_type]` 稀疏注入（§6.3），量化回退（单值 npr → 比例描述、缺 inner_monologue_pct → 不注入该子项，§6.0b/§4.1），verb_style 力度/比例渲染（存在才注入）。Task 5 引用；测试断言输出。
   - `RANGE_TIERS`、`ENUM_ZH` 常量 —— test_style_rules.py 直接 import
   - `CHECK_CATEGORIES: list[str]` —— 验收检查项四类（数值/占比、硬性规则、建模规则、软引导）
   - `verdict(items: list[dict]) -> str` —— PASS（无违反）/ FAIL（任一违反）
@@ -373,7 +387,7 @@ CARD = {
 def test_range_for():
     check("5.8@75 → '5-6'", range_for(5.8, 75) == "5-6", range_for(5.8, 75))
     check("16@75 → '14-18'", range_for(16, 75) == "14-18", range_for(16, 75))
-    check("5@50 → 区间加宽(±20%)", range_for(5, 50) != range_for(5, 90), f"{range_for(5,50)} vs {range_for(5,90)}")
+    check("5.8@50 → 区间加宽(±20%)", range_for(5.8, 50) != range_for(5.8, 90), f"{range_for(5.8,50)} vs {range_for(5.8,90)}")
 
 def test_enum_zh():
     check("mixed → 标签混合使用", enum_zh("tag_style", "mixed") == "标签混合使用", enum_zh("tag_style", "mixed"))
@@ -399,6 +413,27 @@ def test_render_card():
     check("硬性规则逐条透传", any("引号包裹" in x for x in out["硬性规则"]), out.get("硬性规则"))
     check("风格参考例句分组透传", any("inner_thought" in x for x in out["风格参考例句"]), out.get("风格参考例句"))
 
+def test_render_card_verb():
+    out = render_card(CARD)
+    check("general 渲染动词力度", any("力度中等" in x for x in out["句式"]), out.get("句式"))
+    check("general 渲染动词比例", any("动作 35%" in x for x in out["句式"]), out.get("句式"))
+
+def test_render_card_sparse():
+    out = render_card(CARD, "dialogue")
+    check("dialogue 场景注入词汇", bool(out.get("词汇")), out.get("词汇"))
+    check("dialogue 场景注入对话风格", bool(out.get("对话风格")), out.get("对话风格"))
+    check("dialogue 场景不含句式", not out.get("句式"), out.get("句式"))
+    check("dialogue 场景不含节奏", not out.get("节奏"), out.get("节奏"))
+
+def test_render_card_fallback():
+    legacy = dict(CARD)
+    legacy["lexicon"] = dict(CARD["lexicon"])
+    legacy["lexicon"]["name_pronoun_ratio"] = 55                      # 旧 jieba 卡单值
+    legacy["emotion_expression"] = {k: v for k, v in CARD["emotion_expression"].items() if k != "inner_monologue_pct"}
+    lo = render_card(legacy)
+    check("单值 npr 渲染为比例", any("人名/代词使用比例 55%" in x for x in lo["词汇"]), lo.get("词汇"))
+    check("缺 inner_monologue_pct 不注入该子项", not any("内心独白" in x for x in lo["情绪表达"]), lo.get("情绪表达"))
+
 def test_verify_verdict():
     ok = [{"no": 1, "require": "禁'宛如'", "evidence": "无", "violated": False}]
     bad = [{"no": 1, "require": "禁'宛如'", "evidence": "出现1次", "violated": True}]
@@ -420,7 +455,8 @@ def test_verify_report():
     check("含表头", "原文要求" in r, r)
     check("含结论 FAIL 与汇总", "FAIL" in r and "1/1" in r, r)
 
-test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection(); test_render_card()
+test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
+test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
 test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report()
 print(f"\n{PASS} passed, {FAIL} failed")
 sys.exit(1 if FAIL else 0)
@@ -511,70 +547,90 @@ def _flatten_dists(d: dict) -> list[str]:
           "name": "人名", "he_she": "他/她", "i_you": "我/你"}
     return [f"{zh.get(k, k)}占比 {v}%" for k, v in d.items() if v]
 
-def render_card(card: dict) -> dict[str, list[str]]:
+def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]:
     conf = card.get("confidence") or 0
     out: dict[str, list[str]] = {k: [] for k in
         ["词汇", "句式", "节奏", "修辞与感官", "情绪表达", "对话风格", "衔接", "视角",
          "硬性规则", "整体基调", "风格参考例句"]}
+    dims = SCENE_INJECTION.get(scene_type, SCENE_INJECTION["general"])   # 稀疏注入（spec 6.3）
 
     # 词汇
-    lex = card.get("lexicon") or {}
-    out["词汇"].append(f"形容词密度：每百字 {range_for(lex.get('adj_density_per_100') or 0, conf)} 个")
-    out["词汇"].append(f"副词密度：每百字 {range_for(lex.get('adv_density_per_100') or 0, conf)} 个")
-    out["词汇"].append(f"四字短语频率：每百字 {range_for(lex.get('four_phrase_freq_per_100') or 0, conf)} 个")
-    if lex.get("preferred_words"):
-        out["词汇"].append("偏好词：" + "、".join(lex["preferred_words"]))
-    npr = lex.get("name_pronoun_ratio")
-    if isinstance(npr, dict):
-        out["词汇"].extend(_flatten_dists(npr))
+    if "lexicon" in dims:
+        lex = card.get("lexicon") or {}
+        out["词汇"].append(f"形容词密度：每百字 {range_for(lex.get('adj_density_per_100') or 0, conf)} 个")
+        out["词汇"].append(f"副词密度：每百字 {range_for(lex.get('adv_density_per_100') or 0, conf)} 个")
+        out["词汇"].append(f"四字短语频率：每百字 {range_for(lex.get('four_phrase_freq_per_100') or 0, conf)} 个")
+        if lex.get("preferred_words"):
+            out["词汇"].append("偏好词：" + "、".join(lex["preferred_words"]))
+        npr = lex.get("name_pronoun_ratio")
+        if isinstance(npr, dict):
+            out["词汇"].extend(_flatten_dists(npr))                       # 三维 → 逐桶
+        elif isinstance(npr, (int, float)):                               # 单值（旧 jieba 卡）→ 比例（spec 6.0b）
+            out["词汇"].append(f"人名/代词使用比例 {npr}%")
     # 句式
-    syn = card.get("syntax") or {}
-    out["句式"].append(f"平均句长：{range_for(syn.get('avg_sentence_length') or 0, conf)} 字左右")
-    sld = syn.get("sentence_length_dist")
-    if isinstance(sld, dict):
-        out["句式"].extend(_flatten_dists(sld))
-    out["句式"].append(f"单句段占比 ≥ {syn.get('single_sentence_paragraph_pct') or 0}%")
-    out["句式"].append(f"每段平均句数：{syn.get('avg_sentences_per_paragraph') or 0} 句")
-    out["句式"].append(f"疑问句占比：{syn.get('question_ratio') or 0}%（{pct_zh(syn.get('question_ratio') or 0)}）")
-    out["句式"].append(f"感叹句占比：{syn.get('exclamation_ratio') or 0}%")
+    if "syntax" in dims:
+        syn = card.get("syntax") or {}
+        out["句式"].append(f"平均句长：{range_for(syn.get('avg_sentence_length') or 0, conf)} 字左右")
+        sld = syn.get("sentence_length_dist")
+        if isinstance(sld, dict):
+            out["句式"].extend(_flatten_dists(sld))
+        out["句式"].append(f"单句段占比 ≥ {syn.get('single_sentence_paragraph_pct') or 0}%")
+        out["句式"].append(f"每段平均句数：{syn.get('avg_sentences_per_paragraph') or 0} 句")
+        out["句式"].append(f"疑问句占比：{syn.get('question_ratio') or 0}%（{pct_zh(syn.get('question_ratio') or 0)}）")
+        out["句式"].append(f"感叹句占比：{syn.get('exclamation_ratio') or 0}%")
+        # verb_style 并入句式（fight 场景经 SCENE_INJECTION 注入；存在才渲染）
+        vs = card.get("verb_style") or {}
+        if vs.get("strength"):
+            out["句式"].append(enum_zh("strength", vs["strength"]))
+        if any(k in vs for k in ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio")):
+            out["句式"].append(f"动词：动作 {vs.get('action_verb_ratio') or 0}% / 心理 {vs.get('mental_verb_ratio') or 0}% / 状态 {vs.get('state_verb_ratio') or 0}%")
     # 节奏
-    rhy = card.get("rhythm") or {}
-    out["节奏"].append(f"对话约 {rhy.get('dialogue_pct') or 0}%（{pct_zh(rhy.get('dialogue_pct') or 0)}）")
-    out["节奏"].append(f"动作约 {rhy.get('action_pct') or 0}%、环境约 {rhy.get('environment_pct') or 0}%")
-    out["节奏"].append(f"内心独白约 {rhy.get('inner_thought_pct') or 0}%、叙述约 {rhy.get('narration_pct') or 0}%")
+    if "rhythm" in dims:
+        rhy = card.get("rhythm") or {}
+        out["节奏"].append(f"对话约 {rhy.get('dialogue_pct') or 0}%（{pct_zh(rhy.get('dialogue_pct') or 0)}）")
+        out["节奏"].append(f"动作约 {rhy.get('action_pct') or 0}%、环境约 {rhy.get('environment_pct') or 0}%")
+        out["节奏"].append(f"内心独白约 {rhy.get('inner_thought_pct') or 0}%、叙述约 {rhy.get('narration_pct') or 0}%")
     # 修辞
-    rhe = card.get("rhetoric") or {}
-    out["修辞与感官"].append(f"比喻密度：每百字 {range_for(rhe.get('metaphor_density_per_100') or 0, conf)} 个")
-    mp = rhe.get("metaphor_preference")
-    if isinstance(mp, dict):
-        out["修辞与感官"].append("常用喻体：" + "、".join(_flatten_dists(mp)))
-    sd = rhe.get("sensory_dist")
-    if isinstance(sd, dict):
-        out["修辞与感官"].append("感官通道：" + "、".join(_flatten_dists(sd)))
+    if "rhetoric" in dims:
+        rhe = card.get("rhetoric") or {}
+        out["修辞与感官"].append(f"比喻密度：每百字 {range_for(rhe.get('metaphor_density_per_100') or 0, conf)} 个")
+        mp = rhe.get("metaphor_preference")
+        if isinstance(mp, dict):
+            out["修辞与感官"].append("常用喻体：" + "、".join(_flatten_dists(mp)))
+        sd = rhe.get("sensory_dist")
+        if isinstance(sd, dict):
+            out["修辞与感官"].append("感官通道：" + "、".join(_flatten_dists(sd)))
     # 情绪
-    emo = card.get("emotion_expression") or {}
-    out["情绪表达"].append(f"直接陈述 {emo.get('direct_pct') or 0}%、动作/生理 {emo.get('action_physiology_pct') or 0}%")
-    out["情绪表达"].append(f"环境投射 {emo.get('environment_projection_pct') or 0}%、内心独白 {emo.get('inner_monologue_pct') or 0}%")
+    if "emotion_expression" in dims:
+        emo = card.get("emotion_expression") or {}
+        out["情绪表达"].append(f"直接陈述 {emo.get('direct_pct') or 0}%、动作/生理 {emo.get('action_physiology_pct') or 0}%")
+        if emo.get("inner_monologue_pct") is not None:                    # 缺省不注入该子项（spec 6.0b/4.1）
+            out["情绪表达"].append(f"环境投射 {emo.get('environment_projection_pct') or 0}%、内心独白 {emo.get('inner_monologue_pct') or 0}%")
+        else:
+            out["情绪表达"].append(f"环境投射 {emo.get('environment_projection_pct') or 0}%")
     # 对话
-    dia = card.get("dialogue_style") or {}
-    if dia.get("tag_style"):
-        out["对话风格"].append(enum_zh("tag_style", dia["tag_style"]))
-    out["对话风格"].append(f"平均对话长度：{range_for(dia.get('avg_dialogue_length') or 0, conf)} 字")
-    out["对话风格"].append(f"打断频率：每百字 {range_for(dia.get('interrupt_freq_per_100') or 0, conf)} 次")
-    out["对话风格"].append(f"潜台词占比：{dia.get('subtext_ratio') or 0}%")
+    if "dialogue_style" in dims:
+        dia = card.get("dialogue_style") or {}
+        if dia.get("tag_style"):
+            out["对话风格"].append(enum_zh("tag_style", dia["tag_style"]))
+        out["对话风格"].append(f"平均对话长度：{range_for(dia.get('avg_dialogue_length') or 0, conf)} 字")
+        out["对话风格"].append(f"打断频率：每百字 {range_for(dia.get('interrupt_freq_per_100') or 0, conf)} 次")
+        out["对话风格"].append(f"潜台词占比：{dia.get('subtext_ratio') or 0}%")
     # 衔接
-    coh = card.get("cohesion") or {}
-    out["衔接"].append(f"连接词频率：每百字 {range_for(coh.get('conjunction_freq_per_100') or 0, conf)} 次")
-    if coh.get("paragraph_bridge_style"):
-        out["衔接"].append(enum_zh("paragraph_bridge_style", coh["paragraph_bridge_style"]))
+    if "cohesion" in dims:
+        coh = card.get("cohesion") or {}
+        out["衔接"].append(f"连接词频率：每百字 {range_for(coh.get('conjunction_freq_per_100') or 0, conf)} 次")
+        if coh.get("paragraph_bridge_style"):
+            out["衔接"].append(enum_zh("paragraph_bridge_style", coh["paragraph_bridge_style"]))
     # 视角
-    nar = card.get("narrative") or {}
-    if nar.get("perspective"):
-        out["视角"].append(enum_zh("perspective", nar["perspective"]))
-    if nar.get("focal_character"):
-        out["视角"].append(f"聚焦角色：{nar['focal_character']}")
-    if nar.get("inner_monologue_style"):
-        out["视角"].append(enum_zh("inner_monologue_style", nar["inner_monologue_style"]))
+    if "narrative" in dims:
+        nar = card.get("narrative") or {}
+        if nar.get("perspective"):
+            out["视角"].append(enum_zh("perspective", nar["perspective"]))
+        if nar.get("focal_character"):
+            out["视角"].append(f"聚焦角色：{nar['focal_character']}")
+        if nar.get("inner_monologue_style"):
+            out["视角"].append(enum_zh("inner_monologue_style", nar["inner_monologue_style"]))
     # 声音层透传
     out["硬性规则"] = list(card.get("hard_constraints") or [])
     out["整体基调"] = list(card.get("soft_guidance") or [])
@@ -658,7 +714,7 @@ if __name__ == "__main__":
 - [ ] **Step 4: 跑测试确认通过**
 
 Run: `python tools/test_style_rules.py`
-Expected: 全部 ok，`27 passed, 0 failed`，exit 0。
+Expected: 全部 ok，`35 passed, 0 failed`，exit 0。
 
 - [ ] **Step 5: Commit**
 
@@ -686,7 +742,11 @@ git commit -m "feat: 规则模块（style_render 渲染 + style_verify 验收聚
 创建 `knowledge/style-distill/prompt-templates/rendering-rules.md`：
 
 ```markdown
-# 案例 2 风格提示词渲染规格（prompt-crafter 用）
+# 案例 2 风格提示词渲染规格（prompt-crafter 已蒸馏态用）
+
+## 适用范围（双态）
+- 本规格仅用于**已蒸馏卡**（confidence>0）。未蒸馏态（confidence=0）由 prompt-crafting Step 1.1
+  既有分支走正文定性四字段注入（现状不变，不读本文件）。
 
 ## 数据源
 - 只读卡（settings/writing-style.md 主卡 + 按 scene_type 叠加 settings/style-profiles/{scene}.md override），
@@ -694,7 +754,9 @@ git commit -m "feat: 规则模块（style_render 渲染 + style_verify 验收聚
 - 区间/枚举/注入矩阵规则：`tools/style_render.py`（读其 RANGE_TIERS / ENUM_ZH / SCENE_INJECTION 常量）。
 
 ## 渲染步骤
-0. 占位守卫：confidence=0（未蒸馏/手动占位）→ 只注入声音层（硬性规则/整体基调/风格参考例句），不注入量化节；≥1 继续后续步骤。
+0. 回退守卫（§6.0b）：已蒸馏卡缺声音层（遗留 jieba 蒸馏卡，confidence>0 无 hard_constraints 等）→
+   量化节照常渲染；声音层节【硬性规则】/【整体基调】/【风格参考例句】回退读卡正文定性四字段
+   （叙事身份/硬约束/AI易犯错误/描写层次）注入，其中【风格参考例句】以正文的描写层次示例充当。
 1. 数值密度类（adj_density_per_100 等）：按 confidence 用 RANGE_TIERS 定区间 →「每百字 L-U 个」。
 2. 占比类（dialogue_pct 等）：「约 X%（中文定性：近一半/大部分/…）」。
 3. 分布类（sentence_length_dist / metaphor_preference / sensory_dist / name_pronoun_ratio）：
@@ -707,15 +769,15 @@ git commit -m "feat: 规则模块（style_render 渲染 + style_verify 验收聚
 
 ## 输出结构
 【词汇】【句式】【节奏】【修辞与感官】【情绪表达】【对话风格】【衔接】【视角】
-【硬性规则】【风格参考例句】【整体基调】【剧情上下文】【写作要求】
+【硬性规则】【整体基调】【风格参考例句】【剧情上下文】【写作要求】
 ```
 
 - [ ] **Step 2: 更新 skills/prompt-crafting.md**
 
-1. Step 1 第 1 条改为：读主卡 + 场景卡 → 按 rendering-rules.md 渲染案例 2 风格块；confidence=0 时只注入声音层（硬性规则/整体基调/例句），不注入量化节。
+1. Step 1 第 1 条改为：**保留 confidence=0 分支不动**（读主卡正文 → 定性四字段注入，现状不变）；**confidence>0 分支替换为**按 rendering-rules.md 渲染案例 2（读主卡 + 场景卡 frontmatter → 量化节 + 声音层透传）。
 2. Step 1 第 9 条（场景卡）保留，注明 override 叠加。
-3. Step 2「输出·写作风格约束」子节整段替换为：`【词汇】…【写作要求】`（案例 2 结构），并引用 rendering-rules.md 的渲染步骤；「分工」注明量化节来自渲染规则、声音层原样透传。
-4. Step 4 验收自检表：`writing-style 注入` 行改为「案例 2 十一节齐全（量化节按 confidence 渲染；硬性规则/基调/例句透传）；banned_words 与 anti-ai 禁用词去重后无重复；无占位符泄漏」。
+3. Step 2「输出·写作风格约束」子节改为**双态分支**：confidence=0 → 正文定性四字段注入（现状原样保留，节标题沿用）；confidence>0 → 该节输出 `【词汇】…【写作要求】`（案例 2 结构），引用 rendering-rules.md 的渲染步骤；「分工」注明量化节来自渲染规则、声音层原样透传。
+4. Step 4 验收自检表：`writing-style 注入` 行改为「双态：confidence=0 → 定性四字段注入（现状不变）；confidence>0 → 案例 2 十一节齐全（量化节按 rendering-rules 渲染；硬性规则/基调/例句透传；无声音层走 §6.0b 回退）；banned_words 与 anti-ai 禁用词去重后无重复；无占位符泄漏」。
 
 - [ ] **Step 3: 删除 injection-template.md、更新 agents/prompt-crafter.md**
 
@@ -729,10 +791,10 @@ git rm knowledge/style-distill/prompt-templates/injection-template.md
 
 Run:
 ```bash
-grep -n "写作风格约束\|injection-template\|案例 2\|rendering-rules" skills/prompt-crafting.md agents/prompt-crafter.md | head
+grep -n "写作风格约束\|injection-template\|案例 2\|rendering-rules\|confidence" skills/prompt-crafting.md agents/prompt-crafter.md | head
 python tools/check-agents.py
 ```
-Expected: prompt-crafting.md 无 `写作风格约束`/`injection-template` 残留；出现 `案例 2`/`rendering-rules`；check-agents `✅`。
+Expected: prompt-crafting.md **保留** `写作风格约束`（未蒸馏态定性注入节，现状不动）、无 `injection-template` 残留、出现 `案例 2`/`rendering-rules`/`confidence` 分支（已蒸馏态渲染）；check-agents `✅`。
 
 - [ ] **Step 5: Commit**
 
@@ -766,6 +828,7 @@ git commit -m "feat: prompt-crafter 渲染案例2 提示词（rendering-rules �
 对每章正文跑指令遵循验收：读同章 `prompts/vol-{N}-ch-{M}-prompt.md` 的
 【词汇】【句式】【节奏】【修辞与感官】【情绪表达】【对话风格】【衔接】【视角】
 【硬性规则】【整体基调】【风格参考例句】逐条对照正文判定。用与生成同一份提示词（同源）。
+（双态：未蒸馏态提示词无量化节、含正文定性四字段 → 按定性条验收「叙事身份/硬约束/AI易犯错误/描写层次」；已蒸馏态 → 下方四类条 + 【风格参考例句】作风格锚点逐句对照正文。遗留 jieba 卡（confidence>0 无声音层）的硬性规则/基调/例句按 §6.0b 回退读正文定性四字段，例句以描写层次示例充当。）
 
 ## 检查项（四类）
 1. 数值/占比条：「对话约 48%」→ 本章对话是否明显偏离（偏离即违反，不要求数值精确）。
@@ -788,6 +851,7 @@ git commit -m "feat: prompt-crafter 渲染案例2 提示词（rendering-rules �
 ### Gate G：风格验收（指令遵循，读同章提示词）
 - 读 `prompts/vol-{N}-ch-{M}-prompt.md`（与 writer 生成同源），按 `knowledge/style-distill/prompt-templates/verify-checklist.md`
   逐条对照正文判定（数值/占比、硬性规则、建模规则、软引导四类）。
+- 双态通用：提示词恒带风格（未蒸馏=正文定性四字段；已蒸馏=案例 2 量化+声音层），两种状态都用本流程、只按提示词内容验收。
 - 输出违反报告（.anti-ai.md 验收节）：逐条「条号 + 原文要求 + 正文表现 + 违反与否 + 建议」，汇总违反条数/总条数，结论 PASS/FAIL。
 - 汇总/判定/报告格式对齐 `tools/style_verify.py`（verdict/should_reroll/pick_best/format_report）；违反条目即抽卡反馈源。
 - Gate A-F（去 AI 味）保持不变；Gate G 只出 verdict，不改正文。
@@ -909,12 +973,12 @@ git commit -m "feat: novel-agent 抽卡调度（FAIL→writer 重写≤3）+ 卡
 - 三、Input Sources 增加：`.agent/task/writing-order.md` 的 rewrite 字段（rewrite_of/round/violations）、`.agent/task/*-violations.md`（重写时）。
 - 七、Retry Policy 改为「抽卡重写由 novel-agent 调度，round ≤3；单次生成内部自检仍最多 2 次补充」。
 - 四、Loop Integration 的 OBSERVE 增加「读 writing-order.md，若含 rewrite_of → 走重写分支」。
-- **风格源切换（案例 2 提示词 = 唯一写作风格源，writer 不再直读卡正文四字段）：**
+- **风格源切换（渲染后提示词 = 唯一写作风格源，双态通用；writer 不再直读卡正文四字段）：**
   - 三、Input Sources：删除 `settings/writing-style.md`（写作风格方法论）一行；`settings/genre-setting.md`（题材设定）保留。
   - 一、Dependencies：把「写前加载 writing-style.md 和 genre-setting.md 获取写作风格与题材设定」改为「写前加载案例 2 提示词（风格已渲染在内）和 genre-setting.md 获取题材设定」。
   - 四、Loop：OBSERVE 的「读 settings/」与 ACT 的「写前加载：writing-style.md 写作风格方法论」→ 均改为「写前加载：案例 2 提示词（风格节已在其中）」。
   - 五、Read 权限：`settings/` 从「仅 writing-style.md 和 genre-setting.md」改为「仅 genre-setting.md」；Permission Level 行同步。
-  - 六、Style Rules：删除 role/core_principles/possible_mistakes/depiction_techniques 四项映射，改为「**Style Rules（案例 2 提示词 = 唯一写作风格源）**：硬性规则（不可违背）+ 整体基调（soft_guidance）+ 风格参考例句（few_shot）——prompt-crafter 已从卡 frontmatter 渲染进提示词，writer 不直读卡正文」。
+  - 六、Style Rules：删除 role/core_principles/possible_mistakes/depiction_techniques 四项映射，改为「**Style Rules（渲染后提示词 = 唯一写作风格源，双态通用）**：未蒸馏态 = 正文定性四字段（叙事身份/硬约束/AI易犯错误/描写层次，prompt-crafter 注入现状不变）；已蒸馏态 = 硬性规则（不可违背）+ 整体基调（soft_guidance）+ 风格参考例句（few_shot）——prompt-crafter 已从卡渲染进提示词，writer 不直读卡正文」。
   - 九、Context Isolation：`settings/ 设定文件` → `settings/ 的 genre-setting.md`。
 
 - [ ] **Step 3: 验证**
@@ -940,7 +1004,7 @@ git commit -m "feat: writer 带违反报告重写（rewrite_of/round/violations 
 
 **Interfaces:**
 - Consumes: Task 3/6 已消除对退役工具的引用
-- Produces: 仓库无 distill/compare/mix/jieba/style-update-order 引用；init/sync 不再部署风格工具脚本；新卡 schema 迁移钩子（Task 10 用）
+- Produces: 仓库无 distill/compare/mix/jieba/style-update-order 引用；init/sync 不再部署风格工具脚本；`_write_new_style_card`/`migrate_writing_style` **保持旧 schema 原样**（双态向前兼容：无迁移钩子，未蒸馏态零改动）
 
 - [ ] **Step 1: 删除退役工具**
 
@@ -951,12 +1015,11 @@ git rm tools/distill-style.py tools/compare-style.py tools/mix-style.py
 - [ ] **Step 2: 更新 tools/init.py**
 
 1. 删除 `_DEPLOY_TOOLS = ["distill-style.py", "compare-style.py", "mix-style.py"]`（init.py:318）及 `deploy_tools` 函数（init.py:321-330，仅服务这三脚本）——`deploy_tools` 调用一并移除，不再向新项目拷贝风格工具脚本。
-2. `_write_new_style_card`（init.py:454）的 seed frontmatter 模板同步为 Task 2 的新 schema：删除 `locked: []`（init.py:467）；`name_pronoun_ratio: 0`（init.py:469）改为 `{ name: 0, he_she: 0, i_you: 0 }`；补 `profile_name: ""`、`emotion_expression.inner_monologue_pct: 0`、`verb_style.strength: ""`。
-3. 迁移钩子 `migrate_writing_style`（init.py:585-608）复用更新后的模板 → 旧卡迁移自动补新字段（缺省回退 0/""），无需单独改迁移逻辑。
+2. `_write_new_style_card`（init.py:454）与 `migrate_writing_style`（init.py:585-608）**保持旧模板原样**——双态向前兼容要求未蒸馏态零改动、**无 schema 迁移**（spec §8 不迁移；蒸馏卡由 style-distiller 收敛时在原卡结构上叠加填值，见 Task 3）。
 
 - [ ] **Step 3: 更新 tools/sync-project.py**
 
-1. 删除 `_STYLE_TOOL_NAMES = ("distill-style.py", "compare-style.py", "mix-style.py")` 及 `sync_style_assets` 中的脚本同步逻辑（保留 templates/settings 树部署 + 旧卡迁移钩子）。
+1. 删除 `_STYLE_TOOL_NAMES = ("distill-style.py", "compare-style.py", "mix-style.py")` 及 `sync_style_assets` 中的脚本同步逻辑（保留 templates/settings 树部署 + 迁移钩子——部署补缺语义，与卡 schema 迁移无关，见 Task 9 Step 2）。
 2. `sync_style_assets`（sync-project.py:411+）递归部署 `templates/settings/` 树——`genre-baselines/` 模板随树保留作纯参照（spec §8「模板可留作纯参照」）；更新该处注释为「主卡 + 场景卡 + genre-baselines（纯参照，无运行时引用）」。
 3. 运行时 `settings/style-profiles/analysis/` 是蒸馏产物，无需模板——确认不部署。
 
@@ -994,14 +1057,14 @@ git commit -m "feat: 退役统计引擎（distill/compare/mix 删 + jieba 去依
 
 ---
 
-### Task 10: 测试重写 + CI + 迁移 + 全量回归
+### Task 10: 测试重写 + CI + 双态 + 全量回归
 
 **Files:**
 - Rewrite: `tools/test_style_distill.py`（保留文件名，删旧数字断言；渲染/验收单测已在 Task 4 的 `tools/test_style_rules.py`，此处不重复）
 
 **Interfaces:**
 - Consumes: Task 1-9 全部产物；Task 4 的 `test_style_rules.py`（已绿，CI 与本节同时运行）；spec §10 测试矩阵
-- Produces: `tools/test_style_distill.py` 全绿（schema/方法论/退役/抽卡契约/迁移断言）
+- Produces: `tools/test_style_distill.py` 全绿（schema/方法论/退役/抽卡契约/双态断言）
 
 - [ ] **Step 1: 重写 tools/test_style_distill.py**
 
@@ -1019,7 +1082,7 @@ git commit -m "feat: 退役统计引擎（distill/compare/mix 删 + jieba 去依
 - 13 模板方法论：feature-extract.md 十三节齐全 + verify-checklist/rendering-rules 存在、退役模板已删
 - 退役清理：三工具已删、CI 无 jieba、init/sync 无风格工具部署
 - 抽卡契约：rewrite_of/violations 字段 + 无 style-update-order 残留（novel-agent/writer/dispatch 文档）+ writer 不以卡正文四字段为风格源
-- 迁移：init.py 新 schema 模板字段（profile_name/三维 name_pronoun/inner_monologue_pct/strength）、无 locked
+- 双态：未蒸馏模板 / 蒸馏卡 / 遗留 jieba 卡三态过 check_style_card（增强字段可选、存在才校验）+ init 模板保留 locked（未蒸馏态零改动）
 """
 import sys
 from pathlib import Path
@@ -1039,6 +1102,9 @@ def test_feature_extract():
     for name in ["模板 1", "模板 2", "模板 3", "模板 4", "模板 5", "模板 6", "模板 7",
                  "模板 8", "模板 9", "模板 10", "模板 11", "模板 12", "模板 13", "阶段一", "阶段二", "阶段三"]:
         check(f"feature-extract 含 {name}", name in t)
+    # 13 模板 schema token（spec §9：量化表键完整、建模规则格式正确——句式卡结构公式/对话模式轮次序列/节奏模型关键参数/锚点模型章首章尾）
+    for token in ("量化表", "结构公式", "轮次序列", "关键参数", "章首锚点", "章尾锚点"):
+        check(f"feature-extract 含 schema token「{token}」", token in t)
     for f in ("rendering-rules.md", "verify-checklist.md"):
         check(f"{f} 存在", (REPO / "knowledge/style-distill/prompt-templates" / f).exists())
     for gone in ("distill-prompt.md", "injection-template.md", "gate-g-checklist.md"):
@@ -1085,15 +1151,51 @@ def test_anti_ai_verify():
     check("anti-ai 无 distill-style.py", "distill-style.py" not in skill)
     check("anti-ai 无 gate-g-checklist", "gate-g-checklist" not in skill)
 
-def test_migration_schema():
+def test_dual_mode():
+    import importlib.util, tempfile, yaml
+    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    main_tpl = REPO / "templates/settings/writing-style.md"
+    fm = yaml.safe_load(main_tpl.read_text(encoding="utf-8").split("---", 2)[1])
+    # 未蒸馏态：模板零改动、confidence=0 过校验（spec §4）
+    check("未蒸馏态（旧模板原样）过卡校验", not mod.check_style_card(main_tpl))
+    check("未蒸馏态 confidence=0", fm.get("confidence") == 0, str(fm.get("confidence")))
+    # 蒸馏卡：原卡结构叠加声音层 + 增强字段 + confidence>0 → 过校验
+    fm["profile_name"] = "测试蒸馏卡"; fm["confidence"] = 75
+    fm["lexicon"]["name_pronoun_ratio"] = {"name": 45, "he_she": 50, "i_you": 5}
+    fm["rhetoric"]["metaphor_preference"] = {"weapon_metal": 5, "nature": 10, "body": 20, "abstract": 30, "other": 35}
+    fm["rhetoric"]["sensory_dist"] = {"visual": 72, "auditory": 15, "tactile": 10, "olfactory": 2, "gustatory": 1}
+    fm["emotion_expression"]["inner_monologue_pct"] = 35
+    fm["verb_style"]["strength"] = "medium"
+    fm["hard_constraints"] = ["内心独白必须用引号包裹"]
+    fm["soft_guidance"] = ["整体基调：轻松吐槽向"]
+    fm["few_shot_examples"] = [{"type": "inner_thought", "text": "好想死啊", "reason": "口头禅式吐槽"}]
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("蒸馏卡（声音层+增强字段+confidence>0）过卡校验", not errs, "; ".join(errs))
+    # 遗留 jieba 蒸馏卡：confidence>0、无声音层/增强字段 → 过校验（spec §6.0b 回退兼容）
+    fm2 = yaml.safe_load(main_tpl.read_text(encoding="utf-8").split("---", 2)[1])
+    fm2["confidence"] = 70
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm2, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("遗留 jieba 卡（confidence>0 无声音层）过卡校验", not errs, "; ".join(errs))
+    # init 模板保留 locked（未蒸馏态零改动，无迁移）
     init = (REPO / "tools/init.py").read_text(encoding="utf-8")
-    for token in ("profile_name", "name_pronoun_ratio", "inner_monologue_pct", "strength"):
-        check(f"init 新卡模板含 {token}", token in init)
-    check("init 新卡模板无 locked", "locked" not in init)
+    check("init 模板保留 locked（未蒸馏态零改动）", "locked" in init)
+    # prompt-crafting 双态分支（spec §6：未蒸馏=正文定性四字段注入现状不变 / 已蒸馏=案例 2 渲染）
+    pc = (REPO / "skills/prompt-crafting.md").read_text(encoding="utf-8")
+    check("prompt-crafting 含 confidence 分支", "confidence" in pc)
+    check("prompt-crafting 保留未蒸馏定性注入节（写作风格约束）", "写作风格约束" in pc)
+    check("prompt-crafting 引用 rendering-rules（已蒸馏渲染）", "rendering-rules" in pc)
+    check("prompt-crafting 引用 案例 2 结构", "案例 2" in pc)
 
 def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
-    test_reroll_contract(); test_anti_ai_verify(); test_migration_schema()
+    test_reroll_contract(); test_anti_ai_verify(); test_dual_mode()
     print(f"\n{PASS} passed, {FAIL} failed")
     return 1 if FAIL else 0
 
@@ -1120,7 +1222,7 @@ python tools/check-agents.py
 python tools/check-conflicts.py
 python -m py_compile tools/*.py
 ```
-Expected: test_style_distill + test_style_rules 全绿；test_platforms 107 全绿；check-agents exit 0；check-conflicts exit 0；py_compile 0。
+Expected: test_style_distill + test_style_rules 全绿；test_platforms 全绿（107-108，随 Python 版本 tomllib 分支：CI 3.11 → 108）；check-agents exit 0；check-conflicts exit 0；py_compile 0。
 
 - [ ] **Step 4: Commit**
 
@@ -1144,5 +1246,5 @@ git commit -m "docs: style-distiller LLM 重构实施计划（10 任务）"
 |-----------|---------|
 | C2' 生成验收 PASS 率 ≥90%（流程级） | Task 6/7/8（验收 + 抽卡，人工/作者跑） |
 | C3' 场景区分 | Task 3（场景卡三阶段）、Task 5（稀疏注入） |
-| C5 迁移零损失 | Task 2/9/10（schema + init 迁移 + test_migration_schema） |
+| C5 双态向前兼容（零迁移、旧项目零改动） | Task 2/9/10（check-agents 双态校验 + init 模板不动 + test_dual_mode 三态断言） |
 | C6 作者盲测 ≥70%（主验收） | 代码路径就绪（Task 1-10）；填标杆卡 + 盲测为作者内容任务 |
