@@ -154,9 +154,28 @@ def test_unit_convergence():
         errs = mod.check_style_card(p)
         check("决策A：subtext_ratio=1.5 拒绝（非整数百分数亦非分数）", any("subtext_ratio" in e for e in errs), errs)
 
+def test_verify_doc_code_alignment():
+    """#11 修复交叉断言：verify-checklist.md 文档措辞与 style_verify.py 代码行为一致。
+    文档违反白名单令牌（`` `true/是/yes/1/违反` ``）= 代码 VIOLATED_STRINGS；
+    文档「其余字符串→不违反」= 代码对白名单外字符串返回 False，且尾部标点被剥（是。→是）。"""
+    import re
+    import style_verify
+    doc = (REPO / "knowledge/style-distill/prompt-templates/verify-checklist.md").read_text(encoding="utf-8")
+    m = re.search(r"`([^`]+)` → 违反", doc)
+    check("verify-checklist 含违反白名单行", m is not None, "未找到 `...` → 违反 措辞")
+    if m:
+        doc_tokens = set(m.group(1).split("/"))
+        check("文档白名单 = 代码 VIOLATED_STRINGS",
+              doc_tokens == set(style_verify.VIOLATED_STRINGS),
+              f"doc={sorted(doc_tokens)} vs code={sorted(style_verify.VIOLATED_STRINGS)}")
+    check("文档「其余字符串→不违反」= 代码行为",
+          style_verify._is_violated("其余字符串") is False and style_verify._is_violated("是。") is True,
+          style_verify._is_violated("是。"))
+
 def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
     test_reroll_contract(); test_anti_ai_verify(); test_dual_mode(); test_unit_convergence()
+    test_verify_doc_code_alignment()
     print(f"\n{summary()}")
     return exit_code()
 

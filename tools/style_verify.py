@@ -15,15 +15,20 @@ from __future__ import annotations
 # 1) 验收检查项四类（spec 7.1）
 CHECK_CATEGORIES = ["数值/占比条", "硬性规则条", "建模规则条", "软引导条"]
 
+# 违反判定收敛白名单（spec 7.1 / verify-checklist.md）：LLM 输出的字符串布尔一律按此收敛，
+# 匹配前剥尾部标点（'是。'→'是'、'yes。'→'yes'），白名单外一律不违反（'false'/'否'/空/'其余字符串'）。
+VIOLATED_STRINGS = frozenset({"true", "是", "yes", "1", "违反"})
+
 def _is_violated(v) -> bool:
-    """violated 判定：bool/字符串 布尔都收敛——LLM 可能输出 'false'/'是' 等字符串，误判会触发错误抽卡。
-    字符串按 truthy 语义：'true'/'是'/'yes'/'1'/'违反' → 违反；其余（'false'/'否'/空）→ 不违反。"""
+    """violated 判定：bool/字符串 布尔都收敛——LLM 可能输出 '是。'/'false' 等字符串，误判会触发错误抽卡。
+    字符串按 truthy 语义：'true'/'是'/'yes'/'1'/'违反'（含尾部标点）→ 违反；其余（'false'/'否'/空）→ 不违反。"""
     if v is None:
         return False
     if isinstance(v, bool):
         return v
     if isinstance(v, str):
-        return v.strip().lower() in ("true", "是", "yes", "1", "违反", "yes。")
+        s = v.strip().strip("。？！…，,.!? 　")
+        return s.lower() in VIOLATED_STRINGS
     return bool(v)
 
 def verdict(items: list[dict]) -> str:

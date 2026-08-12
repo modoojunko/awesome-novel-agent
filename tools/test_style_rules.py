@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from style_render import range_for, enum_zh, pct_zh, _pct, render_card, SCENE_INJECTION
-from style_verify import verdict, should_reroll, pick_best, format_report
+from style_verify import verdict, should_reroll, pick_best, format_report, _is_violated, VIOLATED_STRINGS
 from test_util import check, summary, exit_code
 
 CARD = {
@@ -109,6 +109,21 @@ def test_render_percent_normalize():
     check("整数 subtext_ratio 22 → 渲染 22%", any("潜台词占比：22%" in x for x in out["对话风格"]), out.get("对话风格"))
     check("密度字段不受 _pct 归一（每百字 X）", any("每百字 5-6" in x for x in out["词汇"]), out.get("词汇"))
 
+def test_verify_string_bool():
+    # #11 修复：字符串布尔收敛——剥尾部标点后按白名单匹配（是。→是），白名单外一律不违反
+    check("'是。' → 违反", _is_violated("是。") is True, _is_violated("是。"))
+    check("'违反。' → 违反", _is_violated("违反。") is True, _is_violated("违反。"))
+    check("'true。' → 违反", _is_violated("true。") is True, _is_violated("true。"))
+    check("'yes。' → 违反", _is_violated("yes。") is True, _is_violated("yes。"))
+    check("'是！' → 违反", _is_violated("是！") is True, _is_violated("是！"))
+    check("'YES' → 违反", _is_violated("YES") is True, _is_violated("YES"))
+    check("'否。' → 不违反", _is_violated("否。") is False, _is_violated("否。"))
+    check("'false' → 不违反", _is_violated("false") is False, _is_violated("false"))
+    check("'其余字符串' → 不违反", _is_violated("其余字符串") is False, _is_violated("其余字符串"))
+    check("None → 不违反", _is_violated(None) is False, _is_violated(None))
+    check("bool True/False 原样", _is_violated(True) is True and _is_violated(False) is False)
+    check("VIOLATED_STRINGS 为文档白名单 5 令牌", VIOLATED_STRINGS == frozenset({"true", "是", "yes", "1", "违反"}))
+
 def test_verify_verdict():
     ok = [{"no": 1, "require": "禁'宛如'", "evidence": "无", "violated": False}]
     bad = [{"no": 1, "require": "禁'宛如'", "evidence": "出现1次", "violated": True}]
@@ -133,6 +148,6 @@ def test_verify_report():
 test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
 test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
 test_pct_normalize(); test_render_percent_normalize()
-test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report()
+test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report(); test_verify_string_bool()
 print(f"\n{summary()}")
 sys.exit(exit_code())
