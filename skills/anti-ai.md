@@ -102,11 +102,13 @@ Gate E: 命中 X 处（按 E1-E5 分类）
 Gate F: 命中 X 处（按 F1-F4 分类）
 ```
 
-**Gate G：风格偏差（可选，读 `settings/writing-style.md` 主卡 + 对应场景卡）**
-- Bash 调 `python tools/distill-style.py check -c settings/writing-style.md <正文>` → 读偏差表。`check` 退出码 0=通过 / 1=有 FAIL / 2=无法验证（无 jieba 或无期望维度可比对，需人工判定）
-- LLM 按风格卡估算语义维度（rhetoric/emotion_expression/narrative/dialogue_style）对比
-- 按 gate-g-checklist 分级：通过 / 警告（作者确认）/ 不通过（局部重写建议）
-- 命中 boundary-cases Gate G 豁免组 → SKIP 标注
+### Gate G：风格验收（指令遵循，读同章提示词）
+- 读 `prompts/vol-{N}-ch-{M}-prompt.md`（与 writer 生成同源），按 `knowledge/style-distill/prompt-templates/verify-checklist.md`
+  逐条对照正文判定（数值/占比、硬性规则、建模规则、软引导四类）。
+- 双态通用：提示词恒带风格（未蒸馏=正文定性四字段；已蒸馏=案例 2 量化+声音层），两种状态都用本流程、只按提示词内容验收。
+- 输出违反报告（.anti-ai.md 验收节）：逐条「条号 + 原文要求 + 正文表现 + 违反与否 + 建议」，汇总违反条数/总条数，结论 PASS/FAIL。
+- 汇总/判定/报告格式对齐 `tools/style_verify.py`（verdict/should_reroll/pick_best/format_report）；违反条目即抽卡反馈源。
+- Gate A-F（去 AI 味）保持不变；Gate G 只出 verdict，不改正文。
 
 ---
 
@@ -122,7 +124,6 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 | 对话标签密度 | Gate E2 命中数 / 对话句数 | <10% | 10%-25% | >25% |
 | 平均段落句数 | 总句数 / 总段落数 | 2.5-4 | 4-5.5 | >5.5 或 <2 |
 | 重复描写密度 | Gate C6 命中数 / 千字 | <1 | 1-3 | >3 |
-| 风格偏差维度数 | Gate G 偏差维度数 | <2 | 2-3 | ≥4 |
 
 ### 定级规则
 
