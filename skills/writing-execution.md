@@ -14,6 +14,13 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 
 > AI 原版快照（`.agent/{chapter}-draft-ai.md`）由 **updater 在归档时创建**（从草稿复制，updater-archive Step 1），writer 不负责保存。
 
+## 重写分支（writing-order.md 含 rewrite_of 时）
+
+1. 读 writing-order.md 的 rewrite_of / round / violations 字段。
+2. 读原始案例 2 提示词 prompts/vol-{N}-ch-{M}-prompt.md + 违反报告 violations 文件。
+3. 只重写违反报告中标记「违反」的条目对应段落，向「建议」靠拢；其余段落保持原文。
+4. 完成后照常写 archives/*.draft.md，order 标 DONE（保留 round 原值，由 novel-agent 递增）。
+
 ## Step 1: 准备
 
 1. 确认卷号 `{N}` 和章号 `{M}`
