@@ -188,7 +188,7 @@ def _convert_to_reasonix(text: str, run_as: str = "subagent", inline_sops=None) 
             "在 Reasonix 环境调度子 agent 用 `run_skill` 工具：\n"
             "- `run_skill(name=\"<子agent名>\", arguments=\"{order 内容}\")` 调单个子 agent\n"
             "- 子 agent 名即 .reasonix/skills/ 下的 skill 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
             "- 子 agent 是 subagent 类型，run_skill 的 arguments 会作为它唯一的 task 输入\n"
             "- 并发调度只读子 agent 可用 `parallel_tasks`；order 文件协议（status: DONE）不变\n"
         )
@@ -446,7 +446,7 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
             "\n\n## Codex 调度适配（本环境无 Agent 工具）\n"
             "在 Codex 环境调度子 agent 用 `spawn_agent` 工具：\n"
             "- 子 agent 名即 `.codex/agents/` 下的 TOML 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater）\n"
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
             "- 把 order 文件内容作为任务消息传给子 agent；order 文件协议（status: DONE）不变\n"
             "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
             "- 你是本项目唯一调度者：spawn 后留意 agent 树，子 agent 若尝试再派生，立即 interrupt 并按规范重派\n"

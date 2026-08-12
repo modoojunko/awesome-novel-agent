@@ -1,9 +1,16 @@
 # style-distiller 模块验收记录（spec §13 六项验收 C1-C6）
 
+> **遗留记录（jieba 管线）**：本文档记录原始实现（Task 18）基于 jieba 统计的 C1-C6 验收。
+> LLM 重构（2026-08-11 rework）退役了量化工具 `tools/distill-style.py`（distill/update/check 模式）、
+> `tools/compare-style.py`、`tools/mix-style.py`：产卡改为 13 模板纯 LLM 蒸馏，验收改为
+> anti-ai 案例 2 指令遵循（verify-checklist.md）。因此 **C1-C4 的量化证据仅作历史记录**，
+> 新管线的对应验收为：蒸馏卡量化维来自 LLM 反推、生成后按同源提示词做指令遵循验收（PASS/FAIL + 违反报告）。
+> **C6 作者盲测是重构后主验收**（≥70%），仍在待办。
+
 - 日期：2026-08-11
-- 任务：Task 18（收官验收执行）
-- 工具：`tools/distill-style.py`（distill/update/check 三模式）、`tools/compare-style.py`、`tools/init.py`、`tools/sync-project.py`
-- 环境：jieba 0.42.1 可用（`.venv`），全量测试 `python tools/test_style_distiller` → **129 通过 / 0 失败**
+- 任务：Task 18（原始实现收官验收执行，jieba 管线，已被 LLM 重构替代）
+- 工具（遗留）：`tools/distill-style.py`（distill/update/check 三模式）、`tools/compare-style.py`；`tools/init.py`、`tools/sync-project.py` 保留
+- 环境（遗留）：jieba 0.42.1 可用（`.venv`），全量测试 `python tools/test_style_distiller` → **129 通过 / 0 失败**
 
 ## 验收结果总表
 
@@ -41,7 +48,7 @@
 
 主卡：用 1763 字样本蒸馏 → `confidence=55`（≥51），11 个客观维度入卡。容差 = ±20%（confidence 51-70 档）。
 
-3 段同场景正文（夜间旅馆/茶楼线索交接场景，每段 460-500 字 ≥ 300 字/段），逐段跑 `distill-style.py check -c <主卡> <段>`：
+3 段同场景正文（夜间旅馆/茶楼线索交接场景，每段 460-500 字 ≥ 300 字/段），逐段跑遗留的 `distill-style.py check -c <主卡> <段>`（LLM 重构后该检查模式退役，改为 anti-ai 指令遵循验收）：
 
 **段 1**（495 字）——11/11 pass，最大 |dev| = 19%（adv_density -19%）：
 ```
@@ -84,7 +91,7 @@ verb:     act 90.4(+0%)   men 5.5(-5%)     sta 4.1(+5%)
 
 两段各自蒸馏实测维度入场景卡（confidence=60，容差 ±20%），`check -c <场景卡> <段>` 均通过（对话 11/11、战斗 7/7，RC=0）。
 
-`compare-style.py` 对比两段实测维度（对话卡 A vs 战斗卡 B）：
+遗留的 `compare-style.py` 对比两段实测维度（对话卡 A vs 战斗卡 B；LLM 重构后该工具已退役）：
 
 | 关键维度 | 对话段 | 战斗段 | 差值 | ≥容差(20%) |
 |---|---|---|---|---|

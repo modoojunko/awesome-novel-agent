@@ -15,17 +15,32 @@ from __future__ import annotations
 # 1) 验收检查项四类（spec 7.1）
 CHECK_CATEGORIES = ["数值/占比条", "硬性规则条", "建模规则条", "软引导条"]
 
+def _is_violated(v) -> bool:
+    """violated 判定：bool/字符串 布尔都收敛——LLM 可能输出 'false'/'是' 等字符串，误判会触发错误抽卡。
+    字符串按 truthy 语义：'true'/'是'/'yes'/'1'/'违反' → 违反；其余（'false'/'否'/空）→ 不违反。"""
+    if v is None:
+        return False
+    if isinstance(v, bool):
+        return v
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "是", "yes", "1", "违反", "yes。")
+    return bool(v)
+
 def verdict(items: list[dict]) -> str:
     """全违反否 → PASS；任一违反 → FAIL"""
-    return "FAIL" if any(i.get("violated") for i in items) else "PASS"
+    return "FAIL" if any(_is_violated(i.get("violated")) for i in items) else "PASS"
 
 def should_reroll(round_no: int, violated: int) -> bool:
     """抽卡判定（spec 7.2）：round < 3 且本轮有违反 → 重写"""
     return round_no < 3 and violated > 0
 
 def pick_best(rounds: list[dict]) -> dict:
-    """超限取最优（spec 7.2）：违反条数最少的一轮，同分取最新"""
-    return min(rounds, key=lambda r: (r.get("violated", 0), -rounds.index(r)))
+    """超限取最优（spec 7.2）：违反条数最少的一轮，同分取最新。
+    同分按列表位置（越靠后越新）取最新，避免依赖 dict ==（相同 dict 会退化成取最旧）。
+    空轮次列表返回空 dict（调用方按无违反处理），避免 min() 抛 ValueError。"""
+    if not rounds:
+        return {}
+    return min(enumerate(rounds), key=lambda ir: (ir[1].get("violated", 0), -ir[0]))[1]
 
 def format_report(items: list[dict]) -> str:
     """违反报告表格渲染（spec 7.1 输出格式）"""
@@ -33,9 +48,9 @@ def format_report(items: list[dict]) -> str:
     for i, it in enumerate(items, 1):
         lines.append(
             f"| {it.get('no', i)} | {it.get('require', '')} | {it.get('evidence', '')} | "
-            f"{'是' if it.get('violated') else '否'} | {it.get('advice', '')} |"
+            f"{'是' if _is_violated(it.get('violated')) else '否'} | {it.get('advice', '')} |"
         )
-    n_v = sum(1 for i in items if i.get("violated"))
+    n_v = sum(1 for i in items if _is_violated(i.get("violated")))
     lines.append(f"\n结论：{'FAIL' if n_v else 'PASS'}（{n_v}/{len(items)}）")
     return "\n".join(lines)
 

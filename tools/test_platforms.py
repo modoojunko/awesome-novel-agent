@@ -26,18 +26,8 @@ except ImportError:  # Python < 3.11
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
 
-PASS = 0
-FAIL = 0
-
-
-def check(name: str, cond: bool, detail: str = ""):
-    global PASS, FAIL
-    if cond:
-        PASS += 1
-        print(f"  ok  {name}")
-    else:
-        FAIL += 1
-        print(f"  FAIL {name}  {detail}")
+from test_util import check
+import test_util as _tu
 
 
 def run(cmd, cwd=None, env=None) -> subprocess.CompletedProcess:
@@ -455,8 +445,8 @@ def main():
             fn()
         except Exception as e:
             check(f"{name} 异常", False, repr(e))
-    print(f"\n结果: {PASS} 通过, {FAIL} 失败")
-    sys.exit(0 if FAIL == 0 else 1)
+    print(f"\n结果: {_tu.PASS} 通过, {_tu.FAIL} 失败")
+    sys.exit(0 if _tu.FAIL == 0 else 1)
 
 
 if __name__ == "__main__":

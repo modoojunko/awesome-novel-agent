@@ -103,11 +103,11 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 ```
 
 ### Gate G：风格验收（指令遵循，读同章提示词）
-- 读 `prompts/vol-{N}-ch-{M}-prompt.md`（与 writer 生成同源），按 `knowledge/style-distill/prompt-templates/verify-checklist.md`
+- 读 `prompts/vol-{N}-ch-{M}-prompt.md`（与 writer 生成同源），按 `.claude/knowledge/style-distill/prompt-templates/verify-checklist.md`
   逐条对照正文判定（数值/占比、硬性规则、建模规则、软引导四类）。
 - 双态通用：提示词恒带风格（未蒸馏=正文定性四字段；已蒸馏=案例 2 量化+声音层），两种状态都用本流程、只按提示词内容验收。
 - 输出违反报告（.anti-ai.md 验收节）：逐条「条号 + 原文要求 + 正文表现 + 违反与否 + 建议」，汇总违反条数/总条数，结论 PASS/FAIL。
-- 汇总/判定/报告格式对齐 `tools/style_verify.py`（verdict/should_reroll/pick_best/format_report）；违反条目即抽卡反馈源。
+- 汇总/判定/报告格式对齐 `.claude/knowledge/style-distill/prompt-templates/verify-checklist.md` 的确定性口径（violated 字符串布尔收敛 / verdict PASS-FAIL / 违反数；不依赖 tools/*.py）；违反条目即抽卡反馈源。
 - Gate A-F（去 AI 味）保持不变；Gate G 只出 verdict，不改正文。
 
 ---

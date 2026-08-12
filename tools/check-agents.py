@@ -18,6 +18,8 @@
   对 (b) 类做"路径模式"白名单校验，不要求文件存在。
 """
 
+from __future__ import annotations  # str | None 等注解在 Python 3.9 下延迟求值，避免 import 即 TypeError
+
 import sys
 import re
 import yaml
@@ -57,18 +59,29 @@ DEPLOYED_PATTERNS = [
 ]
 
 
+def _split_frontmatter(text: str) -> str | None:
+    """提取 frontmatter 正文（两行 --- 之间）。按行定位闭合行，正文含 '---'（如 markdown 分隔线）不错位；缺闭合返回 None。"""
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return None
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            return "\n".join(lines[1:i])
+    return None
+
+
 def check_file(path: Path) -> list:
     errors = []
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---"):
         return [f"{path.name}: 缺少 frontmatter (--- 开头)"]
 
-    parts = text.split("---", 2)
-    if len(parts) != 3:
+    fm_text = _split_frontmatter(text)
+    if fm_text is None:
         return [f"{path.name}: frontmatter 未正确闭合 (需两对 ---)"]
 
     try:
-        fm = yaml.safe_load(parts[1])
+        fm = yaml.safe_load(fm_text)
     except Exception as e:
         return [f"{path.name}: frontmatter YAML 解析失败: {e}"]
 
@@ -137,15 +150,33 @@ STYLE_CARD_DIMS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expressio
                    "narrative", "dialogue_style", "cohesion", "verb_style"]
 
 
+def _pct_sum_errors(d: dict, label: str, expected: float = 100, max_sum: float | None = None) -> list:
+    """占比/分布 dict 求和校验：值必须全为数值（type 排除 bool）；全零 = 占位跳过；非零须和≈expected（或≤max_sum）。
+
+    字符串值（LLM 或手改）不再被 `if total and` 静默跳过——非数值直接报错。"""
+    bad = [k for k, v in d.items() if type(v) not in (int, float)]
+    if bad:
+        return [f"{label} 值应为数值（非数值键: {sorted(bad)}）"]
+    total = sum(d.values())
+    if total == 0:
+        return []                                  # 全零占位（未蒸馏/空 override）
+    if max_sum is not None:
+        if total > max_sum:
+            return [f"{label} 总计应 ≤{max_sum}（当前 {round(total)}）"]
+        return []
+    if abs(total - expected) > 1:
+        return [f"{label} 和应≈{expected}（当前 {round(total)}）"]
+    return []
+
+
 def check_style_card(path: Path) -> list:
     errors = []
-    is_scene = path.name != "writing-style.md"   # 场景卡为 override 风格（只写差异），主卡为全量 9 维度
     text = path.read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    if len(parts) != 3:
+    fm_text = _split_frontmatter(text)
+    if fm_text is None:
         return [f"{path.name}: 风格卡缺 frontmatter（需两对 ---）"]
     try:
-        fm = yaml.safe_load(parts[1])
+        fm = yaml.safe_load(fm_text)
     except Exception as e:
         return [f"{path.name}: 卡片 frontmatter YAML 解析失败: {e}"]
     if not isinstance(fm, dict):
@@ -160,7 +191,9 @@ def check_style_card(path: Path) -> list:
     # 用 type() 而非 isinstance() 以排除 bool（True/False 是 int 子类，会蒙混过关）
     if not type(conf) is int or not (0 <= conf <= 100):
         errors.append(f"{path.name}: confidence 需为 0-100 整数（当前 {conf!r}）")
-    if is_scene:
+    # schema 判别（不按文件名）：有 override → 场景卡（稀疏差异）；否则 → 全量 9 维
+    #（主卡 + genre-baselines 的 base/benchmark/delta 卡都是全量 schema，后者数值为 0 占位）。
+    if "override" in fm:
         ov = fm.get("override")
         if not isinstance(ov, dict):
             errors.append(f"{path.name}: 场景卡需 override 字段（dict，只写与主卡的差异维度）")
@@ -172,6 +205,9 @@ def check_style_card(path: Path) -> list:
         for dim in STYLE_CARD_DIMS:
             if dim not in fm:
                 errors.append(f"{path.name}: 卡片缺维度 {dim}")
+    bf = fm.get("baseline_for")
+    if bf is not None and (not isinstance(bf, str) or not bf):
+        errors.append(f"{path.name}: baseline_for 需为非空字符串（当前 {bf!r}）")
     locked = fm.get("locked")
     if locked is not None and not isinstance(locked, list):
         errors.append(f"{path.name}: locked 需为列表")
@@ -200,9 +236,8 @@ def check_style_card(path: Path) -> list:
         if keys != {"name", "he_she", "i_you"}:
             errors.append(f"{path.name}: name_pronoun_ratio 键应为 name/he_she/i_you（当前 {sorted(keys)}）")
         else:
-            total = sum(v for v in npr.values() if isinstance(v, (int, float)))
-            if total and abs(total - 100) > 1:     # 全零 = 未填占位（等价旧单值 0），跳过和校验
-                errors.append(f"{path.name}: name_pronoun_ratio 三维和应≈100（当前 {npr}）")
+            for e in _pct_sum_errors(npr, f"{path.name}: name_pronoun_ratio 三维和"):
+                errors.append(e)
 
     em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
     if "inner_monologue_pct" in em and not _opt_pct(em["inner_monologue_pct"]):
@@ -222,9 +257,9 @@ def check_style_card(path: Path) -> list:
     rhy = fm.get("rhythm") if isinstance(fm.get("rhythm"), dict) else {}
     _FIVE = ("dialogue_pct", "action_pct", "environment_pct", "inner_thought_pct", "narration_pct")
     if all(f in rhy for f in _FIVE):
-        total5 = sum(rhy[f] for f in _FIVE if isinstance(rhy[f], (int, float)))
-        if total5 and total5 > 110:                  # 五层可重叠，上限 110%（spec §5.1）
-            errors.append(f"{path.name}: 五层占比总计应 ≤110%（当前 {round(total5)}）")
+        five = {f: rhy[f] for f in _FIVE}
+        for e in _pct_sum_errors(five, f"{path.name}: 五层占比总计", max_sum=110):   # 五层可重叠，上限 110%（spec §5.1）
+            errors.append(e)
 
     _DIST = {"syntax": ["sentence_length_dist"], "rhetoric": ["metaphor_preference", "sensory_dist"]}
     for dim, fields in _DIST.items():
@@ -232,9 +267,8 @@ def check_style_card(path: Path) -> list:
         for f in fields:
             sub = d.get(f)
             if isinstance(sub, dict) and sub:
-                total = sum(v for v in sub.values() if isinstance(v, (int, float)))
-                if total and abs(total - 100) > 1:
-                    errors.append(f"{path.name}: {f} 分布和应≈100（当前 {round(total)}）")
+                for e in _pct_sum_errors(sub, f"{path.name}: {f} 分布和"):
+                    errors.append(e)
     return errors
 
 
@@ -244,7 +278,7 @@ def check_style_cards() -> list:
     if not main.exists():
         return ["templates/settings/writing-style.md 不存在（旧布局仓库？）"]
     errors = []
-    for p in [main] + sorted((base / "style-profiles").glob("*.md")):
+    for p in [main] + sorted((base / "style-profiles").rglob("*.md")):   # 递归：含 genre-baselines/**/base|benchmark|delta
         errors.extend(check_style_card(p))
     return errors
 

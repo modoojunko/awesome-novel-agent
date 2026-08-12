@@ -15,7 +15,7 @@ novel-agent **只做三件事**：
 |-------|--------|-----------|
 | setup | updater | `setting-update-order.md` |
 | setup | style-distiller | `style-distill-order.md`（作者提供风格样本时触发） |
-| 手动 | style-distiller | `style-distill-order.md`（作者主动触发重蒸馏/调参数/混风格） |
+| 手动 | style-distiller | `style-distill-order.md`（作者主动触发重蒸馏/调参数） |
 | outline | volume-planner | `volume-plan-order.md` |
 | outline | chapter-planner | `chapter-plan-order.md` |
 | draft | prompt-crafter | `prompt-craft-order.md` |

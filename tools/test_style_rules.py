@@ -5,12 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from style_render import range_for, enum_zh, pct_zh, render_card, SCENE_INJECTION
 from style_verify import verdict, should_reroll, pick_best, format_report
-
-PASS = FAIL = 0
-def check(name, cond, detail=""):
-    global PASS, FAIL
-    if cond: PASS += 1; print(f"  ok  {name}")
-    else: FAIL += 1; print(f"  FAIL {name}  {detail}")
+from test_util import check, summary, exit_code
 
 CARD = {
     "profile_version": "1.0", "profile_name": "测试卡", "scene_type": "general",
@@ -36,7 +31,8 @@ CARD = {
 def test_range_for():
     check("5.8@75 → '5-6'", range_for(5.8, 75) == "5-6", range_for(5.8, 75))
     check("16@75 → '14-18'", range_for(16, 75) == "14-18", range_for(16, 75))
-    check("5.8@50 → 区间加宽(±20%)", range_for(5.8, 50) != range_for(5.8, 90), f"{range_for(5.8,50)} vs {range_for(5.8,90)}")
+    check("5.8@50 → 区间加宽 '5-7'(±20%)", range_for(5.8, 50) == "5-7", range_for(5.8, 50))
+    check("5.8@90 → '5-6'(±10%)", range_for(5.8, 90) == "5-6", range_for(5.8, 90))
 
 def test_enum_zh():
     check("mixed → 标签混合使用", enum_zh("tag_style", "mixed") == "标签混合使用", enum_zh("tag_style", "mixed"))
@@ -107,5 +103,5 @@ def test_verify_report():
 test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
 test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
 test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report()
-print(f"\n{PASS} passed, {FAIL} failed")
-sys.exit(1 if FAIL else 0)
+print(f"\n{summary()}")
+sys.exit(exit_code())

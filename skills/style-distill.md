@@ -2,7 +2,7 @@
 
 ## 一、主卡蒸馏
 1. 收集样本：作者参考文本（.md/.txt）或已归档章节。少于 1500 字向 novel-agent 说明质量不足可挂起。
-2. 读 `knowledge/style-distill/prompt-templates/feature-extract.md`（方法论 = 13 模板定义）。
+2. 读 `.claude/knowledge/style-distill/prompt-templates/feature-extract.md`（方法论 = 13 模板定义）。
 3. 阶段一 拆解（模板 1-4）：对样本逐段/逐句/逐情绪标注（LLM 内部推理，不写文件）。
 4. 阶段二 量化（模板 5-8）：频次/五层占比/情绪通道/词汇 → 量化表。
 5. 阶段三 建模（模板 9-13）：句式卡/行为树/对话模式/节奏模型/锚点 → 建模规则。

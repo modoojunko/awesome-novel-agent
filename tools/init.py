@@ -445,6 +445,7 @@ confidence: 0
 last_updated: ""
 locked: []
 
+# 9 大维度（PRD 定义；0/空 = 未蒸馏，首次蒸馏后由 style-distiller 填充）
 lexicon: {{ adj_density_per_100: 0, adv_density_per_100: 0, four_phrase_freq_per_100: 0, preferred_words: [], banned_words: [], name_pronoun_ratio: 0 }}
 syntax: {{ avg_sentence_length: 0, sentence_length_dist: {{}}, single_sentence_paragraph_pct: 0, avg_sentences_per_paragraph: 0, question_ratio: 0, exclamation_ratio: 0 }}
 rhythm: {{ dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct: 0, narration_pct: 0 }}
@@ -567,7 +568,8 @@ def migrate_writing_style(project_path: Path) -> None:
     card = project_path / "settings" / "writing-style.md"
     if not card.exists():
         return
-    text = card.read_text(encoding="utf-8")
+    # utf-8-sig：剥掉 Windows 编辑器可能写入的 BOM（﻿），否则 BOM+--- 被判为旧格式清空重写
+    text = card.read_text(encoding="utf-8-sig")
     if text.lstrip().startswith("---"):          # 已是新格式
         return
     # 旧标题带中文后缀（如 "## role（叙事身份）"），按完整标题提取

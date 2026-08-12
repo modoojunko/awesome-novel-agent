@@ -16,4 +16,10 @@
 ## 违反报告格式（写入 archives/*.anti-ai.md 验收节）
 | 条号 | 原文要求 | 正文表现 | 违反与否 | 建议 |
 结论：PASS / FAIL（违反条数 / 总条数）
-汇总/判定/报告的确定性编码见 tools/style_verify.py（verdict / pick_best / format_report），anti-ai 按此口径输出。
+
+## 确定性判定口径（本文自含，不依赖 tools/*.py）
+- **violated 判定**（「违反与否」列与结论计数）：`true/是/yes/1/违反` → 违反；`false/否/空/其余字符串` → 不违反（LLM 输出的字符串布尔一律按此收敛，防误抽卡）。
+- **verdict**：任一违反 → FAIL；全部不违反 → PASS。
+- **should_reroll（抽卡）**：当前轮 round<3 且本轮违反条数>0 → 重写（violations 报告喂回 writer）。
+- **pick_best（超 3 轮取最优）**：取违反条数最少的一轮；同分取最新一轮。
+- **format_report**：上表逐条 + 结论行 `结论：FAIL/PASS（违反数/总条数）`。

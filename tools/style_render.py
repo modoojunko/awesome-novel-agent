@@ -15,11 +15,27 @@ from __future__ import annotations
 import argparse
 import sys
 
+# 0) 数值防御：LLM 或手改 YAML 可能把数值写成字符串，渲染端统一收敛（spec 卡值应为数值）
+def _num(v, default: float = 0.0) -> float:
+    """字符串/数值 → float；None/非法 → default。纯防御，不抛异常。"""
+    if v is None:
+        return default
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str):
+        try:
+            return float(v.strip())
+        except ValueError:
+            return default
+    return default
+
 # 1) 密度类区间：confidence → ±%（spec 6.1a）
 RANGE_TIERS = [(70, 0.10), (50, 0.20), (0, 0.30)]
 
 def range_for(value: float, confidence: int) -> str:
-    """5.8 @ 75 → '5-6'（X×(1±tier)，round 取整）"""
+    """5.8 @ 75 → '5-6'（X×(1±tier)，round 取整）。value/confidence 字符串也收敛为数值。"""
+    value = _num(value)
+    confidence = int(_num(confidence))
     tier = 0.30
     for floor, t in RANGE_TIERS:
         if confidence >= floor:
@@ -47,6 +63,7 @@ def enum_zh(key: str, value: str) -> str:
 
 # 3) 占比 → 中文定性（spec 6.1a）
 def pct_zh(value: float) -> str:
+    value = _num(value)
     if value >= 80: return "绝大多数"
     if value >= 60: return "大部分"
     if value >= 40: return "近一半"
@@ -76,10 +93,16 @@ def _flatten_dists(d: dict) -> list[str]:
     return [f"{zh.get(k, k)}占比 {v}%" for k, v in d.items() if v]
 
 def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]:
-    conf = card.get("confidence") or 0
+    conf = int(_num(card.get("confidence")))
     out: dict[str, list[str]] = {k: [] for k in
         ["词汇", "句式", "节奏", "修辞与感官", "情绪表达", "对话风格", "衔接", "视角",
          "硬性规则", "整体基调", "风格参考例句"]}
+    if not conf:
+        # 未蒸馏卡（confidence=0）：量化维全零，渲染 0-1 区间误导——按 spec 应走正文定性四字段注入，
+        # 这里仅透传声音层并给出提示，不再产出虚假量化区间。
+        _sound_layer(out, card)
+        out["硬性规则"].insert(0, "（未蒸馏卡：量化维未填充，请按正文定性四字段注入，不走案例 2 渲染）")
+        return out
     dims = SCENE_INJECTION.get(scene_type, SCENE_INJECTION["general"])   # 稀疏注入（spec 6.3）
 
     # 词汇
@@ -159,26 +182,54 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
             out["视角"].append(f"聚焦角色：{nar['focal_character']}")
         if nar.get("inner_monologue_style"):
             out["视角"].append(enum_zh("inner_monologue_style", nar["inner_monologue_style"]))
-    # 声音层透传
-    out["硬性规则"] = list(card.get("hard_constraints") or [])
-    out["整体基调"] = list(card.get("soft_guidance") or [])
-    fse = card.get("few_shot_examples") or []
+    _sound_layer(out, card)
+    return out
+
+def _sound_layer(out: dict[str, list[str]], card: dict) -> None:
+    """声音层透传：hard_constraints/soft_guidance/few_shot_examples 原样保留（spec 案例 2 声音层）。
+    防御：字符串或非列表输入按单项包裹，避免 list('字符串') 拆成逐字。"""
+    hc = card.get("hard_constraints")
+    out["硬性规则"] = _as_list(hc)
+    sg = card.get("soft_guidance")
+    out["整体基调"] = _as_list(sg)
+    fse = card.get("few_shot_examples")
+    if not isinstance(fse, list):
+        fse = [fse] if fse else []
     out["风格参考例句"] = [f"[{e.get('type')}] {e.get('text')} — {e.get('reason')}" if isinstance(e, dict)
                         else str(e) for e in fse]
-    return out
+
+def _as_list(v) -> list[str]:
+    """字符串 → 单元素列表；已是列表 → 原样；None/空 → []。"""
+    if v is None:
+        return []
+    if isinstance(v, list):
+        return list(v)
+    if isinstance(v, (str, int, float)):
+        return [str(v)]
+    return []
+
+def _parse_frontmatter(text: str) -> dict:
+    """frontmatter → dict。按行定位闭合 '---'（值内含 '---' 不错位），缺闭行返回 {}。"""
+    import yaml
+    lines = text.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}
+    for i in range(1, len(lines)):
+        if lines[i].strip() == "---":
+            fm = "\n".join(lines[1:i])
+            return yaml.safe_load(fm) or {}
+    return {}
 
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--card", required=True)
     args = ap.parse_args()
-    import yaml
     text = __import__("pathlib").Path(args.card).read_text(encoding="utf-8")
-    parts = text.split("---", 2)
-    if len(parts) != 3:
+    card = _parse_frontmatter(text)
+    if not card:
         print("卡缺 frontmatter", file=sys.stderr)
         return 2
-    card = yaml.safe_load(parts[1]) or {}
-    for sec, items in render_card(card).items():
+    for sec, items in render_card(card, scene_type=card.get("scene_type") or "general").items():
         if items:
             print(f"【{sec}】")
             for it in items:

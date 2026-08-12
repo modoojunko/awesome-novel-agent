@@ -15,7 +15,7 @@ Step 4: 验收自检
 
 > 9 类文件（含写作记忆/永久记忆）。
 
-1. **writing-style.md（主卡）** → 提取正文定性层四字段（core_principles, possible_mistakes, depiction_techniques）+ 量化层 9 大维度 + confidence。**双态**：confidence=0 → 只注入定性层（读主卡正文 → 定性四字段注入，现状不变）；confidence>0 → 按 rendering-rules.md 渲染案例 2（读主卡 + 场景卡 frontmatter → 量化节 + 声音层透传）
+1. **writing-style.md（主卡）** → 提取正文定性层四字段（叙事身份 / 硬约束 / AI 易犯错误 / 描写层次和手法）+ 量化层 9 大维度 + confidence。**双态**：confidence=0 → 只注入定性层（读主卡正文 → 定性四字段注入，现状不变）；confidence>0 → 按 rendering-rules.md 渲染案例 2（读主卡 + 场景卡 frontmatter → 量化节 + 声音层透传）
 2. **volume.md** → 提取前一章的章名、结尾画面、情绪落点
 3. **chapter.md** → 提取 memo, emotional_design, outline（场景分解）, payoff_plan
 4. **角色设定文件** → 读取涉及的角色，提取本章相关状态
@@ -496,7 +496,7 @@ Step 4 融合输出：
 **双态分支：**
 
 - **confidence=0（未蒸馏）→ 正文定性四字段注入：** 读主卡正文四字段（叙事身份 / 硬约束 / AI 易犯错误 / 描写层次）注入本节，节标题沿用「写作风格约束」，现状不变。
-- **confidence>0（已蒸馏）→ 案例 2 渲染：** 本节输出 `【词汇】【句式】【节奏】【修辞与感官】【情绪表达】【对话风格】【衔接】【视角】【硬性规则】【整体基调】【风格参考例句】【剧情上下文】【写作要求】`（案例 2 结构），渲染步骤按 rendering-rules.md（区间/枚举/稀疏注入矩阵，读取 tools/style_render.py 的 RANGE_TIERS / ENUM_ZH / SCENE_INJECTION）。banned_words / 硬约束归入「不可违反规则·红线约束」。
+- **confidence>0（已蒸馏）→ 案例 2 渲染：** 本节输出 `【词汇】【句式】【节奏】【修辞与感官】【情绪表达】【对话风格】【衔接】【视角】【硬性规则】【整体基调】【风格参考例句】【剧情上下文】【写作要求】`（案例 2 结构），渲染步骤按 `.claude/knowledge/style-distill/prompt-templates/rendering-rules.md`（精确值自含：区间/枚举/稀疏注入矩阵）。banned_words / 硬约束归入「不可违反规则·红线约束」。
 
 **分工：** confidence>0 时量化节（【词汇】…【视角】）来自渲染规则，声音层（【硬性规则】【整体基调】【风格参考例句】）原样透传；scene-craft 方法论只注入「怎么写」（场景写作指引子节），两者不并列重复。
 

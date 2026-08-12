@@ -18,11 +18,7 @@ TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
-PASS = FAIL = 0
-def check(name, cond, detail=""):
-    global PASS, FAIL
-    if cond: PASS += 1; print(f"  ok  {name}")
-    else: FAIL += 1; print(f"  FAIL {name}  {detail}")
+from test_util import check, summary, exit_code
 
 def test_feature_extract():
     t = (REPO / "knowledge/style-distill/prompt-templates/feature-extract.md").read_text(encoding="utf-8")
@@ -123,8 +119,8 @@ def test_dual_mode():
 def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
     test_reroll_contract(); test_anti_ai_verify(); test_dual_mode()
-    print(f"\n{PASS} passed, {FAIL} failed")
-    return 1 if FAIL else 0
+    print(f"\n{summary()}")
+    return exit_code()
 
 if __name__ == "__main__":
     sys.exit(run_all())

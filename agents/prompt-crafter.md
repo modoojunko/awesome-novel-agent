@@ -70,7 +70,7 @@ knowledge:
 - **Input Sources:**
   - `.agent/task/prompt-craft-order.md` → 目标章节
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（memo、情绪、场景）
-  - `settings/writing-style.md` → 写作风格四字段（core_principles/possible_mistakes/depiction_techniques）
+  - `settings/writing-style.md` → 写作风格四字段（叙事身份/硬约束/AI 易犯错误/描写层次和手法）
   - `settings/character-setting/` → 本章涉及的角色设定（角色初始状态 + 叙事规则关联推导）
   - `volumes/vol-{N}.md` → 前章摘要（结尾画面、情绪落点、缺口）
   - `.claude/knowledge/anti-ai.md` → 反 AI 规则
@@ -106,7 +106,7 @@ knowledge:
     输入（如从审计轮回退）：携带的审计问题清单 → 针对性修正对应元素
     依据：二(Decision Rights): 自主决定填充方式 + 优先级排序
     约束：六(Principles): 严格按 6 元素骨架, [writer-preference]优先, 来源层末汇总
-    全局规则：writing-style 四字段（role/core_principles/possible_mistakes/depiction_techniques）必须全部注入
+    全局规则：writing-style 四字段（叙事身份/硬约束/AI 易犯错误/描写层次和手法）必须全部注入
     反模式：六(Anti-Patterns): 不meta泄漏, 不整段复制章纲, 不加自由指令
 
   ACT:
@@ -179,7 +179,7 @@ knowledge:
 - **Quality Gates:**
   - 结构完整（角色/任务指示/背景信息/案例/输入/输出 6 元素不缺）
   - 字段填充完整（各元素字段有值，无 `______` 占位符残留）
-  - writing-style 四字段全部注入（role/core_principles/possible_mistakes/depiction_techniques）
+  - writing-style 四字段全部注入（叙事身份/硬约束/AI 易犯错误/描写层次和手法）
   - 章纲核心 memo 已注入前情上下文
   - 前情上下文有画面感（ch-1 标注无前置章节）
   - 反 AI 规则已注入输出·写作规范

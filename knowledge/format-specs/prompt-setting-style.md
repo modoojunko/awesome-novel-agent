@@ -3,7 +3,7 @@
 **定位：** 将章纲 + writing-style + genre-profile 生产为 subagent 可执行的 prompt.md（`prompts/vol-{N}-ch-{M}-prompt.md`），并对产物做合格判定。只对 prompt 负责，不涉及正文写作。
 
 **全局约束：**
-- writing-style 四字段必须全部注入 prompt——role 定叙事身份，core_principles 定不可违背的写作信条，possible_mistakes 定 AI 易犯错误列表，depiction_techniques 定描写层次和手法。缺任何一个 subagent 都会在最关键的地方放飞。
+- writing-style 四字段必须全部注入 prompt——叙事身份定叙事距离和态度，硬约束定不可违背的写作信条，AI 易犯错误定具体反模式列表，描写层次和手法定可操作的描写做法。缺任何一个 subagent 都会在最关键的地方放飞。
 - 正文字数目标、情绪目标等执行参数从 `settings/writing-style.md` 和 `chapters/vol-{N}-ch-{M}.md` 读取，不在 prompts/ 中重复定义——一处修改全局生效。
 
 **设计原则：每语义单一定义**

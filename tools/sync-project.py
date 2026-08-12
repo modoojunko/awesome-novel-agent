@@ -138,12 +138,15 @@ def compute_fingerprint() -> str:
             for f in sorted(base.rglob("*")):
                 if f.is_file() and f.name != ".gitkeep":
                     files.append(f)
-    for base in [TEMPLATE_SETTINGS_DIR]:  # templates/settings 全部纳入
-        if base.exists():
-            for f in sorted(base.rglob("*")):
-                if not f.is_file() or f.name == ".gitkeep":
-                    continue
-                files.append(f)
+    # 风格资产（与 sync_style_assets 部署范围一致：主卡 + style-profiles/**），
+    # 非风格 settings 模板（world-setting 等）不部署也不纳入指纹，避免永久 "有更新可用"。
+    main_tpl = TEMPLATE_SETTINGS_DIR / "writing-style.md"
+    if main_tpl.is_file():
+        files.append(main_tpl)
+    profiles = TEMPLATE_SETTINGS_DIR / "style-profiles"
+    if profiles.exists():
+        for f in sorted(profiles.rglob("*.md")):
+            files.append(f)
 
     h = hashlib.sha256()
     for f in files:
@@ -402,14 +405,22 @@ def sync_style_assets(project: Path) -> int:
 
     只补缺失文件（不覆盖已有），与 init.py 的 seed 守卫同语义——
     升级/迁移不破坏用户已编辑的写作风格卡。
+
+    范围严格限定为风格资产（templates/settings/writing-style.md + style-profiles/**），
+    不部署 world-setting/genre-setting/timeline/foreshadowing 等非风格模板（那些随 init 骨架走，
+    且含未 seed 的 {..} 占位符，不应由本函数注入）。
     """
     count = 0
-    # 递归部署整个 templates/settings/ 树（主卡 + 场景卡 + genre-baselines，纯参照，无运行时引用）：
-    # 只补缺失文件（不覆盖已有），与 init.py 的 seed 守卫同语义。
-    # 注：运行时 settings/style-profiles/analysis/ 是蒸馏产物，无对应模板，不部署。
     src_settings = TEMPLATE_SETTINGS_DIR
     if src_settings.exists():
-        for f in src_settings.rglob("*.md"):
+        # 主卡 + style-profiles 树（场景卡 + genre-baselines，纯参照，无运行时引用）
+        candidates = [src_settings / "writing-style.md"]
+        profiles = src_settings / "style-profiles"
+        if profiles.exists():
+            candidates.extend(sorted(profiles.rglob("*.md")))
+        for f in candidates:
+            if not f.is_file():
+                continue
             rel = f.relative_to(src_settings)
             dst = project / "settings" / rel
             if not dst.exists():

@@ -20,4 +20,4 @@ verb_style: { action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, s
 
 # 题材基线·题材偏移（都市）
 
-本卡只写与基础卡的题材偏移 delta，mix-style 合成用（P1 占位）。数值暂为 0（偏移占位），待 P1 填充。
+本卡只写与基础卡的题材偏移 delta（纯参照，无运行时引用）。数值暂为 0（偏移占位），待作者/C6 盲测阶段填充。
