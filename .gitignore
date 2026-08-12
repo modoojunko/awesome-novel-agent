@@ -1,4 +1,6 @@
-.claude/
+# .claude/ 只跟踪 agent 定义；settings（含本机权限/凭据）和 scratchpad（一次性草稿）保持忽略
+.claude/settings*.json
+.claude/scratchpad.md
 .vscode/
 docs/
 tools/__pycache__/
