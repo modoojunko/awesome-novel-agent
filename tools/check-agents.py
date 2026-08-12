@@ -189,6 +189,52 @@ def check_style_card(path: Path) -> list:
             except ValueError:
                 rels = "、".join(str(c) for c in candidates)  # 路径不在 ROOT 下（测试/外部调用）
             errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {rels}）")
+    # --- 蒸馏卡可选增强字段（2026-08-12 双态：存在才校验，缺失兼容旧卡/未蒸馏卡） ---
+    def _opt_pct(v):
+        return isinstance(v, (int, float)) and 0 <= v <= 100
+
+    lex = fm.get("lexicon") if isinstance(fm.get("lexicon"), dict) else {}
+    npr = lex.get("name_pronoun_ratio")
+    if isinstance(npr, dict):
+        keys = set(npr)
+        if keys != {"name", "he_she", "i_you"}:
+            errors.append(f"{path.name}: name_pronoun_ratio 键应为 name/he_she/i_you（当前 {sorted(keys)}）")
+        else:
+            total = sum(v for v in npr.values() if isinstance(v, (int, float)))
+            if total and abs(total - 100) > 1:     # 全零 = 未填占位（等价旧单值 0），跳过和校验
+                errors.append(f"{path.name}: name_pronoun_ratio 三维和应≈100（当前 {npr}）")
+
+    em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
+    if "inner_monologue_pct" in em and not _opt_pct(em["inner_monologue_pct"]):
+        errors.append(f"{path.name}: inner_monologue_pct 需为 0-100 数值（当前 {em['inner_monologue_pct']!r}）")
+
+    vs = fm.get("verb_style") if isinstance(fm.get("verb_style"), dict) else {}
+    if vs.get("strength") not in (None, "", "weak", "medium", "strong"):
+        errors.append(f"{path.name}: verb_style.strength 应为 weak/medium/strong（当前 {vs.get('strength')!r}）")
+
+    for key in ("hard_constraints", "soft_guidance"):
+        v = fm.get(key)
+        if v is not None and not isinstance(v, list):
+            errors.append(f"{path.name}: {key} 需为列表")
+    if fm.get("few_shot_examples") is not None and not isinstance(fm.get("few_shot_examples"), list):
+        errors.append(f"{path.name}: few_shot_examples 需为列表")
+
+    rhy = fm.get("rhythm") if isinstance(fm.get("rhythm"), dict) else {}
+    _FIVE = ("dialogue_pct", "action_pct", "environment_pct", "inner_thought_pct", "narration_pct")
+    if all(f in rhy for f in _FIVE):
+        total5 = sum(rhy[f] for f in _FIVE if isinstance(rhy[f], (int, float)))
+        if total5 and total5 > 110:                  # 五层可重叠，上限 110%（spec §5.1）
+            errors.append(f"{path.name}: 五层占比总计应 ≤110%（当前 {round(total5)}）")
+
+    _DIST = {"syntax": ["sentence_length_dist"], "rhetoric": ["metaphor_preference", "sensory_dist"]}
+    for dim, fields in _DIST.items():
+        d = fm.get(dim) if isinstance(fm.get(dim), dict) else {}
+        for f in fields:
+            sub = d.get(f)
+            if isinstance(sub, dict) and sub:
+                total = sum(v for v in sub.values() if isinstance(v, (int, float)))
+                if total and abs(total - 100) > 1:
+                    errors.append(f"{path.name}: {f} 分布和应≈100（当前 {round(total)}）")
     return errors
 
 
