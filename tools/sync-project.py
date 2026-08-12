@@ -53,10 +53,6 @@ AGENT_DIR = SKILL_HOME / "agents"
 SKILL_DIR = SKILL_HOME / "skills"
 KNOWLEDGE_DIR = SKILL_HOME / "knowledge"
 TEMPLATE_SETTINGS_DIR = SKILL_HOME / "templates" / "settings"
-TOOLS_SRC_DIR = SKILL_HOME / "tools"
-# TOOLS_SRC_DIR 仅指纹 style-distiller 的 distill/compare/mix 三个脚本，避免对全部 tools/
-# （init.py / platforms.py / 测试脚本等）哈希——那些不属于项目要同步的资产。
-_STYLE_TOOL_NAMES = ("distill-style.py", "compare-style.py", "mix-style.py")
 FINGERPRINT_FILE = Path(".agent") / ".sync-fingerprint"
 VERSION_FILE = Path(".agent") / ".sync-version"
 
@@ -135,19 +131,17 @@ def get_version_info() -> tuple[str | None, str | None]:
 
 
 def compute_fingerprint() -> str:
-    """对 skill 源目录的所有 agent/skill/knowledge/templates/settings 文件与 style-distiller 脚本算一个 hash"""
+    """对 skill 源目录的所有 agent/skill/knowledge/templates/settings 文件算一个 hash"""
     files = []
     for base in [AGENT_DIR, SKILL_DIR, KNOWLEDGE_DIR]:
         if base.exists():
             for f in sorted(base.rglob("*")):
                 if f.is_file() and f.name != ".gitkeep":
                     files.append(f)
-    for base in [TEMPLATE_SETTINGS_DIR, TOOLS_SRC_DIR]:  # templates/settings 全部纳入；TOOLS_SRC_DIR 只取 distill 三脚本
+    for base in [TEMPLATE_SETTINGS_DIR]:  # templates/settings 全部纳入
         if base.exists():
             for f in sorted(base.rglob("*")):
                 if not f.is_file() or f.name == ".gitkeep":
-                    continue
-                if base == TOOLS_SRC_DIR and f.name not in _STYLE_TOOL_NAMES:
                     continue
                 files.append(f)
 
@@ -404,14 +398,15 @@ def sync_knowledge(project_path: Path, platform: Platform) -> int:
 
 
 def sync_style_assets(project: Path) -> int:
-    """同步 style-distiller 资产：风格卡 + 蒸馏脚本 + 旧卡迁移钩子。
+    """同步 style-distiller 资产：主卡 + 场景卡 + genre-baselines（纯参照，无运行时引用）+ 旧卡迁移钩子。
 
-    只补缺失文件（不覆盖已有），与 init.py 的 deploy_tools/seed 守卫同语义——
-    升级/迁移不破坏用户已编辑的写作风格卡与项目 tools/。
+    只补缺失文件（不覆盖已有），与 init.py 的 seed 守卫同语义——
+    升级/迁移不破坏用户已编辑的写作风格卡。
     """
     count = 0
-    # 递归部署整个 templates/settings/ 树（主卡 + 场景卡 + genre-baselines）：
-    # 只补缺失文件（不覆盖已有），与 init.py 的 deploy_tools/seed 守卫同语义。
+    # 递归部署整个 templates/settings/ 树（主卡 + 场景卡 + genre-baselines，纯参照，无运行时引用）：
+    # 只补缺失文件（不覆盖已有），与 init.py 的 seed 守卫同语义。
+    # 注：运行时 settings/style-profiles/analysis/ 是蒸馏产物，无对应模板，不部署。
     src_settings = TEMPLATE_SETTINGS_DIR
     if src_settings.exists():
         for f in src_settings.rglob("*.md"):
@@ -421,13 +416,6 @@ def sync_style_assets(project: Path) -> int:
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 dst.write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
                 count += 1
-    dst_tools = project / "tools"
-    dst_tools.mkdir(parents=True, exist_ok=True)
-    for name in _STYLE_TOOL_NAMES:
-        src = TOOLS_SRC_DIR / name
-        if src.exists() and not (dst_tools / name).exists():
-            (dst_tools / name).write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
-            count += 1
     try:
         from init import migrate_writing_style   # init.py main 有 __main__ 守卫，导入安全
         migrate_writing_style(project)

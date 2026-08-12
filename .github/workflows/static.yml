@@ -25,7 +25,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install dependencies
-        run: pip install pyyaml jieba
+        run: pip install pyyaml
       - name: Check Python syntax
         run: python -m py_compile tools/*.py
       - name: Check agent definitions
@@ -35,7 +35,9 @@ jobs:
       - name: Run platform tests
         run: python tools/test_platforms.py
       - name: style-distiller 验证
-        run: python tools/test_style_distill.py
+        run: |
+          python tools/test_style_distill.py
+          python tools/test_style_rules.py
 
   deploy:
     needs: lint

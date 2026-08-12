@@ -168,9 +168,6 @@ def main():
     elif platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
 
-    # Step 3.6: 部署风格工具脚本到项目 tools/（style-distiller / anti-ai 用）
-    deploy_tools(project_path)
-
     # Step 4: 按题材继承记忆
     deploy_memory(project_path, genre)
 
@@ -313,24 +310,6 @@ def deploy_agents(project_path: Path, platform: Platform):
                 content = rewrite_refs(content, platform)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
-
-
-_DEPLOY_TOOLS = ["distill-style.py", "compare-style.py", "mix-style.py"]  # 现有文件才拷，缺省跳过
-
-
-def deploy_tools(project_path: Path) -> None:
-    """拷贝风格工具脚本到项目 tools/（style-distiller / anti-ai 用 Bash 调）。"""
-    src = SKILL_HOME / "tools"
-    dst = project_path / "tools"
-    dst.mkdir(parents=True, exist_ok=True)
-    n = 0
-    for name in _DEPLOY_TOOLS:
-        f = src / name
-        if f.exists():
-            (dst / name).write_text(f.read_text(encoding="utf-8"), encoding="utf-8")
-            n += 1
-    if n:
-        print(f"  ✅ 已部署风格工具脚本到 tools/（{n} 个）")
 
 
 def deploy_memory(project_path: Path, genre: str):
