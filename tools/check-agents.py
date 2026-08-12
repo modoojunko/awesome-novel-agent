@@ -219,6 +219,8 @@ def check_style_card(path: Path) -> list:
     if inh:
         # 继承目标：场景卡继承主卡（style-profiles/../writing-style.md）或同级场景卡
         candidates = [path.parent / str(inh), path.parent.parent / str(inh)]
+        if path.resolve() in {c.resolve() for c in candidates}:
+            errors.append(f"{path.name}: inherits 自引用（继承自身，会形成环）")
         if not any(c.exists() for c in candidates):
             try:
                 rels = "、".join(str(c.relative_to(ROOT)) for c in candidates)
@@ -226,18 +228,15 @@ def check_style_card(path: Path) -> list:
                 rels = "、".join(str(c) for c in candidates)  # 路径不在 ROOT 下（测试/外部调用）
             errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {rels}）")
     # --- 蒸馏卡可选增强字段（2026-08-12 双态：存在才校验，缺失兼容旧卡/未蒸馏卡） ---
-    def _opt_pct(v):
-        return isinstance(v, (int, float)) and 0 <= v <= 100
-
     def _pct_ok(v):
-        # 决策 A：标量占比字段统一整数百分数 0-100；遗留 0-1 分数兼容（渲染端 _pct 归一 ×100）
+        # 决策 A 修正：标量占比字段一律 0-100 百分数（int 或 float）。
+        # 旧 jieba 引擎产出 0-100 一位小数百分数（13.4），无 0-1 分数假设——0.3 是 0.3% 而非 30%。
         if type(v) not in (int, float) or isinstance(v, bool):
             return False
-        if isinstance(v, int):
-            return 0 <= v <= 100
-        if 0 < v < 1:
-            return True
-        return False
+        return 0 <= v <= 100
+
+    def _pct_field(dim, field, val):
+        errors.append(f"{path.name}: {dim}.{field} 需为 0-100 数值（当前 {val!r}）")
 
     lex = fm.get("lexicon") if isinstance(fm.get("lexicon"), dict) else {}
     npr = lex.get("name_pronoun_ratio")
@@ -249,24 +248,38 @@ def check_style_card(path: Path) -> list:
             for e in _pct_sum_errors(npr, f"{path.name}: name_pronoun_ratio 三维和"):
                 errors.append(e)
     elif npr is not None and not _pct_ok(npr):
-        errors.append(f"{path.name}: lexicon.name_pronoun_ratio 标量需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {npr!r}）")
+        errors.append(f"{path.name}: lexicon.name_pronoun_ratio 标量需为 0-100 数值（旧引擎存人名/代词比值；当前 {npr!r}）")
+    for wf in ("preferred_words", "banned_words"):
+        wv = lex.get(wf)
+        if wv is not None and not isinstance(wv, list):
+            errors.append(f"{path.name}: lexicon.{wf} 需为列表（当前 {type(wv).__name__}）")
 
     syn = fm.get("syntax") if isinstance(fm.get("syntax"), dict) else {}
-    for f in ("question_ratio", "exclamation_ratio"):
+    for f in ("single_sentence_paragraph_pct", "question_ratio", "exclamation_ratio"):
         v = syn.get(f)
         if v is not None and not _pct_ok(v):
-            errors.append(f"{path.name}: syntax.{f} 需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {v!r}）")
+            _pct_field("syntax", f, v)
     dia = fm.get("dialogue_style") if isinstance(fm.get("dialogue_style"), dict) else {}
     if dia.get("subtext_ratio") is not None and not _pct_ok(dia["subtext_ratio"]):
-        errors.append(f"{path.name}: dialogue_style.subtext_ratio 需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {dia['subtext_ratio']!r}）")
+        _pct_field("dialogue_style", "subtext_ratio", dia["subtext_ratio"])
 
     em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
-    if "inner_monologue_pct" in em and not _opt_pct(em["inner_monologue_pct"]):
-        errors.append(f"{path.name}: inner_monologue_pct 需为 0-100 数值（当前 {em['inner_monologue_pct']!r}）")
+    for f in ("direct_pct", "action_physiology_pct", "environment_projection_pct", "inner_monologue_pct"):
+        v = em.get(f)
+        if v is not None and not _pct_ok(v):
+            _pct_field("emotion_expression", f, v)
 
     vs = fm.get("verb_style") if isinstance(fm.get("verb_style"), dict) else {}
     if vs.get("strength") not in (None, "", "weak", "medium", "strong"):
         errors.append(f"{path.name}: verb_style.strength 应为 weak/medium/strong（当前 {vs.get('strength')!r}）")
+    for f in ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio"):
+        v = vs.get(f)
+        if v is not None and not _pct_ok(v):
+            _pct_field("verb_style", f, v)
+
+    coh = fm.get("cohesion") if isinstance(fm.get("cohesion"), dict) else {}
+    if coh.get("transition_sentence_ratio") is not None and not _pct_ok(coh["transition_sentence_ratio"]):
+        _pct_field("cohesion", "transition_sentence_ratio", coh["transition_sentence_ratio"])
 
     for key in ("hard_constraints", "soft_guidance"):
         v = fm.get(key)
@@ -281,6 +294,9 @@ def check_style_card(path: Path) -> list:
         five = {f: rhy[f] for f in _FIVE}
         for e in _pct_sum_errors(five, f"{path.name}: 五层占比总计", max_sum=110):   # 五层可重叠，上限 110%（spec §5.1）
             errors.append(e)
+        for f in _FIVE:                                                             # 单桶 0-100（防 dialogue_pct:110 蒙混）
+            if not _pct_ok(five[f]):
+                _pct_field("rhythm", f, five[f])
 
     _DIST = {"syntax": ["sentence_length_dist"], "rhetoric": ["metaphor_preference", "sensory_dist"]}
     for dim, fields in _DIST.items():
@@ -293,14 +309,55 @@ def check_style_card(path: Path) -> list:
     return errors
 
 
+def _resolve_inherits(p: Path, inh: str) -> Path | None:
+    """inherits 目标解析（与 check_style_card 相同的双候选路径）→ 命中文件或 None。"""
+    for c in (p.parent / inh, p.parent.parent / inh):
+        if c.exists():
+            return c.resolve()
+    return None
+
+
 def check_style_cards() -> list:
     base = ROOT / "templates" / "settings"
     main = base / "writing-style.md"
     if not main.exists():
         return ["templates/settings/writing-style.md 不存在（旧布局仓库？）"]
+    cards = [main] + sorted((base / "style-profiles").rglob("*.md"))   # 递归：含 genre-baselines/**/base|benchmark|delta
     errors = []
-    for p in [main] + sorted((base / "style-profiles").rglob("*.md")):   # 递归：含 genre-baselines/**/base|benchmark|delta
+    for p in cards:
         errors.extend(check_style_card(p))
+    # 继承环检测（跨文件 DFS）：A→B→A 循环在单卡存在性检查中不被发现
+    graph = {}
+    for p in cards:
+        fm_text = _split_frontmatter(p.read_text(encoding="utf-8"))
+        if not fm_text:
+            continue
+        fm = yaml.safe_load(fm_text) or {}
+        if fm.get("inherits"):
+            tgt = _resolve_inherits(p, fm["inherits"])
+            graph[str(p.resolve())] = str(tgt) if tgt else None
+    _visited: set[str] = set()
+    _cycles: set[str] = set()
+
+    def _find_cycle(n: str, stack: list[str]) -> list[str] | None:
+        if n in stack:
+            return stack[stack.index(n):] + [n]
+        if n in _visited or n not in graph:
+            return None
+        _visited.add(n)
+        nxt = graph[n]
+        if nxt:
+            r = _find_cycle(nxt, stack + [n])
+            if r:
+                return r
+        return None
+
+    for start in list(graph):
+        cyc = _find_cycle(start, [])
+        if cyc:
+            _cycles.add(" → ".join(cyc))
+    for cyc in sorted(_cycles):
+        errors.append(f"inherits 继承环：{cyc}")
     return errors
 
 

@@ -18,6 +18,13 @@ TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
+# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+
 from test_util import check, summary, exit_code
 
 def test_feature_extract():
@@ -117,8 +124,8 @@ def test_dual_mode():
     check("prompt-crafting 引用 案例 2 结构", "案例 2" in pc)
 
 def test_unit_convergence():
-    """决策 A：占比字段单位收敛。旧 0-1 分数卡通过校验（渲染端 _pct 归一 ×100）；
-    越界值（>100 / 非整数百分数亦非 0-1 分数，如 1.5）拒绝。"""
+    """决策 A 修正：占比字段一律 0-100 百分数（旧引擎一位小数百分数 13.4/2.31 通过；
+    0.3=0.3% 不乘 100；1.5 是合法百分数）。越界值（>100）拒绝。"""
     import importlib.util, tempfile, yaml
     spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
     mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
@@ -126,15 +133,16 @@ def test_unit_convergence():
 
     fm = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
     fm["confidence"] = 75
-    fm["syntax"]["question_ratio"] = 0.30
-    fm["syntax"]["exclamation_ratio"] = 0.28
-    fm["dialogue_style"]["subtext_ratio"] = 0.25
-    fm["lexicon"]["name_pronoun_ratio"] = 0.99
+    fm["syntax"]["question_ratio"] = 13.4          # 旧引擎一位小数百分数
+    fm["syntax"]["exclamation_ratio"] = 7.2
+    fm["syntax"]["single_sentence_paragraph_pct"] = 46.1
+    fm["dialogue_style"]["subtext_ratio"] = 22.5
+    fm["lexicon"]["name_pronoun_ratio"] = 2.31     # 旧引擎人名/代词比值
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "writing-style.md"
         p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
         errs = mod.check_style_card(p)
-        check("决策A：旧 0-1 分数卡通过校验（渲染端归一）", not errs, "; ".join(errs))
+        check("决策A：旧引擎 0-100 一位小数百分数卡通过校验", not errs, "; ".join(errs))
 
     fm2 = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
     fm2["confidence"] = 75
@@ -152,7 +160,67 @@ def test_unit_convergence():
         p = Path(d) / "writing-style.md"
         p.write_text("---\n" + yaml.safe_dump(fm3, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
         errs = mod.check_style_card(p)
-        check("决策A：subtext_ratio=1.5 拒绝（非整数百分数亦非分数）", any("subtext_ratio" in e for e in errs), errs)
+        check("决策A：subtext_ratio=1.5 通过（1.5% 合法，旧引擎可产出）", not errs, "; ".join(errs))
+
+def test_scalar_percent_validation():
+    """校验端补齐：节奏单桶 >100、transition_sentence_ratio 越界、preferred_words 类型、self-inherits。"""
+    import importlib.util, tempfile, yaml
+    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    base = REPO / "templates/settings/writing-style.md"
+
+    def _check(card_mut, contains):
+        fm = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
+        fm["confidence"] = 75
+        card_mut(fm)
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "writing-style.md"
+            p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+            return mod.check_style_card(p)
+
+    errs = _check(lambda fm: fm["rhythm"].update({"dialogue_pct": 110, "action_pct": 0, "environment_pct": 0, "inner_thought_pct": 0, "narration_pct": 0}), "rhythm")
+    check("节奏单桶 >100 拒绝（dialogue_pct:110）", any("rhythm.dialogue_pct" in e for e in errs), errs)
+    errs = _check(lambda fm: fm["cohesion"].update({"transition_sentence_ratio": 120}), "transition")
+    check("transition_sentence_ratio>100 拒绝", any("transition_sentence_ratio" in e for e in errs), errs)
+    errs = _check(lambda fm: fm["lexicon"].update({"preferred_words": "好想死"}), "preferred")
+    check("preferred_words 非列表拒绝", any("preferred_words" in e for e in errs), errs)
+    errs = _check(lambda fm: fm["lexicon"].update({"banned_words": "宛如"}), "banned")
+    check("banned_words 非列表拒绝", any("banned_words" in e for e in errs), errs)
+
+    # 自引用 inherits 被单卡校验检出
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        fm = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
+        fm["confidence"] = 75
+        fm["scene_type"] = "dialogue"
+        fm["override"] = {"syntax": {"avg_sentence_length": 12}}
+        fm["inherits"] = "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("自引用 inherits 拒绝", any("自引用" in e for e in errs), errs)
+
+def test_inherits_cycle_detected():
+    """继承环（A→B→A）被 check_style_cards 跨文件检出。"""
+    import importlib.util, tempfile, yaml
+    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        tpl = root / "templates" / "settings"
+        tpl.mkdir(parents=True)
+        (tpl / "writing-style.md").write_text("---\nprofile_version: '1.0'\nscene_type: general\nconfidence: 70\nlast_updated: ''\nsource_sample_length: 100\n---\n", encoding="utf-8")
+        sp = tpl / "style-profiles"; sp.mkdir()
+        fm_a = {"profile_version": "1.0", "scene_type": "dialogue", "confidence": 70, "last_updated": "", "source_sample_length": 100, "override": {}, "inherits": "b.md"}
+        fm_b = {"profile_version": "1.0", "scene_type": "dialogue", "confidence": 70, "last_updated": "", "source_sample_length": 100, "override": {}, "inherits": "a.md"}
+        (sp / "a.md").write_text("---\n" + yaml.safe_dump(fm_a, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        (sp / "b.md").write_text("---\n" + yaml.safe_dump(fm_b, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        old_root = mod.ROOT
+        mod.ROOT = root
+        try:
+            errs = mod.check_style_cards()
+        finally:
+            mod.ROOT = old_root
+        check("A→B→A 继承环被检出", any("继承环" in e for e in errs), errs)
 
 def test_verify_doc_code_alignment():
     """#11 修复交叉断言：verify-checklist.md 文档措辞与 style_verify.py 代码行为一致。
@@ -175,6 +243,7 @@ def test_verify_doc_code_alignment():
 def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
     test_reroll_contract(); test_anti_ai_verify(); test_dual_mode(); test_unit_convergence()
+    test_scalar_percent_validation(); test_inherits_cycle_detected()
     test_verify_doc_code_alignment()
     print(f"\n{summary()}")
     return exit_code()

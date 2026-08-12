@@ -1,9 +1,20 @@
 #!/usr/bin/env python3
-"""style_render + style_verify 规则单测（TDD Task 4，长期保留）。"""
+"""style_render + style_verify 规则单测（TDD Task 4，长期保留）。
+
+用法: python tools/test_style_rules.py
+返回码 0 = 全部通过。
+"""
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from style_render import range_for, enum_zh, pct_zh, _pct, render_card, SCENE_INJECTION
+
+# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+from style_render import range_for, enum_zh, pct_zh, _pct, _num, _flatten_dists, render_card, SCENE_INJECTION
 from style_verify import verdict, should_reroll, pick_best, format_report, _is_violated, VIOLATED_STRINGS
 from test_util import check, summary, exit_code
 
@@ -21,7 +32,7 @@ CARD = {
     "emotion_expression": {"direct_pct": 15, "action_physiology_pct": 45, "environment_projection_pct": 5, "inner_monologue_pct": 35},
     "narrative": {"perspective": "third_limited", "focal_character": "贺天然", "inner_monologue_style": "direct"},
     "dialogue_style": {"tag_style": "mixed", "avg_dialogue_length": 12, "interrupt_freq_per_100": 6, "subtext_ratio": 22, "direct_address_freq_per_100": 8},
-    "cohesion": {"conjunction_freq_per_100": 2.6, "transition_sentence_ratio": 0.04, "paragraph_bridge_style": "action"},
+    "cohesion": {"conjunction_freq_per_100": 2.6, "transition_sentence_ratio": 4, "paragraph_bridge_style": "action"},
     "verb_style": {"action_verb_ratio": 35, "mental_verb_ratio": 40, "state_verb_ratio": 25, "strength": "medium"},
     "hard_constraints": ["内心独白必须用引号包裹"],
     "soft_guidance": ["整体基调：轻松吐槽向"],
@@ -33,6 +44,11 @@ def test_range_for():
     check("16@75 → '14-18'", range_for(16, 75) == "14-18", range_for(16, 75))
     check("5.8@50 → 区间加宽 '5-7'(±20%)", range_for(5.8, 50) == "5-7", range_for(5.8, 50))
     check("5.8@90 → '5-6'(±10%)", range_for(5.8, 90) == "5-6", range_for(5.8, 90))
+    check("零值 → '0'（不虚构 0-1）", range_for(0, 75) == "0", range_for(0, 75))
+    check("极低值 0.2@75 → '0'（单值）", range_for(0.2, 75) == "0", range_for(0.2, 75))
+    check("_num(True) → 0（bool 排除）", _num(True) == 0, _num(True))
+    check("_num(nan) → 0（非有限过滤）", _num(float("nan")) == 0, _num(float("nan")))
+    check("_num(inf) → 0", _num(float("inf")) == 0, _num(float("inf")))
 
 def test_enum_zh():
     check("mixed → 标签混合使用", enum_zh("tag_style", "mixed") == "标签混合使用", enum_zh("tag_style", "mixed"))
@@ -80,34 +96,81 @@ def test_render_card_fallback():
     check("缺 inner_monologue_pct 不注入该子项", not any("内心独白" in x for x in lo["情绪表达"]), lo.get("情绪表达"))
 
 def test_pct_normalize():
-    check("0.30 → 30", _pct(0.30) == 30, _pct(0.30))
-    check("0.28 → 28", _pct(0.28) == 28, _pct(0.28))
-    check("0.99 → 99", _pct(0.99) == 99, _pct(0.99))
-    check("0.25 → 25", _pct(0.25) == 25, _pct(0.25))
+    # 决策 A 修正：0-100 百分数语义，无 0-1 分数 ×100 假设（旧引擎产出 0-100 一位小数百分数）
+    check("13.4 → 13.4（旧引擎一位小数百分数）", _pct(13.4) == 13.4, _pct(13.4))
+    check("0.30 → 0.3（低百分数，不做 ×100）", _pct(0.30) == 0.3, _pct(0.30))
+    check("0.99 → 0.99", _pct(0.99) == 0.99, _pct(0.99))
+    check("2.31 → 2.31（旧引擎人名/代词比值）", _pct(2.31) == 2.31, _pct(2.31))
     check("整数原样 23 → 23", _pct(23) == 23, _pct(23))
+    check("23.0 → 23（整数值收敛为 int）", _pct(23.0) == 23, _pct(23.0))
     check("0 → 0", _pct(0) == 0, _pct(0))
-    check("字符串分数 '0.30' → 30", _pct("0.30") == 30, _pct("0.30"))
+    check("字符串 '13.4' → 13.4", _pct("13.4") == 13.4, _pct("13.4"))
     check("None → 0", _pct(None) == 0, _pct(None))
     check("非法串 → 0", _pct("abc") == 0, _pct("abc"))
+    check("越界 150 → 0（防御收敛）", _pct(150) == 0, _pct(150))
+    check("bool True → 0（bool 排除）", _pct(True) == 0, _pct(True))
 
 def test_render_percent_normalize():
+    # 决策 A 修正：旧引擎 0-100 一位小数百分数按原样渲染（13.4%），不做 ×100
     legacy = dict(CARD)
-    legacy["lexicon"] = dict(CARD["lexicon"])
-    legacy["lexicon"]["name_pronoun_ratio"] = 0.99                    # 旧 jieba 单值分数
     legacy["syntax"] = dict(CARD["syntax"])
-    legacy["syntax"]["question_ratio"] = 0.30
-    legacy["syntax"]["exclamation_ratio"] = 0.28
+    legacy["syntax"]["question_ratio"] = 13.4
+    legacy["syntax"]["exclamation_ratio"] = 7.2
     legacy["dialogue_style"] = dict(CARD["dialogue_style"])
-    legacy["dialogue_style"]["subtext_ratio"] = 0.25
+    legacy["dialogue_style"]["subtext_ratio"] = 22.5
     lo = render_card(legacy)
-    check("分数 question_ratio 0.30 → 渲染 30%（一部分）", any("疑问句占比：30%（一部分）" in x for x in lo["句式"]), lo.get("句式"))
-    check("分数 exclamation_ratio 0.28 → 渲染 28%", any("感叹句占比：28%" in x for x in lo["句式"]), lo.get("句式"))
-    check("分数 name_pronoun_ratio 0.99 → 渲染 99%", any("人名/代词使用比例 99%" in x for x in lo["词汇"]), lo.get("词汇"))
-    check("分数 subtext_ratio 0.25 → 渲染 25%", any("潜台词占比：25%" in x for x in lo["对话风格"]), lo.get("对话风格"))
+    check("旧百分数 question_ratio 13.4 → 13.4%（少量）", any("疑问句占比：13.4%（少量）" in x for x in lo["句式"]), lo.get("句式"))
+    check("旧百分数 exclamation_ratio 7.2 → 7.2%", any("感叹句占比：7.2%" in x for x in lo["句式"]), lo.get("句式"))
+    check("旧百分数 subtext_ratio 22.5 → 22.5%", any("潜台词占比：22.5%" in x for x in lo["对话风格"]), lo.get("对话风格"))
     out = render_card(CARD)
     check("整数 question_ratio 13 → 渲染 13%（少量）", any("疑问句占比：13%（少量）" in x for x in out["句式"]), out.get("句式"))
     check("整数 subtext_ratio 22 → 渲染 22%", any("潜台词占比：22%" in x for x in out["对话风格"]), out.get("对话风格"))
     check("密度字段不受 _pct 归一（每百字 X）", any("每百字 5-6" in x for x in out["词汇"]), out.get("词汇"))
+
+def test_render_percent_all_fields_consistent():
+    # 全部标量百分比字段统一 0-100 展示（旧引擎一位小数百分数不乘 100、不原样吞掉）
+    legacy = dict(CARD)
+    legacy["lexicon"] = dict(CARD["lexicon"]); legacy["lexicon"]["name_pronoun_ratio"] = 2.31   # 旧引擎人名/代词比值
+    legacy["syntax"] = dict(CARD["syntax"]); legacy["syntax"]["single_sentence_paragraph_pct"] = 46.1
+    legacy["rhythm"] = dict(CARD["rhythm"]); legacy["rhythm"]["dialogue_pct"] = 48.2
+    legacy["emotion_expression"] = dict(CARD["emotion_expression"])
+    legacy["emotion_expression"]["direct_pct"] = 15.1; legacy["emotion_expression"]["inner_monologue_pct"] = 34.8
+    legacy["verb_style"] = dict(CARD["verb_style"]); legacy["verb_style"]["action_verb_ratio"] = 35.4
+    lo = render_card(legacy)
+    check("单句段 46.1 → 46.1%", any("单句段占比 ≥ 46.1%" in x for x in lo["句式"]), lo.get("句式"))
+    check("对话 48.2 → 48.2%（近一半）", any("对话约 48.2%（近一半）" in x for x in lo["节奏"]), lo.get("节奏"))
+    check("直接陈述 15.1 → 15.1%", any("直接陈述 15.1%" in x for x in lo["情绪表达"]), lo.get("情绪表达"))
+    check("内心独白 34.8 → 34.8%", any("内心独白 34.8%" in x for x in lo["情绪表达"]), lo.get("情绪表达"))
+    check("动词动作 35.4 → 35.4%", any("动作 35.4%" in x for x in lo["句式"]), lo.get("句式"))
+    check("过渡句 4 → 4%（cohesion 渲染补齐）", any("过渡句占比：4%" in x for x in lo["衔接"]), lo.get("衔接"))
+    check("名称比值 2.31 → 2.31（不乘 100）", any("人名/代词使用比例 2.31" in x for x in lo["词汇"]), lo.get("词汇"))
+
+def test_render_density_skip_unmeasured():
+    # 缺密度键 = 未测 → 不注入（防 or 0 把未测当实测 0）
+    sparse = dict(CARD)
+    sparse["lexicon"] = dict(CARD["lexicon"])
+    sparse["lexicon"].pop("adj_density_per_100")
+    out = render_card(sparse)
+    check("缺形容词密度键不注入", not any("形容词密度" in x for x in out["词汇"]), out.get("词汇"))
+    check("副词密度仍在", any("副词密度：每百字 3-4" in x for x in out["词汇"]), out.get("词汇"))
+
+def test_render_override_guard():
+    # 未合并场景卡（override-only）→ 明确报错，防静默全零渲染（spec §6.3）
+    scene = {"confidence": 75, "scene_type": "dialogue",
+             "override": {"lexicon": {"adj_density_per_100": 5.8}, "dialogue_style": {"subtext_ratio": 22}},
+             "inherits": "writing-style.md"}
+    try:
+        render_card(scene, "dialogue")
+        check("未合并场景卡应 raise ValueError", False, "no raise")
+    except ValueError:
+        check("未合并场景卡 raise ValueError", True)
+
+def test_flatten_dists_clean():
+    check("负值桶丢弃", _flatten_dists({"short_le_8": -5}) == [], _flatten_dists({"short_le_8": -5}))
+    check("非法字符串桶丢弃", _flatten_dists({"short_le_8": "abc"}) == [], _flatten_dists({"short_le_8": "abc"}))
+    check("字符串数值收敛（'35' → 35%）", _flatten_dists({"short_le_8": "35"}) == ["短句（≤8字）占比 35%"], _flatten_dists({"short_le_8": "35"}))
+    check("0.5 合法桶保留", _flatten_dists({"short_le_8": 0.5}) == ["短句（≤8字）占比 0.5%"], _flatten_dists({"short_le_8": 0.5}))
+    check("nan 桶丢弃", _flatten_dists({"short_le_8": float("nan")}) == [], _flatten_dists({"short_le_8": float("nan")}))
 
 def test_verify_string_bool():
     # #11 修复：字符串布尔收敛——剥尾部标点后按白名单匹配（是。→是），白名单外一律不违反
@@ -140,6 +203,12 @@ def test_verify_pick_best():
     check("取违反最少", pick_best(rounds)["violated"] == 1, pick_best(rounds))
     check("同分取最新", pick_best(rounds)["round"] == 3, pick_best(rounds))
 
+def test_verify_pick_best_coerce():
+    # 字符串条数收敛（LLM 可能输出 "3"）：混合 int/str 不崩、全 str 按数值选（非字典序）
+    check("混合 int/str 不崩且选对", pick_best([{"violated": 3}, {"violated": "1"}])["violated"] in (1, "1"))
+    check("全字符串按数值取最少（10 vs 3 → 3）", pick_best([{"violated": "10"}, {"violated": "3"}])["violated"] == "3")
+    check("None violated → 0", pick_best([{"violated": None}])["violated"] == 0 or pick_best([{"violated": None}])["violated"] is None)
+
 def test_verify_report():
     r = format_report([{"no": 1, "require": "禁'宛如'", "evidence": "出现1次", "violated": True, "advice": "替换"}])
     check("含表头", "原文要求" in r, r)
@@ -147,7 +216,9 @@ def test_verify_report():
 
 test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
 test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
-test_pct_normalize(); test_render_percent_normalize()
-test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report(); test_verify_string_bool()
+test_pct_normalize(); test_render_percent_normalize(); test_render_percent_all_fields_consistent()
+test_render_density_skip_unmeasured(); test_render_override_guard(); test_flatten_dists_clean()
+test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_pick_best_coerce()
+test_verify_report(); test_verify_string_bool()
 print(f"\n{summary()}")
 sys.exit(exit_code())

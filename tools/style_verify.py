@@ -9,8 +9,20 @@
 - format_report     违反报告表格渲染（条号/原文要求/正文表现/违反与否/建议 + 结论行）
 
 anti-ai 按此口径输出违反报告（格式见 verify-checklist.md）；本模块是确定性测试编码。
+
+用法: python tools/style_verify.py < violations.json
+返回码 0 = 成功（结论 PASS/FAIL 见报告末行）。
 """
 from __future__ import annotations
+
+import sys
+
+# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
 
 # 1) 验收检查项四类（spec 7.1）
 CHECK_CATEGORIES = ["数值/占比条", "硬性规则条", "建模规则条", "软引导条"]
@@ -39,13 +51,21 @@ def should_reroll(round_no: int, violated: int) -> bool:
     """抽卡判定（spec 7.2）：round < 3 且本轮有违反 → 重写"""
     return round_no < 3 and violated > 0
 
+def _violated_count(v) -> int:
+    """violated 数值收敛：int/float 原样、数字字符串转 int、其余/None → 0。
+    LLM 可能输出字符串条数（"3"），原生比较会 TypeError 或按字典序选错（"10" < "3"）。"""
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return 0
+
 def pick_best(rounds: list[dict]) -> dict:
     """超限取最优（spec 7.2）：违反条数最少的一轮，同分取最新。
     同分按列表位置（越靠后越新）取最新，避免依赖 dict ==（相同 dict 会退化成取最旧）。
     空轮次列表返回空 dict（调用方按无违反处理），避免 min() 抛 ValueError。"""
     if not rounds:
         return {}
-    return min(enumerate(rounds), key=lambda ir: (ir[1].get("violated", 0), -ir[0]))[1]
+    return min(enumerate(rounds), key=lambda ir: (_violated_count(ir[1].get("violated", 0)), -ir[0]))[1]
 
 def format_report(items: list[dict]) -> str:
     """违反报告表格渲染（spec 7.1 输出格式）"""

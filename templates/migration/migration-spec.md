@@ -94,20 +94,22 @@
 
 | 新模板位置 | 旧版来源 | 迁移方式 | 验收 |
 |-----------|---------|---------|------|
-| `## role` | `writing-style.yaml → role` | ✅ 直接填 | 非空 |
-| `## role`（合并 personality） | `writing-style.yaml → personality` | 🔄 合并到 role 段末尾 | 非空 |
-| `## core_principles` | `writing-style.yaml → core_principles.*` | 🔄 所有子字段合并为一个列表 | 非空，无重复 |
-| `## possible_mistakes` | `writing-style.yaml → possible_mistakes` | ✅ 直接填 | 非空 |
-| `## depiction_techniques` | `writing-style.yaml → depiction_techniques` | ✅ 直接填 | 非空 |
+| role（叙事身份） | `writing-style.yaml → role` | ✅ 直接填 | 非空 |
+| role（叙事身份）（合并 personality） | `writing-style.yaml → personality` | 🔄 合并到 role 段末尾 | 非空 |
+| core_principles（不可违背的写作信条） | `writing-style.yaml → core_principles.*` | 🔄 所有子字段合并为一个列表 | 非空，无重复 |
+| possible_mistakes（AI 易犯错误） | `writing-style.yaml → possible_mistakes` | ✅ 直接填 | 非空 |
+| depiction_techniques（描写层次和手法） | `writing-style.yaml → depiction_techniques` | ✅ 直接填 | 非空 |
 
-**说明：** 新版使用 markdown 格式（非 YAML）。旧版 `core_principles` 的 5 个子字段（global_rules / natural_expression / description_vs_depiction / character_building / pov_consistency）合并为一个列表写入 `## core_principles`。`personality` 合并到 `## role` 段末尾。`genre_profile` → 写入 §8 genre-setting.md。`workflow` / `writing_model` → 新版无对应位置，迁移时跳过。
+**说明：** 新版使用 markdown 格式（非 YAML）。旧版 `core_principles` 的 5 个子字段（global_rules / natural_expression / description_vs_depiction / character_building / pov_consistency）合并为一个列表写入 `## 核心原则`。`personality` 合并到 role 段末尾。`genre_profile` → 写入 §8 genre-setting.md。`workflow` / `writing_model` → 新版无对应位置，迁移时跳过。
+
+> **迁移实际读取的标题**（2026-08-12 对齐 init.py `migrate_writing_style`）：旧 .md 卡正文标题为中文后缀形式——`## role（叙事身份）` / `## core_principles（不可违背的写作信条）` / `## possible_mistakes（AI 易犯错误）` / `## depiction_techniques（描写层次和手法）`（见仓库历史 f4bb229）。迁移按完整标题提取；上表 `role`/`core_principles` 等为 YAML 字段键简写，非字面标题。裸英文标题（`## role` 等）不存在于实际旧卡，无需兼容。
 
 ### 验收
 
-- ## role 段已合并 personality，内容非空
-- ## core_principles 包含旧版所有子字段的内容
-- ## possible_mistakes 完整迁移
-- ## depiction_techniques 完整迁移
+- role（叙事身份）段已合并 personality，内容非空
+- core_principles（不可违背的写作信条）包含旧版所有子字段的内容
+- possible_mistakes（AI 易犯错误）完整迁移
+- depiction_techniques（描写层次和手法）完整迁移
 - 与旧文件对比确认无遗漏
 
 ---

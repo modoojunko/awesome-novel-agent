@@ -212,6 +212,10 @@ def check_freshness(project: Path, platform: Platform):
         changes = find_changes(project, platform)
         if not changes and platform.key in ("reasonix", "codex"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
+        elif not changes:
+            # 指纹含风格资产（writing-style.md + style-profiles/**，line 143-149）而 find_changes 只扫
+            # agents/skills/knowledge → 剩余变化只能是风格资产，给准确提示而非「0 个文件发生变化」空列表。
+            print("有更新可用（风格资产变化，将同步到 settings/）。")
         else:
             lines = [f"有更新可用 ({len(changes)} 个文件发生变化):"]
             for f in changes:

@@ -9,24 +9,35 @@
 - render_card   卡 → 案例 2 各节渲染条目（prompt-crafter 只读引用；测试直接 import）
 
 用法: python tools/style_render.py --card settings/writing-style.md
+返回码 0 = 成功；2 = 卡缺 frontmatter。
 """
 from __future__ import annotations
 
 import argparse
+import math
 import sys
 
-# 0) 数值防御：LLM 或手改 YAML 可能把数值写成字符串，渲染端统一收敛（spec 卡值应为数值）
+# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+
+# 0) 数值防御：LLM 或手改 YAML 可能把数值写成字符串/bool/nan/inf，渲染端统一收敛（spec 卡值应为数值）
 def _num(v, default: float = 0.0) -> float:
-    """字符串/数值 → float；None/非法 → default。纯防御，不抛异常。"""
-    if v is None:
+    """字符串/数值 → float；None/bool/nan/inf/非法 → default。纯防御，不抛异常。"""
+    if v is None or isinstance(v, bool):
         return default
     if isinstance(v, (int, float)):
-        return float(v)
+        f = float(v)
+        return f if math.isfinite(f) else default
     if isinstance(v, str):
         try:
-            return float(v.strip())
+            f = float(v.strip())
         except ValueError:
             return default
+        return f if math.isfinite(f) else default
     return default
 
 # 1) 密度类区间：confidence → ±%（spec 6.1a）
@@ -44,7 +55,7 @@ def range_for(value: float, confidence: int) -> str:
     lo = max(0, round(value * (1 - tier)))
     hi = round(value * (1 + tier))
     if hi <= lo:
-        hi = lo + 1
+        return str(lo)   # 零值/极低值：单值（0 个/0 字），不虚构非零区间（防「每百字 0-1 个」假实测）
     return f"{lo}-{hi}"
 
 # 2) 类别枚举 → 中文（spec 6.2，逐字对齐）
@@ -70,15 +81,18 @@ def pct_zh(value: float) -> str:
     if value >= 20: return "一部分"
     return "少量"
 
-def _pct(v, default: float = 0.0) -> int:
-    """占比/比例字段单位收敛（spec 决策 A）：0<v<1 视为分数 → ×100 取整；v≥1 视为整数百分数原样保留。
+def _pct(v, default: float = 0.0):
+    """占比/比例字段单位收敛（spec 决策 A 修正）：一律按 0-100 百分数展示，不做 ×100。
 
-    仅用于标量百分比字段（name_pronoun_ratio 单值 / question_ratio / exclamation_ratio / subtext_ratio）。
+    旧 jieba 引擎（distill-style.py）产出 round(100*x/n,1) 的 0-100 一位小数百分数（如 13.4），
+    从未产出 0-1 分数；因此 0<v<1 视为合法低百分数（0.3 = 0.3%），消除旧 ×100 把 0.3 误判成 30% 的错。
+
+    适用于全部标量百分比字段（question/exclamation/subtext/单句段/五层节奏/情绪 pct/动词比/过渡句/name_pronoun 单值）。
     分布桶（sentence_length_dist 等，0.5 作为 bucket 合法 = 0.5%）与密度字段（每百字 X 个）不得套用。"""
     v = _num(v, default)
-    if 0 < v < 1:
-        return round(v * 100)
-    return int(v)
+    if v < 0 or v > 100:
+        return 0
+    return int(v) if float(v).is_integer() else v
 
 # 4) 场景稀疏注入矩阵（spec 6.3 / 旧 injection-template 表）
 SCENE_INJECTION = {
@@ -94,13 +108,19 @@ SCENE_INJECTION = {
 
 # 5) 卡 → 案例 2 各节渲染
 def _flatten_dists(d: dict) -> list[str]:
-    """sentence_length_dist 等分布 → 阈值分条"""
+    """sentence_length_dist 等分布 → 阈值分条。数值收敛：字符串→数值、零/负/nan/inf 丢弃（0.5 合法桶保留）。"""
     zh = {"short_le_8": "短句（≤8字）", "medium_9_20": "中句（9-20字）",
           "long_21_35": "长句（21-35字）", "xlong_gt_35": "超长句（>35字）",
           "weapon_metal": "兵器金属", "nature": "自然", "body": "身体", "abstract": "抽象", "other": "其他",
           "visual": "视觉", "auditory": "听觉", "tactile": "触觉", "olfactory": "嗅觉", "gustatory": "味觉",
           "name": "人名", "he_she": "他/她", "i_you": "我/你"}
-    return [f"{zh.get(k, k)}占比 {v}%" for k, v in d.items() if v]
+    out = []
+    for k, v in d.items():
+        v = _num(v)
+        if v <= 0:
+            continue
+        out.append(f"{zh.get(k, k)}占比 {v:g}%")
+    return out
 
 def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]:
     conf = int(_num(card.get("confidence")))
@@ -115,14 +135,23 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
         return out
     dims = SCENE_INJECTION.get(scene_type, SCENE_INJECTION["general"])   # 稀疏注入（spec 6.3）
 
+    # 场景卡守卫（spec §6.3）：未合并 override 的卡（style-distill 落盘形状）→ 明确报错，防静默全零渲染
+    if "override" in card and not any(d in card for d in SCENE_INJECTION["general"]):
+        raise ValueError(
+            "render_card 收到未合并的场景卡（含 override 但无顶层 9 维）——请先叠加主卡"
+            "（inherits 解析 + override 深合并）再渲染")
+
     # 词汇
     if "lexicon" in dims:
         lex = card.get("lexicon") or {}
-        out["词汇"].append(f"形容词密度：每百字 {range_for(lex.get('adj_density_per_100') or 0, conf)} 个")
-        out["词汇"].append(f"副词密度：每百字 {range_for(lex.get('adv_density_per_100') or 0, conf)} 个")
-        out["词汇"].append(f"四字短语频率：每百字 {range_for(lex.get('four_phrase_freq_per_100') or 0, conf)} 个")
-        if lex.get("preferred_words"):
-            out["词汇"].append("偏好词：" + "、".join(lex["preferred_words"]))
+        for _k, _zh in (("adj_density_per_100", "形容词密度"), ("adv_density_per_100", "副词密度"),
+                        ("four_phrase_freq_per_100", "四字短语频率")):
+            _v = lex.get(_k)
+            if _v is not None:                                    # 缺键/未测 → 不注入（旧引擎 None=未测 vs 0）
+                out["词汇"].append(f"{_zh}：每百字 {range_for(_v, conf)} 个")
+        pw = _as_list(lex.get("preferred_words"))                 # 字符串按单项包裹，防逐字拆分
+        if pw:
+            out["词汇"].append("偏好词：" + "、".join(pw))
         npr = lex.get("name_pronoun_ratio")
         if isinstance(npr, dict):
             out["词汇"].extend(_flatten_dists(npr))                       # 三维 → 逐桶
@@ -135,7 +164,7 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
         sld = syn.get("sentence_length_dist")
         if isinstance(sld, dict):
             out["句式"].extend(_flatten_dists(sld))
-        out["句式"].append(f"单句段占比 ≥ {syn.get('single_sentence_paragraph_pct') or 0}%")
+        out["句式"].append(f"单句段占比 ≥ {_pct(syn.get('single_sentence_paragraph_pct'))}%")
         out["句式"].append(f"每段平均句数：{syn.get('avg_sentences_per_paragraph') or 0} 句")
         qr = _pct(syn.get('question_ratio'))
         out["句式"].append(f"疑问句占比：{qr}%（{pct_zh(qr)}）")
@@ -145,17 +174,20 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
         if vs.get("strength"):
             out["句式"].append(enum_zh("strength", vs["strength"]))
         if any(k in vs for k in ("action_verb_ratio", "mental_verb_ratio", "state_verb_ratio")):
-            out["句式"].append(f"动词：动作 {vs.get('action_verb_ratio') or 0}% / 心理 {vs.get('mental_verb_ratio') or 0}% / 状态 {vs.get('state_verb_ratio') or 0}%")
+            out["句式"].append(f"动词：动作 {_pct(vs.get('action_verb_ratio'))}% / 心理 {_pct(vs.get('mental_verb_ratio'))}% / 状态 {_pct(vs.get('state_verb_ratio'))}%")
     # 节奏
     if "rhythm" in dims:
         rhy = card.get("rhythm") or {}
-        out["节奏"].append(f"对话约 {rhy.get('dialogue_pct') or 0}%（{pct_zh(rhy.get('dialogue_pct') or 0)}）")
-        out["节奏"].append(f"动作约 {rhy.get('action_pct') or 0}%、环境约 {rhy.get('environment_pct') or 0}%")
-        out["节奏"].append(f"内心独白约 {rhy.get('inner_thought_pct') or 0}%、叙述约 {rhy.get('narration_pct') or 0}%")
+        _dp = _pct(rhy.get("dialogue_pct"))
+        out["节奏"].append(f"对话约 {_dp}%（{pct_zh(_dp)}）")
+        out["节奏"].append(f"动作约 {_pct(rhy.get('action_pct'))}%、环境约 {_pct(rhy.get('environment_pct'))}%")
+        out["节奏"].append(f"内心独白约 {_pct(rhy.get('inner_thought_pct'))}%、叙述约 {_pct(rhy.get('narration_pct'))}%")
     # 修辞
     if "rhetoric" in dims:
         rhe = card.get("rhetoric") or {}
-        out["修辞与感官"].append(f"比喻密度：每百字 {range_for(rhe.get('metaphor_density_per_100') or 0, conf)} 个")
+        _md = rhe.get("metaphor_density_per_100")
+        if _md is not None:
+            out["修辞与感官"].append(f"比喻密度：每百字 {range_for(_md, conf)} 个")
         mp = rhe.get("metaphor_preference")
         if isinstance(mp, dict):
             out["修辞与感官"].append("常用喻体：" + "、".join(_flatten_dists(mp)))
@@ -165,23 +197,29 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
     # 情绪
     if "emotion_expression" in dims:
         emo = card.get("emotion_expression") or {}
-        out["情绪表达"].append(f"直接陈述 {emo.get('direct_pct') or 0}%、动作/生理 {emo.get('action_physiology_pct') or 0}%")
+        out["情绪表达"].append(f"直接陈述 {_pct(emo.get('direct_pct'))}%、动作/生理 {_pct(emo.get('action_physiology_pct'))}%")
         if emo.get("inner_monologue_pct") is not None:                    # 缺省不注入该子项（spec 6.0b/4.1）
-            out["情绪表达"].append(f"环境投射 {emo.get('environment_projection_pct') or 0}%、内心独白 {emo.get('inner_monologue_pct') or 0}%")
+            out["情绪表达"].append(f"环境投射 {_pct(emo.get('environment_projection_pct'))}%、内心独白 {_pct(emo.get('inner_monologue_pct'))}%")
         else:
-            out["情绪表达"].append(f"环境投射 {emo.get('environment_projection_pct') or 0}%")
+            out["情绪表达"].append(f"环境投射 {_pct(emo.get('environment_projection_pct'))}%")
     # 对话
     if "dialogue_style" in dims:
         dia = card.get("dialogue_style") or {}
         if dia.get("tag_style"):
             out["对话风格"].append(enum_zh("tag_style", dia["tag_style"]))
         out["对话风格"].append(f"平均对话长度：{range_for(dia.get('avg_dialogue_length') or 0, conf)} 字")
-        out["对话风格"].append(f"打断频率：每百字 {range_for(dia.get('interrupt_freq_per_100') or 0, conf)} 次")
+        _if = dia.get('interrupt_freq_per_100')
+        if _if is not None:
+            out["对话风格"].append(f"打断频率：每百字 {range_for(_if, conf)} 次")
         out["对话风格"].append(f"潜台词占比：{_pct(dia.get('subtext_ratio'))}%")
     # 衔接
     if "cohesion" in dims:
         coh = card.get("cohesion") or {}
-        out["衔接"].append(f"连接词频率：每百字 {range_for(coh.get('conjunction_freq_per_100') or 0, conf)} 次")
+        _cf = coh.get('conjunction_freq_per_100')
+        if _cf is not None:
+            out["衔接"].append(f"连接词频率：每百字 {range_for(_cf, conf)} 次")
+        if coh.get("transition_sentence_ratio") is not None:              # spec 声明，渲染/校验端补齐（review #22）
+            out["衔接"].append(f"过渡句占比：{_pct(coh.get('transition_sentence_ratio'))}%")
         if coh.get("paragraph_bridge_style"):
             out["衔接"].append(enum_zh("paragraph_bridge_style", coh["paragraph_bridge_style"]))
     # 视角

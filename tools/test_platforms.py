@@ -18,6 +18,13 @@ import sys
 import tempfile
 from pathlib import Path
 
+# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
+for _s in (sys.stdout, sys.stderr):
+    try:
+        _s.reconfigure(encoding="utf-8")
+    except AttributeError:
+        pass
+
 try:
     import tomllib
 except ImportError:  # Python < 3.11

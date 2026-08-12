@@ -539,18 +539,19 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
     )
 
     # writing-style.md → 新格式（frontmatter 量化层 + 正文定性层）
-    # 守卫：卡已存在且正文无未填充 {...} 占位符 → 已有实质内容（迁移产物/作者编辑），不覆盖。
-    # 注：frontmatter 量化层恒含 `{ ... }` 内联字典，不能以 `"{" in text` 判未填；
-    #     须按正文占位符 token（{role}/{principle_1}/{mistake_1}/{depiction_techniques}）判断。
+    # 守卫：区分 seed 产物（正文带 [auto-seeded] 标记，_write_new_style_card 注入）与迁移/作者编辑产物（无标记）。
+    #   - seed 卡：仍含 {role}/{principle_1} 等占位符 → 未填，可重 seed；已填 → 跳过。
+    #   - 迁移/作者编辑卡：无论是否含「（待设定）」等文字一律保留，绝不被题材种子覆盖（防同 run 覆盖迁移产物）。
+    # 注：frontmatter 量化层恒含 `{ ... }` 内联字典，不能以 `"{" in text` 判未填。
     role = _md_section(text, "叙事者角色") or "（待设定）"
     blueprint = _md_section(text, "文风蓝图") or "（待设定）"
     style_card = project_path / "settings" / "writing-style.md"
-    _STYLE_CARD_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}", "（待设定）")
-    filled = style_card.exists() and not any(
-        tok in style_card.read_text(encoding="utf-8") for tok in _STYLE_CARD_PLACEHOLDERS
-    )
+    _STYLE_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}")
+    _st_text = style_card.read_text(encoding="utf-8") if style_card.exists() else ""
+    _seeded_card = "[auto-seeded]" in _st_text
+    filled = bool(_st_text) and (not _seeded_card or not any(tok in _st_text for tok in _STYLE_PLACEHOLDERS))
     if filled:
-        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）")
+        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）；genre-setting.md 已按新题材更新")
     else:
         _write_new_style_card(
             style_card,
@@ -559,7 +560,7 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
             mistakes=taboo,
             depiction=blueprint or "{depiction_techniques}",
         )
-    print(f"  ✅ 已按题材预填 settings/genre-setting.md + writing-style.md 默认值（{genre}）")
+        print(f"  ✅ 已按题材预填 settings/genre-setting.md + writing-style.md 默认值（{genre}）")
 
 
 def migrate_writing_style(project_path: Path) -> None:
