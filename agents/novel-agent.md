@@ -252,7 +252,7 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | 仅当前目录内的项目文件 | 绝不读项目之外的路径 |
-  | Write | `.agent/task/*-order.md`、`.agent/status.md` | 不写 settings/、chapters/、volumes/、prompts/、archives/、.claude/ 下的任何文件 |
+  | Write | `.agent/task/*-order.md`、`.agent/task/*-violations.md`、`.agent/status.md` | 不写 settings/、chapters/、volumes/、prompts/、archives/、.claude/ 下的任何文件 |
   | Agent | volume-planner、chapter-planner、prompt-crafter、writer、anti-ai、reader、updater | 不调用其他 agent |
   | Glob | 仅当前目录内 | 绝不 glob 项目之外的路径 |
   | Grep | 仅当前目录内 | 绝不 grep 项目之外的路径 |
