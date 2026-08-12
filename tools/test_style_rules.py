@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from style_render import range_for, enum_zh, pct_zh, render_card, SCENE_INJECTION
+from style_render import range_for, enum_zh, pct_zh, _pct, render_card, SCENE_INJECTION
 from style_verify import verdict, should_reroll, pick_best, format_report
 from test_util import check, summary, exit_code
 
@@ -79,6 +79,36 @@ def test_render_card_fallback():
     check("单值 npr 渲染为比例", any("人名/代词使用比例 55%" in x for x in lo["词汇"]), lo.get("词汇"))
     check("缺 inner_monologue_pct 不注入该子项", not any("内心独白" in x for x in lo["情绪表达"]), lo.get("情绪表达"))
 
+def test_pct_normalize():
+    check("0.30 → 30", _pct(0.30) == 30, _pct(0.30))
+    check("0.28 → 28", _pct(0.28) == 28, _pct(0.28))
+    check("0.99 → 99", _pct(0.99) == 99, _pct(0.99))
+    check("0.25 → 25", _pct(0.25) == 25, _pct(0.25))
+    check("整数原样 23 → 23", _pct(23) == 23, _pct(23))
+    check("0 → 0", _pct(0) == 0, _pct(0))
+    check("字符串分数 '0.30' → 30", _pct("0.30") == 30, _pct("0.30"))
+    check("None → 0", _pct(None) == 0, _pct(None))
+    check("非法串 → 0", _pct("abc") == 0, _pct("abc"))
+
+def test_render_percent_normalize():
+    legacy = dict(CARD)
+    legacy["lexicon"] = dict(CARD["lexicon"])
+    legacy["lexicon"]["name_pronoun_ratio"] = 0.99                    # 旧 jieba 单值分数
+    legacy["syntax"] = dict(CARD["syntax"])
+    legacy["syntax"]["question_ratio"] = 0.30
+    legacy["syntax"]["exclamation_ratio"] = 0.28
+    legacy["dialogue_style"] = dict(CARD["dialogue_style"])
+    legacy["dialogue_style"]["subtext_ratio"] = 0.25
+    lo = render_card(legacy)
+    check("分数 question_ratio 0.30 → 渲染 30%（一部分）", any("疑问句占比：30%（一部分）" in x for x in lo["句式"]), lo.get("句式"))
+    check("分数 exclamation_ratio 0.28 → 渲染 28%", any("感叹句占比：28%" in x for x in lo["句式"]), lo.get("句式"))
+    check("分数 name_pronoun_ratio 0.99 → 渲染 99%", any("人名/代词使用比例 99%" in x for x in lo["词汇"]), lo.get("词汇"))
+    check("分数 subtext_ratio 0.25 → 渲染 25%", any("潜台词占比：25%" in x for x in lo["对话风格"]), lo.get("对话风格"))
+    out = render_card(CARD)
+    check("整数 question_ratio 13 → 渲染 13%（少量）", any("疑问句占比：13%（少量）" in x for x in out["句式"]), out.get("句式"))
+    check("整数 subtext_ratio 22 → 渲染 22%", any("潜台词占比：22%" in x for x in out["对话风格"]), out.get("对话风格"))
+    check("密度字段不受 _pct 归一（每百字 X）", any("每百字 5-6" in x for x in out["词汇"]), out.get("词汇"))
+
 def test_verify_verdict():
     ok = [{"no": 1, "require": "禁'宛如'", "evidence": "无", "violated": False}]
     bad = [{"no": 1, "require": "禁'宛如'", "evidence": "出现1次", "violated": True}]
@@ -102,6 +132,7 @@ def test_verify_report():
 
 test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
 test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
+test_pct_normalize(); test_render_percent_normalize()
 test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_report()
 print(f"\n{summary()}")
 sys.exit(exit_code())

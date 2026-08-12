@@ -70,6 +70,16 @@ def pct_zh(value: float) -> str:
     if value >= 20: return "一部分"
     return "少量"
 
+def _pct(v, default: float = 0.0) -> int:
+    """占比/比例字段单位收敛（spec 决策 A）：0<v<1 视为分数 → ×100 取整；v≥1 视为整数百分数原样保留。
+
+    仅用于标量百分比字段（name_pronoun_ratio 单值 / question_ratio / exclamation_ratio / subtext_ratio）。
+    分布桶（sentence_length_dist 等，0.5 作为 bucket 合法 = 0.5%）与密度字段（每百字 X 个）不得套用。"""
+    v = _num(v, default)
+    if 0 < v < 1:
+        return round(v * 100)
+    return int(v)
+
 # 4) 场景稀疏注入矩阵（spec 6.3 / 旧 injection-template 表）
 SCENE_INJECTION = {
     "general": ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expression",
@@ -116,8 +126,8 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
         npr = lex.get("name_pronoun_ratio")
         if isinstance(npr, dict):
             out["词汇"].extend(_flatten_dists(npr))                       # 三维 → 逐桶
-        elif isinstance(npr, (int, float)):                               # 单值（旧 jieba 卡）→ 比例（spec 6.0b）
-            out["词汇"].append(f"人名/代词使用比例 {npr}%")
+        elif isinstance(npr, (int, float)):                               # 单值（旧 jieba 卡）→ 归一化比例（spec 6.0b）
+            out["词汇"].append(f"人名/代词使用比例 {_pct(npr)}%")
     # 句式
     if "syntax" in dims:
         syn = card.get("syntax") or {}
@@ -127,8 +137,9 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
             out["句式"].extend(_flatten_dists(sld))
         out["句式"].append(f"单句段占比 ≥ {syn.get('single_sentence_paragraph_pct') or 0}%")
         out["句式"].append(f"每段平均句数：{syn.get('avg_sentences_per_paragraph') or 0} 句")
-        out["句式"].append(f"疑问句占比：{syn.get('question_ratio') or 0}%（{pct_zh(syn.get('question_ratio') or 0)}）")
-        out["句式"].append(f"感叹句占比：{syn.get('exclamation_ratio') or 0}%")
+        qr = _pct(syn.get('question_ratio'))
+        out["句式"].append(f"疑问句占比：{qr}%（{pct_zh(qr)}）")
+        out["句式"].append(f"感叹句占比：{_pct(syn.get('exclamation_ratio'))}%")
         # verb_style 并入句式（fight 场景经 SCENE_INJECTION 注入；存在才渲染）
         vs = card.get("verb_style") or {}
         if vs.get("strength"):
@@ -166,7 +177,7 @@ def render_card(card: dict, scene_type: str = "general") -> dict[str, list[str]]
             out["对话风格"].append(enum_zh("tag_style", dia["tag_style"]))
         out["对话风格"].append(f"平均对话长度：{range_for(dia.get('avg_dialogue_length') or 0, conf)} 字")
         out["对话风格"].append(f"打断频率：每百字 {range_for(dia.get('interrupt_freq_per_100') or 0, conf)} 次")
-        out["对话风格"].append(f"潜台词占比：{dia.get('subtext_ratio') or 0}%")
+        out["对话风格"].append(f"潜台词占比：{_pct(dia.get('subtext_ratio'))}%")
     # 衔接
     if "cohesion" in dims:
         coh = card.get("cohesion") or {}

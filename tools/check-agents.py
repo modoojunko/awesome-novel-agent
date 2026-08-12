@@ -229,6 +229,16 @@ def check_style_card(path: Path) -> list:
     def _opt_pct(v):
         return isinstance(v, (int, float)) and 0 <= v <= 100
 
+    def _pct_ok(v):
+        # 决策 A：标量占比字段统一整数百分数 0-100；遗留 0-1 分数兼容（渲染端 _pct 归一 ×100）
+        if type(v) not in (int, float) or isinstance(v, bool):
+            return False
+        if isinstance(v, int):
+            return 0 <= v <= 100
+        if 0 < v < 1:
+            return True
+        return False
+
     lex = fm.get("lexicon") if isinstance(fm.get("lexicon"), dict) else {}
     npr = lex.get("name_pronoun_ratio")
     if isinstance(npr, dict):
@@ -238,6 +248,17 @@ def check_style_card(path: Path) -> list:
         else:
             for e in _pct_sum_errors(npr, f"{path.name}: name_pronoun_ratio 三维和"):
                 errors.append(e)
+    elif npr is not None and not _pct_ok(npr):
+        errors.append(f"{path.name}: lexicon.name_pronoun_ratio 标量需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {npr!r}）")
+
+    syn = fm.get("syntax") if isinstance(fm.get("syntax"), dict) else {}
+    for f in ("question_ratio", "exclamation_ratio"):
+        v = syn.get(f)
+        if v is not None and not _pct_ok(v):
+            errors.append(f"{path.name}: syntax.{f} 需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {v!r}）")
+    dia = fm.get("dialogue_style") if isinstance(fm.get("dialogue_style"), dict) else {}
+    if dia.get("subtext_ratio") is not None and not _pct_ok(dia["subtext_ratio"]):
+        errors.append(f"{path.name}: dialogue_style.subtext_ratio 需为 0-100 整数百分数（旧 0-1 分数兼容；当前 {dia['subtext_ratio']!r}）")
 
     em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
     if "inner_monologue_pct" in em and not _opt_pct(em["inner_monologue_pct"]):

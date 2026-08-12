@@ -116,9 +116,47 @@ def test_dual_mode():
     check("prompt-crafting 引用 rendering-rules（已蒸馏渲染）", "rendering-rules" in pc)
     check("prompt-crafting 引用 案例 2 结构", "案例 2" in pc)
 
+def test_unit_convergence():
+    """决策 A：占比字段单位收敛。旧 0-1 分数卡通过校验（渲染端 _pct 归一 ×100）；
+    越界值（>100 / 非整数百分数亦非 0-1 分数，如 1.5）拒绝。"""
+    import importlib.util, tempfile, yaml
+    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
+    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    base = REPO / "templates/settings/writing-style.md"
+
+    fm = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
+    fm["confidence"] = 75
+    fm["syntax"]["question_ratio"] = 0.30
+    fm["syntax"]["exclamation_ratio"] = 0.28
+    fm["dialogue_style"]["subtext_ratio"] = 0.25
+    fm["lexicon"]["name_pronoun_ratio"] = 0.99
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("决策A：旧 0-1 分数卡通过校验（渲染端归一）", not errs, "; ".join(errs))
+
+    fm2 = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
+    fm2["confidence"] = 75
+    fm2["syntax"]["question_ratio"] = 150
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm2, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("决策A：question_ratio=150 拒绝（超 0-100）", any("question_ratio" in e for e in errs), errs)
+
+    fm3 = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
+    fm3["confidence"] = 75
+    fm3["dialogue_style"]["subtext_ratio"] = 1.5
+    with tempfile.TemporaryDirectory() as d:
+        p = Path(d) / "writing-style.md"
+        p.write_text("---\n" + yaml.safe_dump(fm3, allow_unicode=True, sort_keys=False) + "---", encoding="utf-8")
+        errs = mod.check_style_card(p)
+        check("决策A：subtext_ratio=1.5 拒绝（非整数百分数亦非分数）", any("subtext_ratio" in e for e in errs), errs)
+
 def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
-    test_reroll_contract(); test_anti_ai_verify(); test_dual_mode()
+    test_reroll_contract(); test_anti_ai_verify(); test_dual_mode(); test_unit_convergence()
     print(f"\n{summary()}")
     return exit_code()
 
