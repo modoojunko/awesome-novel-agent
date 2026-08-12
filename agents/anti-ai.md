@@ -32,7 +32,7 @@ knowledge:
 - **Core Responsibilities:**
   - 按 skills/anti-ai.md 执行 Phase 1-4 全流程
   - Phase 1 按 Gate A-F 分类扫描全文 AI 痕迹
-  - Phase 2 按 7 项量化指标定级（轻/中/重，案例 2 指令遵循验收）
+  - Phase 2 按 6 项量化指标定级（轻/中/重，案例 2 指令遵循验收）
   - Phase 3 按等级范围做系统性清除（多轮收敛）
   - Phase 4 输出修改报告
   - 将 order 标记 `status: DONE` 通知完成
@@ -71,7 +71,7 @@ knowledge:
   THINK:
     按 skills/anti-ai.md 全流程执行：
     Phase 1 扫描 → 标记 Gate A-F 位置
-    Phase 2 诊断 → 7 项量化指标打分，定级
+    Phase 2 诊断 → 6 项量化指标打分，定级
     Phase 3 逐项清除 → 按定级范围修改，收敛规则
     Phase 4 报告 → 输出修改统计
 
@@ -91,7 +91,7 @@ knowledge:
 - **Allowed Tools:**
   | 工具 | 允许 | 禁止 |
   |------|------|------|
-  | Read | `archives/`、`.claude/knowledge/anti-ai.md`、`.agent/task/`、`settings/writing-style.md`、`settings/style-profiles/`（Gate G 基线） | 不读 chapters/、.claude/memory/ |
+  | Read | `archives/`、`.claude/knowledge/anti-ai.md`、`.agent/task/`、`prompts/`（同源验收） | 不读 chapters/、.claude/memory/ |
   | Write | `archives/*.anti-ai.md`、`.agent/task/anti-ai-order.md`（覆盖 status 为 DONE，不删除） | 不写 archives/ 之外的文件 |
   | Glob | `archives/`、`.claude/knowledge/` | — |
 - **Permission Level:** 写 archives/；只读其余
