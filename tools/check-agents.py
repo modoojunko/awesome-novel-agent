@@ -464,6 +464,15 @@ def main() -> int:
             print(f"  ❌ {e}")
         all_errors.extend(errs)
 
+    # .claude/agents 工具 agent 命名约定（review #53：{role}-agent.md）
+    claude_agents = ROOT / ".claude" / "agents"
+    if claude_agents.is_dir():
+        for f in sorted(claude_agents.glob("*.md")):
+            if not f.name.endswith("-agent.md"):
+                msg = f".claude/agents/{f.name} 不符合 {role}-agent.md 命名约定"
+                print(f"  ❌ {msg}")
+                all_errors.append(msg)
+
     # 校验 agents/ 引用的 skills 文件是否真存在于 skills/ 目录
     refs = set()
     for f in AGENTS_DIR.glob("*.md"):
