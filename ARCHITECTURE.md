@@ -148,8 +148,8 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 │   ├── task/             # order 文件（临时，完成后 status→DONE 留存待删）
 │   ├── archiving/        # 归档 checkpoint（{chapter}.done，防重放重复）
 │   └── {chapter}-draft-ai.md  # AI 原版快照（审计基线，归档后保留，靠 .done 标记区分过期）
-├── .claude/ 或 .opencode/
-│   ├── agents/           # Agent 定义（init.py 部署）
+├── .claude/ 或 .opencode/ 或 .zcode/
+│   ├── agents/           # Agent 定义（init.py 部署；zcode 无 agents，agents 即 .zcode/skills/）
 │   ├── knowledge/        # 反 AI 规则 / 文风偏好 / 场景方法论 / 永久记忆 / 格式规范
 │   └── memory/           # 动态写作记忆（volume/chapter/prompt/writing）
 ```
@@ -187,6 +187,7 @@ tools/           # init.py（初始化）、sync-project.py（同步更新）
 - **Claude Code**：init.py 部署 agent 定义到 `.claude/agents/`，知识到 `.claude/knowledge/`，建 `.claude/memory/` 动态记忆桩
 - **OpenCode**：init.py 同时部署到 `.opencode/agents/`，OpenCode 自动发现 `@novel-agent` 等
 - **Codex**：init.py 部署 9 个自定义 agent 为 `.codex/agents/*.toml`（TOML 转换产物，引用改写为 `.codex/knowledge|memory`），独立工具为 `.codex/skills/<name>/SKILL.md`；novel-agent 用 `spawn_agent` 调度子 agent
+- **ZCode**：init.py 部署 9 个 agent 为 `.zcode/skills/<name>/SKILL.md`（skill 转换产物，引用改写为 `.zcode/knowledge|memory`；ZCode 无项目级 agents 目录，agents 即 skills，与 Reasonix 同构）；novel-agent 用 `Agent` 工具按 skill 名调度子 agent
 - **安装**：`install.sh` / `install.ps1` 将 skill 装到用户级 skills 目录
 
 ---

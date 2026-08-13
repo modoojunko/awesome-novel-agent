@@ -2,7 +2,7 @@
 """
 awesome-novel-skill 项目初始化工具
 
-用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex>]
+用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode>]
 
 平台缺省：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude。
 
@@ -25,6 +25,7 @@ from platforms import (
     deploy_codex_agents,
     deploy_codex_skills,
     deploy_reasonix_skills,
+    deploy_zcode_skills,
     ensure_yaml,
     rewrite_refs,
     resolve_skill_home,
@@ -103,7 +104,7 @@ def main():
         a = args[i]
         if a == "--platform":
             if i + 1 >= len(args) or args[i + 1].startswith("--"):
-                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex）")
+                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode）")
                 sys.exit(1)
             platform_override = args[i + 1]
             i += 2
@@ -158,15 +159,17 @@ def main():
     # Step 2: 创建骨架
     create_skeleton(project_path, platform)
 
-    # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix agents 即 skills）
+    # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix/zcode agents 即 skills）
     if platform.key == "codex":
         deploy_codex_agents(project_path, SKILL_HOME, platform)
     else:
         deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署平台 skills（reasonix 生成 11 个 SKILL.md；codex 只部署独立工具）
+    # Step 3.5: 部署平台 skills（reasonix/zcode 生成 11 个 SKILL.md；codex 只部署独立工具）
     if platform.key == "reasonix":
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
+    elif platform.key == "zcode":
+        deploy_zcode_skills(project_path, SKILL_HOME, platform)
     elif platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
 
@@ -193,6 +196,8 @@ def main():
         print("在 OpenCode 中通过 @novel-agent 开始写作")
     elif platform.key == "codex":
         print("在 Codex 中打开项目目录，调用 @novel-agent 开始写作")
+    elif platform.key == "zcode":
+        print("在 ZCode 中打开项目目录，说“帮我写本小说”或调用 novel-agent skill 开始写作")
     else:
         print("在 Reasonix 中运行 `reasonix code`，然后调用 @novel-agent 开始写作")
 
@@ -221,6 +226,9 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
     if platform.key == "reasonix":
         text = text.replace(".claude/agents/", ".reasonix/skills/")
         text = text.replace(".opencode/agents/", ".reasonix/skills/")
+    elif platform.key == "zcode":
+        text = text.replace(".claude/agents/", ".zcode/skills/")
+        text = text.replace(".opencode/agents/", ".zcode/skills/")
     elif platform.key == "codex":
         text = text.replace(".claude/agents/", ".codex/agents/")
         text = text.replace(".opencode/agents/", ".codex/agents/")
@@ -294,8 +302,8 @@ def deploy_agents(project_path: Path, platform: Platform):
         return
     agent_dir = platform.agents_dir(project_path)
     if agent_dir is None:
-        # reasonix：agents 即 skills（deploy_reasonix_skills 生成），不部署 .claude/agents
-        print("  ℹ️  reasonix 平台不部署 agent 定义（agents 即 .reasonix/skills/）")
+        # reasonix/zcode：agents 即 skills（deploy_*_skills 生成），不部署 .claude/agents
+        print(f"  ℹ️  {platform.label} 平台不部署 agent 定义（agents 即 {platform.root}/skills/）")
         return
     agent_dir.mkdir(parents=True, exist_ok=True)
     is_opencode = platform.key == "opencode"

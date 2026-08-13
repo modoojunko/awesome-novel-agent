@@ -53,10 +53,13 @@ def test_detect():
     check("override=reasonix", p.detect_platform(Path("d:/x"), "reasonix").key == "reasonix")
     check("override=opencode", p.detect_platform(Path("d:/x"), "opencode").key == "opencode")
     check("override=claude", p.detect_platform(Path("d:/x"), "claude").key == "claude")
+    check("override=zcode", p.detect_platform(Path("d:/x"), "zcode").key == "zcode")
     check("path reasonix",
           p.detect_platform(Path("d:/proj/.reasonix/skills/awesome-novel")).key == "reasonix")
     check("path opencode",
           p.detect_platform(Path("d:/proj/.config/opencode/skills/awesome-novel")).key == "opencode")
+    check("path zcode",
+          p.detect_platform(Path("d:/proj/.zcode/skills/awesome-novel")).key == "zcode")
     check("default claude",
           p.detect_platform(Path("d:/code/awesome-novel-skill")).key == "claude")
 
@@ -74,6 +77,10 @@ def test_rewrite():
     check("codex 改写两处",
           out == "先 Read `.codex/knowledge/anti-ai.md` 和 `.codex/memory/volume-memory.md`",
           out)
+    out = p.rewrite_refs(text, p.PLATFORMS["zcode"])
+    check("zcode 改写两处",
+          out == "先 Read `.zcode/knowledge/anti-ai.md` 和 `.zcode/memory/volume-memory.md`",
+          out)
 
 
 def test_config():
@@ -88,10 +95,15 @@ def test_config():
           p.PLATFORMS["codex"].agents_dir(Path("P")) == Path("P") / ".codex" / "agents")
     check("codex skills 路径",
           p.PLATFORMS["codex"].skills_dir(Path("P")) == Path("P") / ".codex" / "skills")
+    check("zcode agents=None", p.PLATFORMS["zcode"].agents_dir(Path("P")) is None)
+    check("zcode skills 路径",
+          p.PLATFORMS["zcode"].skills_dir(Path("P")) == Path("P") / ".zcode" / "skills")
     check("unknown key 抛错", _raises(p.platform_from_key, "bad-key"))
     check("检测优先显式覆盖", p.detect_platform(Path("d:/x/.reasonix/skills"), "claude").key == "claude")
     check("检测 codex 路径",
           p.detect_platform(Path("d:/x/.codex/skills/awesome-novel")).key == "codex")
+    check("检测 zcode 路径",
+          p.detect_platform(Path("d:/x/.zcode/skills/awesome-novel")).key == "zcode")
     check("检测 claude 路径含 codex 子串回落 claude",
           p.detect_platform(Path("/Users/codex-dev/.claude/skills/awesome-novel")).key == "claude")
 
@@ -115,6 +127,8 @@ def test_yaml_precheck():
               _raises_system_exit(p.ensure_yaml, p.PLATFORMS["opencode"]))
         check("缺 yaml 时 reasonix 报错",
               _raises_system_exit(p.ensure_yaml, p.PLATFORMS["reasonix"]))
+        check("缺 yaml 时 zcode 报错",
+              _raises_system_exit(p.ensure_yaml, p.PLATFORMS["zcode"]))
     finally:
         builtins.__import__ = real_import
 
@@ -179,6 +193,7 @@ def test_init_layout():
         "opencode": (["agents", "knowledge", "memory"], [".claude", ".reasonix"]),
         "reasonix": (["skills", "knowledge", "memory"], [".claude"]),
         "codex":    (["agents", "knowledge", "memory"], [".claude", ".opencode", ".reasonix"]),
+        "zcode":    (["skills", "knowledge", "memory"], [".claude", ".opencode", ".reasonix"]),
     }
     for key, (subs, absents) in expect_map.items():
         with tempfile.TemporaryDirectory() as td:
@@ -215,6 +230,42 @@ def test_init_layout():
         cl = (tmp / "CLAUDE.md").read_text(encoding="utf-8")
         check("reasonix CLAUDE.md 无 .claude/agents",
               ".claude/agents" not in cl and ".reasonix/skills/" in cl, cl[:200])
+
+    # zcode 11 个 skill（与 reasonix 同构：agents 即 skills）
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "zcode")
+        names = ["novel-agent", "writer", "volume-planner", "chapter-planner",
+                 "prompt-crafter", "anti-ai", "reader", "updater", "style-distiller",
+                 "memory-recording", "roleplay-sandbox"]  # 与 deploy_zcode_skills 的 11 个 skill 名对应（spec 契约）
+        for n in names:
+            check(f"zcode skill {n}", (tmp / ".zcode/skills" / n / "SKILL.md").exists())
+        w = (tmp / ".zcode/skills/writer/SKILL.md").read_text(encoding="utf-8")
+        check("zcode writer frontmatter",
+              "name: writer" in w and "allowed-tools: Read, Write" in w
+              and "Agent" not in w.split("---", 2)[1], w.split("---", 2)[1][:200])
+        check("zcode writer 引用改写",
+              ".zcode/knowledge/" in w and ".claude/knowledge/" not in w)
+        nv = (tmp / ".zcode/skills/novel-agent/SKILL.md").read_text(encoding="utf-8")
+        check("zcode novel-agent 调度适配",
+              "Agent" in nv and ".zcode/skills/" in nv and "ZCode 调度适配" in nv)
+        check("zcode novel-agent 无 .claude 残留", ".claude" not in nv)
+        all_skills = "".join(
+            f.read_text(encoding="utf-8") for f in sorted(
+                (tmp / ".zcode/skills").rglob("SKILL.md"))
+        )
+        check("zcode 全部 skill 无 .claude 残留", ".claude" not in all_skills)
+
+    # zcode AGENTS.md / CLAUDE.md 模板改写
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "zcode")
+        ag = (tmp / "AGENTS.md").read_text(encoding="utf-8")
+        check("zcode AGENTS.md 指向 .zcode/skills",
+              ".opencode/agents" not in ag and ".zcode/skills/" in ag, ag[:200])
+        cl = (tmp / "CLAUDE.md").read_text(encoding="utf-8")
+        check("zcode CLAUDE.md 无 .claude/agents",
+              ".claude/agents" not in cl and ".zcode/skills/" in cl, cl[:200])
 
     # claude agents 数量
     with tempfile.TemporaryDirectory() as td:
@@ -328,6 +379,19 @@ def test_sync():
               'name = "writer"' in w and "developer_instructions" in w
               and ".codex/knowledge/" in w and ".claude/" not in w)
         check("codex sync 无 .claude", not (tmp / ".claude").exists())
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "zcode")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "zcode"], cwd=str(tmp))
+        check("zcode sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("zcode sync 保持 skill", (tmp / ".zcode/skills/writer/SKILL.md").exists())
+        w = (tmp / ".zcode/skills/writer/SKILL.md").read_text(encoding="utf-8")
+        check("zcode sync 保持 frontmatter 格式",
+              "allowed-tools:" in w and "\ntools:" not in w.split("---", 2)[1]
+              and ".zcode/knowledge/" in w and ".claude/" not in w)
+        check("zcode sync 无 .claude", not (tmp / ".claude").exists())
 
     # --check：无指纹首次 → exit 1
     with tempfile.TemporaryDirectory() as td:

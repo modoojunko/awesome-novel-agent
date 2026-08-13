@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex</em>
+  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex / ZCode</em>
 </p>
 
 <p align="center">
@@ -8,6 +8,7 @@
   <a href="https://github.com/sglaboratory/opencode"><img src="https://img.shields.io/badge/OpenCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-4A90D9?style=flat-square" alt="OpenCode"></a>
   <img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix">
   <a href="#codex-integration"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
+  <a href="#zcode-integration"><img src="https://img.shields.io/badge/ZCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-0EA5E9?style=flat-square" alt="ZCode"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
 </p>
@@ -47,14 +48,14 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## What You Need
 
-- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, or **Codex** installed
+- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, **Codex** or **ZCode** installed
 - Python 3.9+ (the one bundled with macOS works; 3.11+ recommended)
-- pyyaml for OpenCode / Codex (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
+- pyyaml for OpenCode / Codex / ZCode (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
 - About 1 minute to install
 
 ## Installation
 
-**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex) and tell it:
+**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode) and tell it:
 
 > **Install awesome-novel-skill for me**
 
@@ -65,8 +66,9 @@ The agent will download from <https://github.com/modoojunko/awesome-novel-skill>
 | Claude Code | `~/.claude/skills/awesome-novel/` |
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
+| ZCode | `~/.zcode/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex` / `zcode`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex / zcode only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
 
 **Reasonix:**
 
@@ -80,9 +82,18 @@ cd <novel-project-path> && reasonix code
 
 > Use `--genre <number>` to pick a preset genre; without it, init.py asks interactively.
 
+**ZCode:**
+
+ZCode's skill convention (directory + `SKILL.md`) is compatible with Claude Code's, but it has **no project-level agents directory** — the 9 agents are deployed as skills (agents == skills). The skill itself is installed globally via `install.sh`; project contents are deployed per-project to `.zcode/` by `init.py --platform zcode`:
+
+```bash
+./install.sh zcode
+python ~/.zcode/skills/awesome-novel/tools/init.py <novel-project-path> --platform zcode
+```
+
 ## Start Writing
 
-After the skill is installed, launch Claude Code / OpenCode / Codex in the directory where you want your novel project and type:
+After the skill is installed, launch Claude Code / OpenCode / Codex / ZCode in the directory where you want your novel project and type:
 
 > **/awesome-novel**
 
@@ -90,7 +101,7 @@ After the skill is installed, launch Claude Code / OpenCode / Codex in the direc
 
 The skill detects the directory state: for a new directory it confirms with you, then runs `init.py` to scaffold the novel workspace locally (project skeleton, agent definitions, knowledge base, memory files) before entering the writing flow. The system uses 8 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
 
-Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow.
+Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow. ZCode users: just say **"帮我写本小说"** or **"帮我继续写"** in the project directory (ZCode has no `@` syntax — agents are skills and novel-agent is auto-discovered).
 
 ```
 novel-agent (top-level entry — loaded via @novel-agent)
@@ -142,14 +153,18 @@ After setup, the Agent creates your novel project in the current directory:
         ├── chapter-memory.md
         ├── prompt-memory.md
         └── writing-memory.md
-└── .codex/               # Codex: 8 custom agents (TOML) + knowledge + memory
+├── .codex/               # Codex: 8 custom agents (TOML) + knowledge + memory
     ├── agents/           # Custom agent definitions (deployed at init)
     ├── skills/           # Standalone tools (memory-recording, roleplay-sandbox)
     ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
     └── memory/           # Dynamic writing memory (feedback per phase)
+└── .zcode/               # ZCode: 11 skills (agents == skills) + knowledge + memory
+    ├── skills/           # SKILL.md per agent (deployed at init)
+    ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
+    └── memory/           # Dynamic writing memory (feedback per phase)
 ```
 
-All files are plain Markdown — you can open and edit them directly.
+All files are plain Markdown — you can open and edit them directly. Only one platform directory is generated per project (chosen by `init.py --platform`).
 
 ### Planning the Story Framework
 
@@ -260,6 +275,30 @@ The 8 custom agents are deployed as Codex TOML files (`.codex/agents/*.toml`, wi
 Call `/awesome-novel` or `@novel-agent` to enter the writing loop. In Codex, novel-agent dispatches sub-agents with `spawn_agent` (agent name = the TOML name under `.codex/agents/`); the order-file protocol is identical to the other platforms.
 
 Upgrade later with `python tools/sync-project.py <novel-project-path> --platform codex`.
+
+## ZCode Integration
+
+This skill also supports [ZCode](https://zcode.z.ai) (open-source AI coding agent terminal). ZCode's skill convention (directory + `SKILL.md`) is compatible with Claude Code's — **natively supported** — but it has no project-level agents directory, so the 9 agents are deployed as skills (agents == skills). The skill itself is installed **user-level**, while project contents (agents/skills/knowledge/memory) are deployed **project-level** into `.zcode/`.
+
+### Install
+
+Tell ZCode "帮我安装 awesome-novel-skill" and it runs `./install.sh zcode` itself, installing to `~/.zcode/skills/awesome-novel/`.
+
+### Initialize a project
+
+Open the target directory in ZCode and say "帮我写本小说" — the skill initializes automatically. You can also run:
+
+```bash
+python ~/.zcode/skills/awesome-novel/tools/init.py <novel-project-path> --genre <number> --platform zcode
+```
+
+The 9 agents are deployed as `.zcode/skills/<name>/SKILL.md` (11 skills in total, same layout as Reasonix: 9 agents + memory-recording / roleplay-sandbox standalone tools), and anti-AI rules, style preferences, format specs, and writing memory land in `.zcode/knowledge/` / `.zcode/memory/`.
+
+### Start writing
+
+Open the project directory in ZCode and say **"帮我写本小说"** or **"帮我继续写"** to enter the writing loop (ZCode has no `@` syntax — novel-agent is auto-discovered as a skill). In ZCode, novel-agent dispatches sub-agents with the `Agent` tool (sub-agent name = skill name under `.zcode/skills/`); the order-file protocol is identical to the other platforms.
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform zcode`.
 
 ## Star History
 

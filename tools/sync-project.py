@@ -36,6 +36,7 @@ from platforms import (
     detect_platform,
     deploy_codex_skills,
     deploy_reasonix_skills,
+    deploy_zcode_skills,
     ensure_yaml,
     resolve_skill_home,
     rewrite_refs,
@@ -71,7 +72,7 @@ def main():
         if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
             platform_override = sys.argv[idx + 1]
         else:
-            print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex）")
+            print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode）")
             sys.exit(1)
     platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
     try:
@@ -217,7 +218,7 @@ def check_freshness(project: Path, platform: Platform):
         sys.exit(0)
     else:
         changes = find_changes(project, platform)
-        if not changes and platform.key in ("reasonix", "codex"):
+        if not changes and platform.key in ("reasonix", "codex", "zcode"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
         elif not changes:
             # 指纹含风格资产（writing-style.md + style-profiles/**，line 143-149）而 find_changes 只扫
@@ -238,7 +239,7 @@ def check_freshness(project: Path, platform: Platform):
 
 
 def find_changes(project: Path, platform: Platform) -> list[str]:
-    """返回与源不同的文件列表（相对路径）。reasonix 的 skills 是派生产物，不枚举。"""
+    """返回与源不同的文件列表（相对路径）。reasonix/zcode 的 skills 是派生产物，不枚举。"""
     changed = []
     targets = {
         "agents": platform.agents_dir(project),
@@ -255,7 +256,7 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
         src_dir = src_dirs[name]
         if dst_base is None or not src_dir.exists():
             continue
-        if platform.key == "reasonix" and name == "skills":
+        if platform.key in ("reasonix", "zcode") and name == "skills":
             continue  # 派生产物靠源指纹检测，同步时重新生成
         if platform.key == "codex" and name in ("agents", "skills"):
             continue  # TOML/SKILL.md 是派生产物，靠源指纹检测，同步时重新生成
@@ -321,7 +322,7 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
         return 0
     target = platform.agents_dir(project_path)
     if target is None:
-        print("  [i] reasonix 平台无 agents 目录（agents 即 skills）")
+        print(f"  [i] {platform.label} 平台无 agents 目录（agents 即 skills）")
         return 0
     target.mkdir(parents=True, exist_ok=True)
     if platform.key == "opencode":
@@ -366,6 +367,11 @@ def sync_skills(project_path: Path, platform: Platform) -> int:
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
         print(f"  [OK] reasonix skills: {n} 个 SKILL.md 已重新生成")
+        return n
+    if platform.key == "zcode":
+        deploy_zcode_skills(project_path, SKILL_HOME, platform)
+        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
+        print(f"  [OK] zcode skills: {n} 个 SKILL.md 已重新生成")
         return n
     if platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
