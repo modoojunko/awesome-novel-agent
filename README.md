@@ -179,6 +179,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── chapters/             # 章纲
 ├── prompts/              # 提示词
 ├── sandbox/              # 剧情推演记录（可选，作者卡剧情时调用）
+├── novel-samples/        # 文风蒸馏样本（把想学文风的文章放这里，style-distiller 专用）
 ├── archives/             # 正文（定稿）
 ├── .agent/               # Agent 进度 + 任务通信
 │   ├── status.md         # 进度标记（phase/volume/chapter）

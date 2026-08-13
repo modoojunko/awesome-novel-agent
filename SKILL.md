@@ -237,6 +237,7 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 │   └── vol-{N}-ch-{M}-prompt.md  # 提示词
 ├── sandbox/
 │   └── vol-{N}-ch-{M}/    # 剧情推演记录（可选）
+├── novel-samples/        # 文风蒸馏样本（作者把待学文风的文章放这里，style-distiller 专用）
 ├── archives/
 │   ├── *.draft.md        # 草稿
 │   └── *.md              # 定稿

@@ -145,18 +145,19 @@ After setup, the Agent creates your novel project in the current directory:
 ├── chapters/             # Chapter outlines
 ├── prompts/              # Writing prompts
 ├── archives/             # Finalized prose
+├── novel-samples/        # Style distillation samples (put articles you want to learn from here)
 ├── .agent/               # Agent progress + task communication
 │   ├── status.md         # Progress marker (phase/volume/chapter)
 │   └── task/             # Order files for sub-agent dispatch
 ├── .claude/              # Claude Code: agent definitions + knowledge + memory
-    ├── agents/           # 7 agent definitions (deployed at init)
+    ├── agents/           # 9 agent definitions (deployed at init)
     ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
     └── memory/           # Dynamic writing memory (feedback per phase)
         ├── volume-memory.md
         ├── chapter-memory.md
         ├── prompt-memory.md
         └── writing-memory.md
-├── .codex/               # Codex: 8 custom agents (TOML) + knowledge + memory
+├── .codex/               # Codex: 9 custom agents (TOML) + knowledge + memory
     ├── agents/           # Custom agent definitions (deployed at init)
     ├── skills/           # Standalone tools (memory-recording, roleplay-sandbox)
     ├── knowledge/        # Format specs, anti-AI rules, style profile, permanent memory
@@ -181,7 +182,7 @@ After setup, Agent helps plan the overall story structure:
 
 ### Chapter Writing Loop (Multi-Agent)
 
-7 agents collaborate — novel-agent (the director) dispatches sub-agents based on progress. You review and decide:
+9 agents collaborate — novel-agent (the director) dispatches sub-agents based on progress. You review and decide:
 
 | Step | Responsible Agent | What Happens |
 |------|-----------------|--------------|
@@ -271,7 +272,7 @@ Open the target directory in Codex and type `/use awesome-novel` (or say "帮我
 python ~/.codex/skills/awesome-novel/tools/init.py <novel-project-path> --genre <number> --platform codex
 ```
 
-The 8 custom agents are deployed as Codex TOML files (`.codex/agents/*.toml`, with `name` / `description` / `developer_instructions`), standalone tools as `.codex/skills/<name>/SKILL.md`, and anti-AI rules, style preferences, format specs, and writing memory land in `.codex/knowledge/` / `.codex/memory/`.
+The 9 custom agents are deployed as Codex TOML files (`.codex/agents/*.toml`, with `name` / `description` / `developer_instructions`), standalone tools as `.codex/skills/<name>/SKILL.md`, and anti-AI rules, style preferences, format specs, and writing memory land in `.codex/knowledge/` / `.codex/memory/`.
 
 ### Start writing
 
