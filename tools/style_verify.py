@@ -17,12 +17,9 @@ from __future__ import annotations
 
 import sys
 
-# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
-for _s in (sys.stdout, sys.stderr):
-    try:
-        _s.reconfigure(encoding="utf-8")
-    except AttributeError:
-        pass
+from style_common import force_utf8
+
+force_utf8()
 
 # 1) 验收检查项四类（spec 7.1）
 CHECK_CATEGORIES = ["数值/占比条", "硬性规则条", "建模规则条", "软引导条"]
@@ -82,7 +79,7 @@ def format_report(items: list[dict]) -> str:
             f"{'是' if _is_violated(it.get('violated')) else '否'} | {it.get('advice', '')} |"
         )
     n_v = sum(1 for i in items if _is_violated(i.get("violated")))
-    lines.append(f"\n结论：{'FAIL' if n_v else 'PASS'}（{n_v}/{len(items)}）")
+    lines.append(f"\n结论：{verdict(items)}（{n_v}/{len(items)}）")   # 结论行复用 verdict()（review #42）
     return "\n".join(lines)
 
 if __name__ == "__main__":

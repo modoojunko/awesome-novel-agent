@@ -8,12 +8,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
-for _s in (sys.stdout, sys.stderr):
-    try:
-        _s.reconfigure(encoding="utf-8")
-    except AttributeError:
-        pass
+from style_common import force_utf8
+force_utf8()
+
 from style_render import range_for, enum_zh, pct_zh, _pct, _num, _flatten_dists, render_card, SCENE_INJECTION
 from style_verify import verdict, should_reroll, pick_best, format_report, _is_violated, _violated_count, VIOLATED_STRINGS
 from test_util import check, summary, exit_code

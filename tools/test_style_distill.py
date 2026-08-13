@@ -18,14 +18,10 @@ TOOLS = Path(__file__).resolve().parent
 REPO = TOOLS.parent
 sys.path.insert(0, str(TOOLS))
 
-# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
-for _s in (sys.stdout, sys.stderr):
-    try:
-        _s.reconfigure(encoding="utf-8")
-    except AttributeError:
-        pass
+from style_common import force_utf8
+force_utf8()
 
-from test_util import check, summary, exit_code
+from test_util import check, load_module, summary, exit_code
 
 def test_feature_extract():
     t = (REPO / "knowledge/style-distill/prompt-templates/feature-extract.md").read_text(encoding="utf-8")
@@ -41,13 +37,13 @@ def test_feature_extract():
         check(f"退役模板 {gone} 已删", not (REPO / "knowledge/style-distill/prompt-templates" / gone).exists())
 
 def test_schema_templates():
-    import importlib.util
-    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
-    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
     main_tpl = REPO / "templates/settings/writing-style.md"
     errs = mod.check_style_card(main_tpl)
     check("主卡模板过卡校验", not errs, "; ".join(errs))
-    for scene in sorted((REPO / "templates/settings/style-profiles").glob("*.md")):
+    scenes = sorted((REPO / "templates/settings/style-profiles").glob("*.md"))
+    check("场景卡目录非空", len(scenes) > 0, "style-profiles/ 为空——校验静默通过")   # review #49
+    for scene in scenes:
         errs = mod.check_style_card(scene)
         check(f"场景卡 {scene.name} 过卡校验", not errs, "; ".join(errs))
 
@@ -77,14 +73,15 @@ def test_reroll_contract():
 
 def test_anti_ai_verify():
     skill = (REPO / "skills/anti-ai.md").read_text(encoding="utf-8")
-    check("anti-ai 含指令遵循验收", "指令遵循" in skill or "案例 2" in skill or "verify-checklist" in skill)
+    check("anti-ai 含指令遵循验收", "指令遵循" in skill, "缺指令遵循字样")
+    check("anti-ai 含案例 2 验收", "案例 2" in skill, "缺案例 2 字样")
+    check("anti-ai 引用 verify-checklist", "verify-checklist" in skill, "缺 verify-checklist 引用")   # review #49 拆弱断言
     check("anti-ai 无 distill-style.py", "distill-style.py" not in skill)
     check("anti-ai 无 gate-g-checklist", "gate-g-checklist" not in skill)
 
 def test_dual_mode():
-    import importlib.util, tempfile, yaml
-    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
-    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    import tempfile, yaml
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
     main_tpl = REPO / "templates/settings/writing-style.md"
     fm = yaml.safe_load(main_tpl.read_text(encoding="utf-8").split("---", 2)[1])
     # 未蒸馏态：模板零改动、confidence=0 过校验（spec §4）
@@ -126,9 +123,8 @@ def test_dual_mode():
 def test_unit_convergence():
     """决策 A 修正：占比字段一律 0-100 百分数（旧引擎一位小数百分数 13.4/2.31 通过；
     0.3=0.3% 不乘 100；1.5 是合法百分数）。越界值（>100）拒绝。"""
-    import importlib.util, tempfile, yaml
-    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
-    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    import tempfile, yaml
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
     base = REPO / "templates/settings/writing-style.md"
 
     fm = yaml.safe_load(base.read_text(encoding="utf-8").split("---", 2)[1])
@@ -164,9 +160,8 @@ def test_unit_convergence():
 
 def test_scalar_percent_validation():
     """校验端补齐：节奏单桶 >100、transition_sentence_ratio 越界、preferred_words 类型、self-inherits。"""
-    import importlib.util, tempfile, yaml
-    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
-    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    import tempfile, yaml
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
     base = REPO / "templates/settings/writing-style.md"
 
     def _check(card_mut, contains):
@@ -201,9 +196,8 @@ def test_scalar_percent_validation():
 
 def test_inherits_cycle_detected():
     """继承环（A→B→A）被 check_style_cards 跨文件检出。"""
-    import importlib.util, tempfile, yaml
-    spec = importlib.util.spec_from_file_location("check_agents", str(TOOLS / "check-agents.py"))
-    mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+    import tempfile, yaml
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
         tpl = root / "templates" / "settings"

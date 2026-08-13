@@ -29,7 +29,6 @@ try:
     import tomllib
 except ImportError:  # Python < 3.11
     tomllib = None
-
 TOOLS = Path(__file__).resolve().parent
 sys.path.insert(0, str(TOOLS))
 

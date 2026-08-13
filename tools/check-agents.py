@@ -25,12 +25,10 @@ import re
 import yaml
 from pathlib import Path
 
-# 强制 UTF-8 输出，避免 Windows GBK 控制台报错
-for s in (sys.stdout, sys.stderr):
-    try:
-        s.reconfigure(encoding="utf-8")
-    except AttributeError:
-        pass
+from style_common import (frontmatter_text, force_utf8, pct_ok,
+                          STYLE_CARD_DIMS, STYLE_CARD_SCENE_TYPES)
+
+force_utf8()
 
 ROOT = Path(__file__).resolve().parent.parent
 AGENTS_DIR = ROOT / "agents"
@@ -60,14 +58,8 @@ DEPLOYED_PATTERNS = [
 
 
 def _split_frontmatter(text: str) -> str | None:
-    """提取 frontmatter 正文（两行 --- 之间）。按行定位闭合行，正文含 '---'（如 markdown 分隔线）不错位；缺闭合返回 None。"""
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return None
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            return "\n".join(lines[1:i])
-    return None
+    """提取 frontmatter 正文（两行 --- 之间，单源实现见 style_common.frontmatter_text，review #38）。"""
+    return frontmatter_text(text)
 
 
 def _dup_keys(fm_text: str) -> list[str]:
@@ -166,10 +158,9 @@ def _is_deployed(rel: str) -> bool:
     return False
 
 
-STYLE_CARD_SCENE_TYPES = {"general", "dialogue", "fight", "environment",
-                          "inner-mono", "transition", "group-scene"}
-STYLE_CARD_DIMS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expression",
-                   "narrative", "dialogue_style", "cohesion", "verb_style"]
+# 风格卡场景/维度枚举——单源见 style_common.SCENE_INJECTION（review #36）
+STYLE_CARD_SCENE_TYPES = STYLE_CARD_SCENE_TYPES
+STYLE_CARD_DIMS = STYLE_CARD_DIMS
 
 
 def _pct_sum_errors(d: dict, label: str, expected: float = 100, max_sum: float | None = None) -> list:
@@ -195,7 +186,8 @@ def _pct_sum_errors(d: dict, label: str, expected: float = 100, max_sum: float |
     return []
 
 
-def check_style_card(path: Path) -> list:
+def check_style_card(path: Path, fm: dict | None = None) -> list:
+    """校验一张风格卡。fm 可预解析传入（review #43：check_style_cards 批量调用只解析一次）。"""
     errors = []
     text = path.read_text(encoding="utf-8-sig")   # utf-8-sig：剥 BOM（review #23，与 init 口径一致）
     fm_text = _split_frontmatter(text)
@@ -203,10 +195,11 @@ def check_style_card(path: Path) -> list:
         return [f"{path.name}: 风格卡缺 frontmatter（需两对 ---）"]
     for k in _dup_keys(fm_text):
         errors.append(f"{path.name}: YAML 重复键 {k!r}（last-wins 静默覆盖）")
-    try:
-        fm = yaml.safe_load(fm_text)
-    except Exception as e:
-        return [f"{path.name}: 卡片 frontmatter YAML 解析失败: {e}"]
+    if fm is None:
+        try:
+            fm = yaml.safe_load(fm_text)
+        except Exception as e:
+            return [f"{path.name}: 卡片 frontmatter YAML 解析失败: {e}"]
     if not isinstance(fm, dict):
         return [f"{path.name}: 卡片 frontmatter 不是 map"]
     for k in ("profile_version", "scene_type", "confidence", "last_updated", "source_sample_length"):
@@ -266,11 +259,9 @@ def check_style_card(path: Path) -> list:
             errors.append(f"{path.name}: inherits 引用不存在: {inh}（期望 {rels}）")
     # --- 蒸馏卡可选增强字段（2026-08-12 双态：存在才校验，缺失兼容旧卡/未蒸馏卡） ---
     def _pct_ok(v):
-        # 决策 A 修正：标量占比字段一律 0-100 百分数（int 或 float）。
+        # 决策 A 单位校验单源（style_common.pct_ok，review #39）：0-100 百分数（type 排除 bool）。
         # 旧 jieba 引擎产出 0-100 一位小数百分数（13.4），无 0-1 分数假设——0.3 是 0.3% 而非 30%。
-        if type(v) not in (int, float) or isinstance(v, bool):
-            return False
-        return 0 <= v <= 100
+        return pct_ok(v)
 
     def _pct_field(dim, field, val):
         errors.append(f"{path.name}: {dim}.{field} 需为 0-100 数值（当前 {val!r}）")
@@ -391,19 +382,25 @@ def check_style_cards() -> list:
     if not main.exists():
         return ["templates/settings/writing-style.md 不存在（旧布局仓库？）"]
     cards = [main] + sorted((base / "style-profiles").rglob("*.md"))   # 递归：含 genre-baselines/**/base|benchmark|delta
-    errors = []
-    for p in cards:
-        errors.extend(check_style_card(p))
-    # 继承环检测（跨文件 DFS）：A→B→A 循环在单卡存在性检查中不被发现
-    graph = {}
+    # 统一解析一次（review #43：此前每卡解析两遍——校验一遍、继承环检测一遍）
+    parsed: dict[str, dict] = {}
     for p in cards:
         fm_text = _split_frontmatter(p.read_text(encoding="utf-8-sig"))
-        if not fm_text:
-            continue
-        fm = yaml.safe_load(fm_text) or {}
+        if fm_text:
+            try:
+                fm = yaml.safe_load(fm_text)
+            except Exception:
+                fm = {}
+            parsed[str(p.resolve())] = fm if isinstance(fm, dict) else {}
+    errors = []
+    for p in cards:
+        errors.extend(check_style_card(p, parsed.get(str(p.resolve()))))
+    # 继承环检测（跨文件 DFS）：A→B→A 循环在单卡存在性检查中不被发现
+    graph = {}
+    for key, fm in parsed.items():
         if fm.get("inherits"):
-            tgt = _resolve_inherits(p, fm["inherits"])
-            graph[str(p.resolve())] = str(tgt) if tgt else None
+            tgt = _resolve_inherits(Path(key), fm["inherits"])
+            graph[key] = str(tgt) if tgt else None
     _visited: set[str] = set()
     _cycles: set[str] = set()
 

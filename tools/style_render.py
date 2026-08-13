@@ -17,12 +17,9 @@ import argparse
 import math
 import sys
 
-# 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
-for _s in (sys.stdout, sys.stderr):
-    try:
-        _s.reconfigure(encoding="utf-8")
-    except AttributeError:
-        pass
+from style_common import force_utf8, split_frontmatter, SCENE_INJECTION
+
+force_utf8()
 
 # 0) 数值防御：LLM 或手改 YAML 可能把数值写成字符串/bool/nan/inf，渲染端统一收敛（spec 卡值应为数值）
 def _num(v, default: float = 0.0) -> float:
@@ -96,17 +93,7 @@ def _pct(v, default=None):
         return default
     return int(v) if float(v).is_integer() else v
 
-# 4) 场景稀疏注入矩阵（spec 6.3 / 旧 injection-template 表）
-SCENE_INJECTION = {
-    "general": ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expression",
-                "narrative", "dialogue_style", "cohesion", "verb_style"],
-    "dialogue": ["lexicon", "dialogue_style"],
-    "fight": ["verb_style", "syntax"],
-    "environment": ["rhetoric", "rhythm"],
-    "inner-mono": ["emotion_expression", "narrative"],
-    "transition": ["cohesion", "rhythm"],
-    "group-scene": ["rhythm", "dialogue_style"],
-}
+# 4) 场景稀疏注入矩阵（spec 6.3）——SCENE_INJECTION 单源见 style_common（review #36）
 
 # 5) 卡 → 案例 2 各节渲染
 def _flatten_dists(d: dict) -> list[str]:
@@ -319,16 +306,8 @@ def _as_list(v) -> list[str]:
     return []
 
 def _parse_frontmatter(text: str) -> tuple:
-    """frontmatter → (dict, 正文)。按行定位闭合 '---'（值内含 '---' 不错位），缺闭行返回 ({}, 原文)。"""
-    import yaml
-    lines = text.splitlines()
-    if not lines or lines[0].strip() != "---":
-        return {}, text
-    for i in range(1, len(lines)):
-        if lines[i].strip() == "---":
-            fm = "\n".join(lines[1:i])
-            return yaml.safe_load(fm) or {}, "\n".join(lines[i + 1:])
-    return {}, text
+    """frontmatter → (dict, 正文)（单源实现见 style_common.split_frontmatter，review #38）。"""
+    return split_frontmatter(text)
 
 def main() -> int:
     ap = argparse.ArgumentParser()
