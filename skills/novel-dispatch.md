@@ -14,8 +14,8 @@ novel-agent **只做三件事**：
 | phase | 该谁干 | order 文件 |
 |-------|--------|-----------|
 | setup | updater | `setting-update-order.md` |
-| setup | style-distiller | `style-distill-order.md`（文风设定环节作者选蒸馏并给样本时触发） |
-| 手动 | style-distiller | `style-distill-order.md`（作者主动触发重蒸馏/调参数） |
+| setup | style-distiller | `style-distill-order.md`（文风设定决策流程选蒸馏时触发） |
+| 任意 phase | style-distiller | `style-distill-order.md`（作者说"修改文风设定/更新文风/重新蒸馏/按这个风格写"→ 文风设定决策流程；存量项目可用已归档正文做样本） |
 | outline | volume-planner | `volume-plan-order.md` |
 | outline | chapter-planner | `chapter-plan-order.md` |
 | draft | prompt-crafter | `prompt-craft-order.md` |
