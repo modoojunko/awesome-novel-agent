@@ -216,6 +216,28 @@ def test_inherits_cycle_detected():
             mod.ROOT = old_root
         check("A→B→A 继承环被检出", any("继承环" in e for e in errs), errs)
 
+def test_project_cards_skips_analysis():
+    """check_project_cards 排除 analysis/（量化表+建模规则+作者画像，无 frontmatter），
+    防误报「风格卡缺 frontmatter」。"""
+    import tempfile
+    mod = load_module("check_agents", TOOLS / "check-agents.py")
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d)
+        (root / "settings" / "style-profiles" / "analysis").mkdir(parents=True)
+        (root / "settings" / "style-profiles" / "analysis" / "general.md").write_text(
+            "# 分析稿\n\n量化表全文……\n\n## 作者画像\n\n这是你的文风……\n", encoding="utf-8")
+        (root / "settings" / "writing-style.md").write_text(
+            "---\nprofile_version: '1.0'\nscene_type: general\nconfidence: 70\nlast_updated: ''\nsource_sample_length: 100\n---\n",
+            encoding="utf-8")
+        (root / "settings" / "style-profiles" / "dialogue.md").write_text(
+            "---\nprofile_version: '1.0'\nscene_type: dialogue\nconfidence: 70\nlast_updated: ''\nsource_sample_length: 100\noverride: {}\n---\n",
+            encoding="utf-8")
+        errs = mod.check_project_cards(root)
+        check("check_project_cards 不扫 analysis/（无误报）",
+              not any("general.md" in e for e in errs), errs)
+        check("check_project_cards 仍校验真实场景卡（dialogue）",
+              not any("dialogue.md" in e for e in errs), errs)
+
 def test_verify_doc_code_alignment():
     """#11 修复交叉断言：verify-checklist.md 文档措辞与 style_verify.py 代码行为一致。
     文档违反白名单令牌（`` `true/是/yes/1/违反` ``）= 代码 VIOLATED_STRINGS；
@@ -238,6 +260,7 @@ def run_all():
     test_feature_extract(); test_schema_templates(); test_retire_clean()
     test_reroll_contract(); test_anti_ai_verify(); test_dual_mode(); test_unit_convergence()
     test_scalar_percent_validation(); test_inherits_cycle_detected()
+    test_project_cards_skips_analysis()
     test_verify_doc_code_alignment()
     print(f"\n{summary()}")
     return exit_code()

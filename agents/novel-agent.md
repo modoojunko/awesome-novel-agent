@@ -161,10 +161,12 @@ knowledge:
     │   │    │     → 调 style-distiller → DONE 后，**把「作者画像」给作者看并请确认**
     │   │    │     （analysis/general.md「作者画像」节，开头注明"这是你的文风在 AI 眼里的数据化解读，
     │   │    │     不是文学评价"）：像 → 继续设定讨论 / 推进 outline；
-    │   │    │     不像 → 问作者补样本或调整方向，重新派 style-distill-order（重蒸馏，生成新版本快照）
+    │   │    │     不像 → 问作者补样本或调整方向，重新派 style-distill-order（重蒸馏，生成新版本快照）；
+    │   │    │     **重蒸馏最多 2 次，仍不像 → 暂停蒸馏，作者手写卡或退回模板基线（选 ② 语义）**
     │   │    ├─ 选 ② → 跳过（templates 预置题材卡兜底，confidence=0）
-    │   │    └─ 选 ③ → 跳过；3 章归档后作者说"按这个风格写/重新蒸馏" → 补触发 style-distill-order（样本=已归档正文）
-    │   └─ 作者未讨论到文风即结束设定 → 跳过（templates 预置题材卡兜底，confidence=0）
+    │   │    └─ 选 ③ → 跳过；3 章归档后作者说"按这个风格写/重新蒸馏" → 补触发 style-distill-order
+    │   │         （样本=已归档正文）；**DONE 后同样给作者画像确认（同选 ① 流程，含 2 次重蒸馏上限）**
+    │   └─ 作者明确表示暂不讨论文风 → 跳过（templates 预置题材卡兜底，confidence=0）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning

@@ -438,7 +438,8 @@ def check_project_cards(project: Path) -> list:
         cards.append(main)
     profiles = base / "style-profiles"
     if profiles.exists():
-        cards.extend(sorted(profiles.rglob("*.md")))
+        # analysis/（量化表+建模规则+作者画像，无 frontmatter）不是风格卡——排除，防误报缺 frontmatter
+        cards.extend(sorted(f for f in profiles.rglob("*.md") if "analysis" not in f.parts))
     errors = []
     for p in cards:
         errors.extend(check_style_card(p))
