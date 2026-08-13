@@ -42,4 +42,4 @@ knowledge:
 
 ## 三、交接
 
-完成 order 后：把 order 覆盖为 `status: DONE`；报告里给「更新了哪些维度 + confidence + 分析稿摘要」。发现样本质量不足（<1500 字、多题材混杂）时向作者/novel-agent 说明并挂起。
+完成 order 后：把 order 覆盖为 `status: DONE`；报告里给「更新了哪些维度 + confidence + 分析稿摘要」。发现样本质量不足（<6000 字、多题材混杂）时向作者/novel-agent 说明并挂起。

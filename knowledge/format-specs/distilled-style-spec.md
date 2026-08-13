@@ -43,7 +43,7 @@
 
 ## 四、置信度与容差
 
-`confidence = min(100, 20 + min(40, sample_length/50) + min(40, chapter_count*5))`
+`confidence = min(100, 20 + min(40, sample_length/150) + min(40, chapter_count*5))`（sample 系数 /150：6000 字样本达样本项上限，与「约 3 章 6000-10000 字」的最低样本量口径对齐——此前 /50 使 2000 字即封顶，样本量增加对置信度无区分）
 容差档（2026-08-12 对齐实现 RANGE_TIERS，三档取代旧四档，见设计 spec §6.1a）：`confidence ≥ 70 → ±10%` / `≥ 50 → ±20%` / `其余 → ±30%`。
 confidence=0 时量化层不注入，提示词只走定性层，直到首次蒸馏。
 
