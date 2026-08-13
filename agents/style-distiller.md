@@ -37,7 +37,7 @@ knowledge:
 | 工具 | 允许写 | 禁止 |
 |------|--------|------|
 | Write/Edit | `settings/writing-style.md`、`settings/style-profiles/*`、`settings/style-profiles/analysis/*`、`settings/.style-versions/*`、`.agent/task/*-order.md`（仅改 status） | 不写其他 settings、chapters、archives |
-| Read | `archives/`、`chapters/`、`settings/`、`项目内任意路径的样本文件（作者指定）`、`.agent/task/style-sample.md`（聊天粘贴落盘） | 绝不读项目之外（作者给项目外路径时由 novel-agent 提示移入项目内） |
+| Read | `archives/`、`chapters/`、`settings/`、`samples/`（文风蒸馏样本目录，作者放置）、`.agent/task/style-sample.md`（聊天粘贴落盘） | 绝不读项目之外（作者给项目外路径时由 novel-agent 提示移入 samples/） |
 | Bash | 无脚本调用（纯 LLM 提取） | 其他命令需向 novel-agent 说明 |
 
 ## 三、交接

@@ -119,8 +119,8 @@ knowledge:
     ③ 暂缓——先不弄，随时说"修改文风设定"再回来"
    ```
 2. **选 ①（蒸馏）**：
-   - 收样本：**项目空间内任意路径的文档（.md/.txt）或聊天粘贴的文章**——项目内路径文档直接入 order；聊天粘贴文本由 novel-agent 落盘为 `.agent/task/style-sample.md` 再入 order（样本是作者显式提供的材料，落盘仅作调度输入）；已归档正文是现成选择之一，不限定
-   - **项目外路径（如桌面/下载）→ 提示作者无权限读取，请把文档复制进项目内（任意位置）再蒸馏**——所有样本操作限定在项目根内
+   - 收样本：**作者把待蒸馏文章放到项目根 `samples/` 目录**（专用目录，不存在时 novel-agent 创建；类比 sandbox/ 推演目录）——项目内该目录下的任意 .md/.txt 直接入 order；聊天粘贴文本由 novel-agent 落盘为 `.agent/task/style-sample.md` 再入 order；已归档正文（archives/）是现成选择之一，不限定
+   - **项目外路径（如桌面/下载）→ 提示作者无权限读取，请把文档复制进项目内 `samples/` 再蒸馏**——所有样本操作限定在项目根内
    - 写 style-distill-order.md（inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
    - 调 style-distiller → DONE 后，**把「作者画像」给作者看并请确认**（analysis/general.md「作者画像」节，开头注明"这是你的文风在 AI 眼里的数据化解读，不是文学评价"）
    - 像 → 结束流程，回到原调度；不像 → 问作者补样本或调整方向，重新派 style-distill-order（重蒸馏，生成新版本快照）
