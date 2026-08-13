@@ -126,12 +126,15 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 ├── story.md              # 项目索引（元信息 + 主线拆纲）
 ├── settings/
 │   ├── world-setting.md  # 世界观
-│   ├── writing-style.md  # 写作风格
+│   ├── writing-style.md  # 写作风格（蒸馏后含量化层主卡）
 │   ├── genre-setting.md  # 题材设定
 │   ├── foreshadowing.md  # 跨卷伏笔全局台账（init 生成空台账 / updater Step 8 维护，从 chapter.md#payoff_plan 汇总）
 │   ├── timeline.md       # 时间线（归档时追加）
-│   └── character-setting/
-│       └── <id>.md       # 每角色一个
+│   ├── character-setting/
+│   │   └── <id>.md       # 每角色一个
+│   ├── style-profiles/   # 分场景风格卡（style-distiller 蒸馏产出：dialogue/fight/group-scene/…）
+│   │   └── genre-baselines/  # 题材风格基线（base/benchmark/delta）
+│   └── .style-versions/  # 蒸馏版本快照（style-distiller 蒸馏时生成）
 ├── volumes/
 │   └── volume-{N}.md     # 卷纲
 ├── chapters/

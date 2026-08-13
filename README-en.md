@@ -133,11 +133,14 @@ After setup, the Agent creates your novel project in the current directory:
 ├── CLAUDE.md             # Project-level CLAUDE.md (tools whitelist)
 ├── settings/             # Setting files
 │   ├── world-setting.md  # World building
-│   ├── writing-style.md  # Writing style
+│   ├── writing-style.md  # Writing style (quantified master card after distillation)
 │   ├── genre-setting.md  # Genre configuration
 │   ├── timeline.md       # Timeline
-│   └── character-setting/ # Character profiles
-│       └── <id>.md       # One file per character
+│   ├── character-setting/ # Character profiles
+│   │   └── <id>.md       # One file per character
+│   ├── style-profiles/   # Per-scene style cards (distilled: dialogue/fight/group-scene/…)
+│   │   └── genre-baselines/  # Genre style baselines (base/benchmark/delta)
+│   └── .style-versions/  # Distillation version snapshots (created at distill time)
 ├── volumes/              # Volume outlines
 ├── chapters/             # Chapter outlines
 ├── prompts/              # Writing prompts

@@ -222,10 +222,13 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 ├── story.md              # ★ 项目索引
 ├── settings/
 │   ├── world-setting.md  # 世界观
-│   ├── writing-style.md  # 写作风格
+│   ├── writing-style.md  # 写作风格（蒸馏后含量化层主卡）
 │   ├── genre-setting.md  # 题材设定
-│   └── character-setting/
-│       └── <id>.md       # 每角色一个文件
+│   ├── character-setting/
+│   │   └── <id>.md       # 每角色一个文件
+│   ├── style-profiles/   # 分场景风格卡（蒸馏产出：dialogue/fight/group-scene/…）
+│   │   └── genre-baselines/  # 题材风格基线（base/benchmark/delta）
+│   └── .style-versions/  # 蒸馏版本快照（style-distiller 蒸馏时生成）
 ├── volumes/
 │   └── volume-{N}.md     # 卷纲
 ├── chapters/
