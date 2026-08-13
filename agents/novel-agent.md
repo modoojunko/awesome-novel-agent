@@ -149,11 +149,18 @@ knowledge:
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
-    ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
-    │   ├─ 若作者提供了风格参考文本（或说"按这个风格写"）→
-    │   │   写 style-distill-order.md（inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
-    │   │   → 调 style-distiller → DONE 后再推进 outline
-    │   └─ 无样本 → 跳过（templates 预置题材卡兜底，confidence=0）
+    ├── setup → 与作者讨论设定（世界观/题材/角色/文风…）→ 写 setting-update-order → 调 updater
+    │   ├─ **讨论到文风/写作风格时，主动给决策点**（不等作者主动提样本，话术示例）：
+    │   │    "风格这块想怎么定？
+    │   │     ① 给我一段参考文本（≥1500 字、风格纯净）→ 我派 style-distiller 蒸馏成风格卡
+    │   │     ② 直接用模板题材基线（默认文风，后续随时可再蒸馏）
+    │   │     ③ 先不弄，写几章觉得文风要调再说"
+    │   │    ├─ 选 ① → 收样本（路径或粘贴）→ 写 style-distill-order.md
+    │   │    │     （inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
+    │   │    │     → 调 style-distiller → DONE 后再继续设定讨论 / 推进 outline
+    │   │    ├─ 选 ② → 跳过（templates 预置题材卡兜底，confidence=0）
+    │   │    └─ 选 ③ → 跳过；作者后续任何时刻说"按这个风格写/重新蒸馏" → 补触发 style-distill-order
+    │   └─ 作者未讨论到文风即结束设定 → 跳过（templates 预置题材卡兜底，confidence=0）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
