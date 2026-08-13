@@ -121,7 +121,7 @@ cp -r "$SCRIPT_DIR/skills" "$DEST/"
 cp -r "$SCRIPT_DIR/knowledge" "$DEST/"
 cp -r "$SCRIPT_DIR/templates" "$DEST/"
 cp -r "$SCRIPT_DIR/tools" "$DEST/"
-# memory/ 含 writer-style 等静态参考素材，不包含 anti-ai（已迁至 knowledge/anti-ai/）
+# memory/ 已废弃（writer-style 已迁至 knowledge/format-specs/）；保留守卫兼容旧仓库
 [ -d "$SCRIPT_DIR/memory" ] && cp -r "$SCRIPT_DIR/memory" "$DEST/"
 
 echo "安装完成!"

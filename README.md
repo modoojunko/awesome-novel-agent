@@ -361,10 +361,9 @@ awesome-novel-skill/
 │   ├── plot-craft/      # 剧情设计（与作者讨论）
 │   ├── character-craft/ # 角色设定（与作者讨论）
 │   ├── title-craft/     # 取书名（与作者讨论）
+│   ├── style-distill/   # 风格蒸馏（prompt-templates：渲染/验收/特征提取）
 │   ├── genre-example/   # 题材案例
 │   └── anti-ai/         # 反AI写作库（通用规则 + 题材正反例）
-├── memory/               # 动态记忆（→ 项目 .claude/memory/）
-│   └── writer-style
 └── tools/                # 工具脚本
 ```
 

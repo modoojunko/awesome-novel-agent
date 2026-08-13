@@ -57,7 +57,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 | `anti-ai` | Gate A-F 管线检测 + 量化评分定级 + 逐项清除 | novel-agent |
 | `reader` | 深度评审（可选，作者需要时调度） | novel-agent |
 | `updater` | 归档 lore-keeping + 设定变更 + 记忆兜底 | novel-agent |
-| `style-distiller` | 风格蒸馏（脚本统计 + LLM 语义 → 写风格主卡/场景卡/版本快照） | novel-agent |
+| `style-distiller` | 风格蒸馏（LLM 双态：脚本统计引擎已退役 → 蒸馏主卡/场景卡/版本快照） | novel-agent |
 
 ### 1.5 调度架构
 
