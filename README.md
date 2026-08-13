@@ -167,11 +167,14 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── CLAUDE.md             # 项目级 CLAUDE.md（tools 白名单）
 ├── settings/             # 设定文件
 │   ├── world-setting.md  # 世界观
-│   ├── writing-style.md  # 写作风格
+│   ├── writing-style.md  # 写作风格（蒸馏后含量化层主卡）
 │   ├── genre-setting.md  # 题材设定
 │   ├── timeline.md       # 时间线
-│   └── character-setting/ # 角色档案
-│       └── <id>.md       # 每角色一个文件
+│   ├── character-setting/ # 角色档案
+│   │   └── <id>.md       # 每角色一个文件
+│   ├── style-profiles/   # 分场景风格卡（蒸馏产出：dialogue/fight/group-scene/…）
+│   │   └── genre-baselines/  # 题材风格基线（base/benchmark/delta）
+│   └── .style-versions/  # 蒸馏版本快照（style-distiller 蒸馏时生成）
 ├── volumes/              # 卷纲（情绪走向/冲突阶梯/信息差/场景卡）
 ├── chapters/             # 章纲
 ├── prompts/              # 提示词
