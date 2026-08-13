@@ -339,7 +339,73 @@ def test_sync():
         check("reasonix --check 无指纹 exit 1", r.returncode == 1, str(r.returncode))
 
 
-# ---------------- E2E install.sh / 负向场景 ----------------
+# ---------------- E2E style seed 守卫 / 脚手架同步（review #13-17 回归） ----------------
+
+def test_style_seed_guard():
+    """#13/#14 回归：init 后无占位符出货；重跑 init 不覆盖作者编辑、就地补齐占位符。"""
+    print("[e2e] style seed 守卫")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "claude")
+        sc = tmp / "settings" / "writing-style.md"
+        text = sc.read_text(encoding="utf-8")
+        check("init 后无 {role} 占位符", "{role}" not in text, text[:200])
+        check("init 后无其他样式占位符",
+              all(t not in text for t in ("{principle_1}", "{mistake_1}", "{depiction_techniques}")),
+              text[:200])
+
+    # 重跑 init：作者编辑保留 + 残留占位符就地补齐（不整卡覆盖）
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "claude")
+        sc = tmp / "settings" / "writing-style.md"
+        text = sc.read_text(encoding="utf-8")
+        text = text.replace("## 叙事身份（原 role）\n\n",
+                            "## 叙事身份（原 role）\n\n作者自己写的角色设定\n\n", 1)
+        text += "\n- {mistake_1}\n"          # 模拟旧 init 残留占位符
+        sc.write_text(text, encoding="utf-8")
+        init_project(tmp, "claude")
+        t2 = sc.read_text(encoding="utf-8")
+        check("重跑 init 保留作者编辑", "作者自己写的角色设定" in t2, t2[:300])
+        check("重跑 init 就地补齐占位符", "{mistake_1}" not in t2 and "{role}" not in t2, t2[:300])
+
+
+def test_sync_style_missing_and_scaffold():
+    """#15/#17 回归：sync 缺卡主卡写（待设定）不写占位符；脚手架 CLAUDE.md/skill_version 刷新。"""
+    print("[e2e] sync 缺卡主卡 + 脚手架刷新")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "claude")
+        sc = tmp / "settings" / "writing-style.md"
+        sc.unlink()                          # 模拟缺卡项目
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "claude"], cwd=str(tmp))
+        check("sync 缺卡 exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("sync 补主卡", sc.exists())
+        t = sc.read_text(encoding="utf-8")
+        check("补的主卡无 {role} 占位符", "{role}" not in t, t[:200])
+        check("补的主卡含（待设定）", "（待设定）" in t, t[:200])
+
+    # 脚手架刷新：CLAUDE.md 恢复 9 个 agent、status.md skill_version 更新
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "claude")
+        cl = tmp / "CLAUDE.md"
+        cl.write_text(cl.read_text(encoding="utf-8").replace("9 个 agent", "8 个 agent"),
+                      encoding="utf-8")
+        st = tmp / ".agent" / "status.md"
+        st.write_text(st.read_text(encoding="utf-8")
+                      .replace("skill_version:** ", "skill_version:** v0.0.0"), encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "claude"], cwd=str(tmp))
+        check("脚手架同步 exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("CLAUDE.md 恢复 9 个 agent", "9 个 agent" in cl.read_text(encoding="utf-8"),
+              cl.read_text(encoding="utf-8")[:200])
+        st2 = st.read_text(encoding="utf-8")
+        check("status.md skill_version 更新（非 v0.0.0）",
+              "- **skill_version:** v0.0.0" not in st2, st2[:200])
+
+
 
 def test_install_fresh_home():
     """F1 回归：全新 HOME（skills 目录尚不存在）首次安装不被安全校验误拒。"""
@@ -442,6 +508,8 @@ def main():
         ("test_check_yaml", test_check_yaml),
         ("test_init_layout", test_init_layout),
         ("test_sync", test_sync),
+        ("test_style_seed_guard", test_style_seed_guard),
+        ("test_sync_style_missing_and_scaffold", test_sync_style_missing_and_scaffold),
         ("test_install_fresh_home", test_install_fresh_home),
         ("test_install_no_home", test_install_no_home),
         ("test_install_python_gate", test_install_python_gate),

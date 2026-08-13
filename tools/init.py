@@ -427,8 +427,8 @@ def _write_new_style_card(path: Path, role: str, principles: list, mistakes: lis
     """写新格式写作风格卡（frontmatter 量化层 + 正文定性层）。
     confidence=0 → 提示词只走定性层，直到首次蒸馏。"""
     prefix = "> [auto-seeded] 由 init.py 按题材预填，量化层留空，首次蒸馏后由 style-distiller 填充。\n\n" if seeded else ""
-    principles_txt = "\n".join(f"- {p}" for p in principles) if principles else ("" if not seeded else "- {principle_1}")
-    mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else ("" if not seeded else "- {mistake_1}")
+    principles_txt = "\n".join(f"- {p}" for p in principles) if principles else ("" if not seeded else "- （待设定）")
+    mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else ("" if not seeded else "- （待设定）")
     content = f"""---
 profile_version: "1.0"
 scene_type: general
@@ -531,9 +531,10 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
     )
 
     # writing-style.md → 新格式（frontmatter 量化层 + 正文定性层）
-    # 守卫：区分 seed 产物（正文带 [auto-seeded] 标记，_write_new_style_card 注入）与迁移/作者编辑产物（无标记）。
-    #   - seed 卡：仍含 {role}/{principle_1} 等占位符 → 未填，可重 seed；已填 → 跳过。
-    #   - 迁移/作者编辑卡：无论是否含「（待设定）」等文字一律保留，绝不被题材种子覆盖（防同 run 覆盖迁移产物）。
+    # 守卫（三态，修复 review #13/#14 误判/覆盖）：区分裸模板/seed 卡/作者或迁移卡。
+    #   - 裸模板（create_skeleton 拷贝、无 [auto-seeded] 标记、含 {role} 等占位符）→ 未填 → 题材预填。
+    #   - seed 卡（有 [auto-seeded] 标记）残留占位符 → 就地补齐（保留作者已编辑内容，绝不整卡覆盖）。
+    #   - 其余（无标记无占位符 = 作者/迁移卡；有标记无占位符 = 已填 seed 卡）→ 保留，绝不被种子覆盖。
     # 注：frontmatter 量化层恒含 `{ ... }` 内联字典，不能以 `"{" in text` 判未填。
     role = _md_section(text, "叙事者角色") or "（待设定）"
     blueprint = _md_section(text, "文风蓝图") or "（待设定）"
@@ -541,18 +542,38 @@ def seed_settings_from_genre(project_path: Path, genre: str, platform: Platform)
     _STYLE_PLACEHOLDERS = ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}")
     _st_text = style_card.read_text(encoding="utf-8") if style_card.exists() else ""
     _seeded_card = "[auto-seeded]" in _st_text
-    filled = bool(_st_text) and (not _seeded_card or not any(tok in _st_text for tok in _STYLE_PLACEHOLDERS))
-    if filled:
-        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）；genre-setting.md 已按新题材更新")
-    else:
+    _has_ph = any(tok in _st_text for tok in _STYLE_PLACEHOLDERS)
+    if not _seeded_card and _has_ph:
+        # 裸模板 → 题材预填（无作者内容，整卡重建安全）
         _write_new_style_card(
             style_card,
-            role=role or "{role}",
-            principles=[blueprint] if blueprint else [],
+            role=role,
+            principles=[blueprint] if blueprint != "（待设定）" else [],
             mistakes=taboo,
-            depiction=blueprint or "{depiction_techniques}",
+            depiction=blueprint if blueprint != "（待设定）" else "",
         )
         print(f"  ✅ 已按题材预填 settings/genre-setting.md + writing-style.md 默认值（{genre}）")
+    elif _seeded_card and _has_ph:
+        # seed 卡残留占位符 → 就地补齐，保留作者编辑
+        _backfill_style_card(style_card, role, blueprint, taboo)
+        print("  ✅ writing-style.md 残留占位符已就地补齐（保留已有编辑）；genre-setting.md 已按新题材更新")
+    else:
+        print("  ✅ writing-style.md 已有实质内容，跳过题材预填（保留迁移/编辑结果）；genre-setting.md 已按新题材更新")
+
+
+def _backfill_style_card(path: Path, role: str, blueprint: str, taboo: list) -> None:
+    """seed 卡残留占位符就地补齐（不整卡覆盖，保留作者已编辑内容）。
+    用于题材文件缺节时 seed 卡曾回退写入 {role} 等占位符的旧卡。"""
+    text = path.read_text(encoding="utf-8")
+    repl = {
+        "{role}": role or "（待设定）",
+        "{principle_1}": blueprint or "（待设定）",
+        "{mistake_1}": (taboo[0] if taboo else "（待设定）"),
+        "{depiction_techniques}": blueprint or "（待设定）",
+    }
+    for tok, val in repl.items():
+        text = text.replace(tok, val)
+    path.write_text(text, encoding="utf-8")
 
 
 def migrate_writing_style(project_path: Path) -> None:
