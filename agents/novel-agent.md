@@ -158,7 +158,10 @@ knowledge:
     │   │     ③ 先不弄，用模板写 3 章，再用正文蒸馏——自己的正文最贴合"
     │   │    ├─ 选 ① → 收样本（路径或粘贴，≥6000 字）→ 写 style-distill-order.md
     │   │    │     （inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
-    │   │    │     → 调 style-distiller → DONE 后再继续设定讨论 / 推进 outline
+    │   │    │     → 调 style-distiller → DONE 后，**把「作者画像」给作者看并请确认**
+    │   │    │     （analysis/general.md「作者画像」节，开头注明"这是你的文风在 AI 眼里的数据化解读，
+    │   │    │     不是文学评价"）：像 → 继续设定讨论 / 推进 outline；
+    │   │    │     不像 → 问作者补样本或调整方向，重新派 style-distill-order（重蒸馏，生成新版本快照）
     │   │    ├─ 选 ② → 跳过（templates 预置题材卡兜底，confidence=0）
     │   │    └─ 选 ③ → 跳过；3 章归档后作者说"按这个风格写/重新蒸馏" → 补触发 style-distill-order（样本=已归档正文）
     │   └─ 作者未讨论到文风即结束设定 → 跳过（templates 预置题材卡兜底，confidence=0）
