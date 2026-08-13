@@ -43,9 +43,9 @@ VALID_TOOLS = {
 
 # 部署后生成、仓库里不一定有源文件的路径模式（白名单，不要求文件存在）
 # 这些由 init.py 按题材/合并生成，或由 updater 归档时创建
+# （review #47：首项被 `[a-z-]+\.md` 完全包含属冗余，已删）
 DEPLOYED_PATTERNS = [
-    re.compile(r"^\.claude/knowledge/(anti-ai|genre-example|permanent-memory)\.md$"),
-    re.compile(r"^\.claude/knowledge/[a-z-]+\.md$"),          # format-specs 平铺产物
+    re.compile(r"^\.claude/knowledge/[a-z-]+\.md$"),          # 平铺产物（format-specs/anti-ai/genre-example/permanent-memory）
     re.compile(r"^\.claude/knowledge/(plot-craft|scene-craft|character-craft|title-craft|style-distill)/"),
     re.compile(r"^settings/character-setting/"),               # 每角色一个文件
     re.compile(r"^settings/(world-setting|genre-setting|writing-style|timeline|foreshadowing)\.md$"),

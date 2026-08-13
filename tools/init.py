@@ -30,6 +30,8 @@ from platforms import (
     resolve_skill_home,
 )
 
+from style_common import frontmatter_text   # frontmatter 单源解析（review #35/#38）
+
 # 强制 UTF-8 编码，避免 Windows 终端中文乱码
 for s in (sys.stdin, sys.stdout, sys.stderr):
     try:
@@ -168,10 +170,7 @@ def main():
     elif platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
 
-    # Step 4: 按题材继承记忆
-    deploy_memory(project_path, genre)
-
-    # Step 5: 按题材继承知识
+    # Step 4: 按题材继承知识
     deploy_knowledge(project_path, genre, platform)
 
     # Step 5.5: 按题材预填 settings 默认值
@@ -316,11 +315,6 @@ def deploy_agents(project_path: Path, platform: Platform):
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
 
 
-def deploy_memory(project_path: Path, genre: str):
-    """初始化 memory 目录（占位，反 AI/文风已移至 knowledge）"""
-    pass
-
-
 def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
     """按题材拷贝参考材料 + 反 AI/文风规则到 <平台>/knowledge/"""
     knowledge_dir = platform.knowledge_dir(project_path)
@@ -422,6 +416,30 @@ def _md_bullets(sec: str) -> list:
     ]
 
 
+def _style_card_frontmatter() -> str:
+    """9 维 schema 单源（review #35）：从模板 settings/writing-style.md 读取，
+    避免 init 内置字符串与模板漂移。模板缺失时回退内置副本（防御，不应发生）。"""
+    tpl = SOURCE_TEMPLATES / "settings" / "writing-style.md"
+    if tpl.exists():
+        fm = frontmatter_text(tpl.read_text(encoding="utf-8-sig"))
+        if fm:
+            return fm
+    return (
+        'profile_version: "1.0"\nscene_type: general\nsource_sample_length: 0\n'
+        'confidence: 0\nlast_updated: ""\nlocked: []\n\n'
+        "# 9 大维度（PRD 定义；0/空 = 未蒸馏，首次蒸馏后由 style-distiller 填充）\n"
+        "lexicon: { adj_density_per_100: 0, adv_density_per_100: 0, four_phrase_freq_per_100: 0, preferred_words: [], banned_words: [], name_pronoun_ratio: 0 }\n"
+        "syntax: { avg_sentence_length: 0, sentence_length_dist: {}, single_sentence_paragraph_pct: 0, avg_sentences_per_paragraph: 0, question_ratio: 0, exclamation_ratio: 0 }\n"
+        "rhythm: { dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct: 0, narration_pct: 0 }\n"
+        "rhetoric: { metaphor_density_per_100: 0, metaphor_preference: \"\", sensory_dist: \"\" }\n"
+        "emotion_expression: { direct_pct: 0, action_physiology_pct: 0, environment_projection_pct: 0 }\n"
+        "narrative: { perspective: \"\", focal_character: \"\", inner_monologue_style: \"\" }\n"
+        "dialogue_style: { tag_style: \"\", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0 }\n"
+        "cohesion: { conjunction_freq_per_100: 0, transition_sentence_ratio: 0, paragraph_bridge_style: \"\" }\n"
+        "verb_style: { action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, strength: \"\" }"
+    )
+
+
 def _write_new_style_card(path: Path, role: str, principles: list, mistakes: list,
                           depiction: str, seeded: bool = True) -> None:
     """写新格式写作风格卡（frontmatter 量化层 + 正文定性层）。
@@ -430,23 +448,7 @@ def _write_new_style_card(path: Path, role: str, principles: list, mistakes: lis
     principles_txt = "\n".join(f"- {p}" for p in principles) if principles else ("" if not seeded else "- （待设定）")
     mistakes_txt = "\n".join(f"- {m}" for m in mistakes) if mistakes else ("" if not seeded else "- （待设定）")
     content = f"""---
-profile_version: "1.0"
-scene_type: general
-source_sample_length: 0
-confidence: 0
-last_updated: ""
-locked: []
-
-# 9 大维度（PRD 定义；0/空 = 未蒸馏，首次蒸馏后由 style-distiller 填充）
-lexicon: {{ adj_density_per_100: 0, adv_density_per_100: 0, four_phrase_freq_per_100: 0, preferred_words: [], banned_words: [], name_pronoun_ratio: 0 }}
-syntax: {{ avg_sentence_length: 0, sentence_length_dist: {{}}, single_sentence_paragraph_pct: 0, avg_sentences_per_paragraph: 0, question_ratio: 0, exclamation_ratio: 0 }}
-rhythm: {{ dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct: 0, narration_pct: 0 }}
-rhetoric: {{ metaphor_density_per_100: 0, metaphor_preference: "", sensory_dist: "" }}
-emotion_expression: {{ direct_pct: 0, action_physiology_pct: 0, environment_projection_pct: 0 }}
-narrative: {{ perspective: "", focal_character: "", inner_monologue_style: "" }}
-dialogue_style: {{ tag_style: "", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0, direct_address_freq_per_100: 0 }}
-cohesion: {{ conjunction_freq_per_100: 0, transition_sentence_ratio: 0, paragraph_bridge_style: "" }}
-verb_style: {{ action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, strength: "" }}
+{_style_card_frontmatter()}
 ---
 
 # 写作风格

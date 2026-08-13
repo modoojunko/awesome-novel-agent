@@ -19,7 +19,7 @@
 | rhetoric | metaphor_density_per_100 / metaphor_preference / sensory_dist | 修辞：LLM |
 | emotion_expression | direct_pct / action_physiology_pct / environment_projection_pct | 情绪表达：LLM |
 | narrative | perspective / focal_character / inner_monologue_style | 叙事：LLM |
-| dialogue_style | tag_style / avg_dialogue_length / interrupt_freq_per_100 / subtext_ratio / direct_address_freq_per_100 | 对话：LLM |
+| dialogue_style | tag_style / avg_dialogue_length / interrupt_freq_per_100 / subtext_ratio | 对话：LLM |
 | cohesion | conjunction_freq_per_100 / transition_sentence_ratio / paragraph_bridge_style | 衔接：前两项脚本，bridge LLM |
 | verb_style | action_verb_ratio / mental_verb_ratio / state_verb_ratio / strength | 动词：前三项脚本，strength LLM |
 

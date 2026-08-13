@@ -13,7 +13,7 @@ rhythm: { dialogue_pct: 0, action_pct: 0, environment_pct: 0, inner_thought_pct:
 rhetoric: { metaphor_density_per_100: 0, metaphor_preference: "", sensory_dist: "" }
 emotion_expression: { direct_pct: 0, action_physiology_pct: 0, environment_projection_pct: 0 }
 narrative: { perspective: "", focal_character: "", inner_monologue_style: "" }
-dialogue_style: { tag_style: "", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0, direct_address_freq_per_100: 0 }
+dialogue_style: { tag_style: "", avg_dialogue_length: 0, interrupt_freq_per_100: 0, subtext_ratio: 0 }
 cohesion: { conjunction_freq_per_100: 0, transition_sentence_ratio: 0, paragraph_bridge_style: "" }
 verb_style: { action_verb_ratio: 0, mental_verb_ratio: 0, state_verb_ratio: 0, strength: "" }
 ---
