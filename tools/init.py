@@ -241,7 +241,7 @@ def create_skeleton(project_path: Path, platform: Platform):
         "chapters",
         "prompts",
         "sandbox",
-        "samples",          # 文风蒸馏样本（作者把待蒸馏文章放这里，style-distill 专用）
+        "novel-samples",    # 文风蒸馏样本（作者把待蒸馏文章放这里，style-distill 专用）
         "archives",
         ".agent/task",
         "tools",

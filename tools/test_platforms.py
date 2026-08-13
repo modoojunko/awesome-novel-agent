@@ -187,7 +187,7 @@ def test_init_layout():
             check(f"{key} init exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
             for sub in subs:
                 check(f"{key} 存在 .{key}/{sub}", (tmp / f".{key}" / sub).exists())
-            check(f"{key} 存在 samples/（蒸馏样本目录）", (tmp / "samples").exists())
+            check(f"{key} 存在 novel-samples/（蒸馏样本目录）", (tmp / "novel-samples").exists())
             for a in absents:
                 check(f"{key} 无 {a}", not (tmp / a).exists())
 
