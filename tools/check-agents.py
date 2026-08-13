@@ -70,15 +70,37 @@ def _split_frontmatter(text: str) -> str | None:
     return None
 
 
+def _dup_keys(fm_text: str) -> list[str]:
+    """检测 frontmatter YAML 顶层重复键——yaml.safe_load 是 last-wins 静默覆盖
+    （confidence 0→80 无声翻转），需先于解析独立检测（review #22）。"""
+    try:
+        node = yaml.compose(fm_text)
+    except Exception:
+        return []
+    if not isinstance(node, yaml.MappingNode):
+        return []
+    seen: set[str] = set()
+    dup: list[str] = []
+    for k, _v in node.value:
+        key = k.value if isinstance(k, yaml.ScalarNode) else ""
+        if key in seen:
+            dup.append(key)
+        seen.add(key)
+    return dup
+
+
 def check_file(path: Path) -> list:
     errors = []
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")   # utf-8-sig：剥 BOM（review #23，与 init 口径一致）
     if not text.startswith("---"):
         return [f"{path.name}: 缺少 frontmatter (--- 开头)"]
 
     fm_text = _split_frontmatter(text)
     if fm_text is None:
         return [f"{path.name}: frontmatter 未正确闭合 (需两对 ---)"]
+
+    for k in _dup_keys(fm_text):
+        errors.append(f"{path.name}: YAML 重复键 {k!r}（last-wins 静默覆盖）")
 
     try:
         fm = yaml.safe_load(fm_text)
@@ -151,12 +173,16 @@ STYLE_CARD_DIMS = ["lexicon", "syntax", "rhythm", "rhetoric", "emotion_expressio
 
 
 def _pct_sum_errors(d: dict, label: str, expected: float = 100, max_sum: float | None = None) -> list:
-    """占比/分布 dict 求和校验：值必须全为数值（type 排除 bool）；全零 = 占位跳过；非零须和≈expected（或≤max_sum）。
+    """占比/分布 dict 求和校验：值必须全为数值（type 排除 bool）、非负；全零 = 占位跳过；非零须和≈expected（或≤max_sum）。
 
-    字符串值（LLM 或手改）不再被 `if total and` 静默跳过——非数值直接报错。"""
+    字符串值（LLM 或手改）不再被 `if total and` 静默跳过——非数值直接报错；
+    负值（{120,-20} 蒙混和=100）同样报错（review #19）。"""
     bad = [k for k, v in d.items() if type(v) not in (int, float)]
     if bad:
         return [f"{label} 值应为数值（非数值键: {sorted(bad)}）"]
+    neg = [k for k, v in d.items() if v < 0]
+    if neg:
+        return [f"{label} 含负值（键: {sorted(neg)}）"]
     total = sum(d.values())
     if total == 0:
         return []                                  # 全零占位（未蒸馏/空 override）
@@ -171,10 +197,12 @@ def _pct_sum_errors(d: dict, label: str, expected: float = 100, max_sum: float |
 
 def check_style_card(path: Path) -> list:
     errors = []
-    text = path.read_text(encoding="utf-8")
+    text = path.read_text(encoding="utf-8-sig")   # utf-8-sig：剥 BOM（review #23，与 init 口径一致）
     fm_text = _split_frontmatter(text)
     if fm_text is None:
         return [f"{path.name}: 风格卡缺 frontmatter（需两对 ---）"]
+    for k in _dup_keys(fm_text):
+        errors.append(f"{path.name}: YAML 重复键 {k!r}（last-wins 静默覆盖）")
     try:
         fm = yaml.safe_load(fm_text)
     except Exception as e:
@@ -198,9 +226,18 @@ def check_style_card(path: Path) -> list:
         if not isinstance(ov, dict):
             errors.append(f"{path.name}: 场景卡需 override 字段（dict，只写与主卡的差异维度）")
         else:
-            for dim in ov:
+            for dim, ovd in ov.items():
                 if dim not in STYLE_CARD_DIMS:
                     errors.append(f"{path.name}: override 出现未知维度 {dim!r}")
+                elif not isinstance(ovd, dict):
+                    errors.append(f"{path.name}: override.{dim} 需为 dict（当前 {type(ovd).__name__}）")
+                else:
+                    for k, v in ovd.items():          # 值校验：负数 / 占比越界（review #21）
+                        if type(v) in (int, float) and not isinstance(v, bool):
+                            if v < 0:
+                                errors.append(f"{path.name}: override.{dim}.{k} 为负值（{v!r}）")
+                            elif k.endswith(("_pct", "_ratio")) and v > 100:
+                                errors.append(f"{path.name}: override.{dim}.{k} 占比越界 0-100（{v!r}）")
     else:
         for dim in STYLE_CARD_DIMS:
             if dim not in fm:
@@ -238,7 +275,18 @@ def check_style_card(path: Path) -> list:
     def _pct_field(dim, field, val):
         errors.append(f"{path.name}: {dim}.{field} 需为 0-100 数值（当前 {val!r}）")
 
+    def _density_ok(v):
+        """密度字段（每百字 X 个）：非负数值即可（review #18——密度字段此前全库无校验）。"""
+        return type(v) in (int, float) and not isinstance(v, bool) and v >= 0
+
+    def _density_field(dim, field, val):
+        errors.append(f"{path.name}: {dim}.{field} 需为非负数值（当前 {val!r}）")
+
     lex = fm.get("lexicon") if isinstance(fm.get("lexicon"), dict) else {}
+    for f in ("adj_density_per_100", "adv_density_per_100", "four_phrase_freq_per_100"):
+        v = lex.get(f)
+        if v is not None and not _density_ok(v):
+            _density_field("lexicon", f, v)
     npr = lex.get("name_pronoun_ratio")
     if isinstance(npr, dict):
         keys = set(npr)
@@ -259,9 +307,17 @@ def check_style_card(path: Path) -> list:
         v = syn.get(f)
         if v is not None and not _pct_ok(v):
             _pct_field("syntax", f, v)
+    for f in ("avg_sentence_length", "avg_sentences_per_paragraph"):
+        v = syn.get(f)
+        if v is not None and not _density_ok(v):
+            _density_field("syntax", f, v)
     dia = fm.get("dialogue_style") if isinstance(fm.get("dialogue_style"), dict) else {}
     if dia.get("subtext_ratio") is not None and not _pct_ok(dia["subtext_ratio"]):
         _pct_field("dialogue_style", "subtext_ratio", dia["subtext_ratio"])
+    for f in ("avg_dialogue_length", "interrupt_freq_per_100"):
+        v = dia.get(f)
+        if v is not None and not _density_ok(v):
+            _density_field("dialogue_style", f, v)
 
     em = fm.get("emotion_expression") if isinstance(fm.get("emotion_expression"), dict) else {}
     for f in ("direct_pct", "action_physiology_pct", "environment_projection_pct", "inner_monologue_pct"):
@@ -280,6 +336,14 @@ def check_style_card(path: Path) -> list:
     coh = fm.get("cohesion") if isinstance(fm.get("cohesion"), dict) else {}
     if coh.get("transition_sentence_ratio") is not None and not _pct_ok(coh["transition_sentence_ratio"]):
         _pct_field("cohesion", "transition_sentence_ratio", coh["transition_sentence_ratio"])
+    if coh.get("conjunction_freq_per_100") is not None \
+            and not _density_ok(coh["conjunction_freq_per_100"]):
+        _density_field("cohesion", "conjunction_freq_per_100", coh["conjunction_freq_per_100"])
+
+    rhe = fm.get("rhetoric") if isinstance(fm.get("rhetoric"), dict) else {}
+    if rhe.get("metaphor_density_per_100") is not None \
+            and not _density_ok(rhe["metaphor_density_per_100"]):
+        _density_field("rhetoric", "metaphor_density_per_100", rhe["metaphor_density_per_100"])
 
     for key in ("hard_constraints", "soft_guidance"):
         v = fm.get(key)
@@ -290,6 +354,10 @@ def check_style_card(path: Path) -> list:
 
     rhy = fm.get("rhythm") if isinstance(fm.get("rhythm"), dict) else {}
     _FIVE = ("dialogue_pct", "action_pct", "environment_pct", "inner_thought_pct", "narration_pct")
+    if "override" not in fm:
+        missing = [f for f in _FIVE if f not in rhy]
+        if missing:
+            errors.append(f"{path.name}: rhythm 缺五层占比键 {missing}（缺任一键整节校验跳过，review #20）")
     if all(f in rhy for f in _FIVE):
         five = {f: rhy[f] for f in _FIVE}
         for e in _pct_sum_errors(five, f"{path.name}: 五层占比总计", max_sum=110):   # 五层可重叠，上限 110%（spec §5.1）
@@ -329,7 +397,7 @@ def check_style_cards() -> list:
     # 继承环检测（跨文件 DFS）：A→B→A 循环在单卡存在性检查中不被发现
     graph = {}
     for p in cards:
-        fm_text = _split_frontmatter(p.read_text(encoding="utf-8"))
+        fm_text = _split_frontmatter(p.read_text(encoding="utf-8-sig"))
         if not fm_text:
             continue
         fm = yaml.safe_load(fm_text) or {}
@@ -361,7 +429,32 @@ def check_style_cards() -> list:
     return errors
 
 
+def check_project_cards(project: Path) -> list:
+    """校验运行态项目卡（settings/writing-style.md + settings/style-profiles/**）。
+    仓库模板卡由 check_style_cards 校验；项目卡是 style-distiller 蒸馏落盘产物（review #18）。"""
+    base = project / "settings"
+    if not base.exists():
+        return []
+    cards = []
+    main = base / "writing-style.md"
+    if main.exists():
+        cards.append(main)
+    profiles = base / "style-profiles"
+    if profiles.exists():
+        cards.extend(sorted(profiles.rglob("*.md")))
+    errors = []
+    for p in cards:
+        errors.extend(check_style_card(p))
+    return errors
+
+
 def main() -> int:
+    import argparse
+    ap = argparse.ArgumentParser(description="agent 定义静态检查")
+    ap.add_argument("--project", default=None,
+                    help="额外校验运行态项目卡（settings/ 下写作风格卡，style-distiller 蒸馏产物）")
+    args = ap.parse_args()
+
     if not AGENTS_DIR.is_dir():
         print("⚠️  agents/ 目录不存在")
         return 1
@@ -376,7 +469,7 @@ def main() -> int:
     # 校验 agents/ 引用的 skills 文件是否真存在于 skills/ 目录
     refs = set()
     for f in AGENTS_DIR.glob("*.md"):
-        text = f.read_text(encoding="utf-8")
+        text = f.read_text(encoding="utf-8-sig")
         for m in re.finditer(r"skills/([a-z-]+\.md)", text):
             refs.add(m.group(1))
     missing_skills = [r for r in sorted(refs) if not (SKILLS_DIR / r).exists()]
@@ -388,6 +481,12 @@ def main() -> int:
     for e in style_errs:
         print(f"  ❌ {e}")
     all_errors.extend(style_errs)
+
+    if args.project:
+        proj_errs = check_project_cards(Path(args.project))
+        for e in proj_errs:
+            print(f"  ❌ [项目] {e}")
+        all_errors.extend(proj_errs)
 
     if all_errors:
         print(f"\n共 {len(all_errors)} 个问题")
