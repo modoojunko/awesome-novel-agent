@@ -142,6 +142,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 ├── prompts/
 │   └── vol-{N}-ch-{M}-prompt.md  # 6 元素提示词
 ├── sandbox/              # 推演沙盘记录（可选，roleplay-sandbox 产出）
+├── novel-samples/        # 文风蒸馏样本（作者把待学文风的文章放这里，style-distiller 专用）
 ├── archives/
 │   ├── *.draft.md        # 草稿（writer 输出，历史留档）
 │   ├── *.anti-ai.md      # 去 AI 味后版本（历史留档）
