@@ -28,18 +28,19 @@ for _s in (sys.stdout, sys.stderr):
 CHECK_CATEGORIES = ["数值/占比条", "硬性规则条", "建模规则条", "软引导条"]
 
 # 违反判定收敛白名单（spec 7.1 / verify-checklist.md）：LLM 输出的字符串布尔一律按此收敛，
-# 匹配前剥尾部标点（'是。'→'是'、'yes。'→'yes'），白名单外一律不违反（'false'/'否'/空/'其余字符串'）。
-VIOLATED_STRINGS = frozenset({"true", "是", "yes", "1", "违反"})
+# 匹配前剥尾部标点与语气词（'是。'→'是'、'违反了'→'违反'、'是；'→'是'），白名单外一律不违反
+# （'false'/'否'/空/'其余字符串'）。
+VIOLATED_STRINGS = frozenset({"true", "是", "yes", "1", "违反", "违反了"})
 
 def _is_violated(v) -> bool:
-    """violated 判定：bool/字符串 布尔都收敛——LLM 可能输出 '是。'/'false' 等字符串，误判会触发错误抽卡。
-    字符串按 truthy 语义：'true'/'是'/'yes'/'1'/'违反'（含尾部标点）→ 违反；其余（'false'/'否'/空）→ 不违反。"""
+    """violated 判定：bool/字符串 布尔都收敛——LLM 可能输出 '是。'/'违反了'/'是；' 等字符串，误判会触发错误抽卡。
+    字符串按 truthy 语义：'true'/'是'/'yes'/'1'/'违反'/'违反了'（含尾部标点/语气词）→ 违反；其余（'false'/'否'/空）→ 不违反。"""
     if v is None:
         return False
     if isinstance(v, bool):
         return v
     if isinstance(v, str):
-        s = v.strip().strip("。？！…，,.!? 　")
+        s = v.strip().strip("。？！…，,.!? ；; 　").strip("了")
         return s.lower() in VIOLATED_STRINGS
     return bool(v)
 
@@ -52,12 +53,17 @@ def should_reroll(round_no: int, violated: int) -> bool:
     return round_no < 3 and violated > 0
 
 def _violated_count(v) -> int:
-    """violated 数值收敛：int/float 原样、数字字符串转 int、其余/None → 0。
-    LLM 可能输出字符串条数（"3"），原生比较会 TypeError 或按字典序选错（"10" < "3"）。"""
+    """violated 数值收敛：int/float 原样、数字字符串转 int（'3.0'→3、'10'→10）、bool/None/非法/非有限 → 0。
+    LLM 可能输出字符串条数（"3"），原生比较会 TypeError 或按字典序选错（"10" < "3"）；True 是布尔不是条数。"""
+    if v is None or isinstance(v, bool):
+        return 0
     try:
-        return int(v)
+        f = float(v)
     except (TypeError, ValueError):
         return 0
+    if f != f or f in (float("inf"), float("-inf")):   # nan/inf 过滤
+        return 0
+    return int(f)
 
 def pick_best(rounds: list[dict]) -> dict:
     """超限取最优（spec 7.2）：违反条数最少的一轮，同分取最新。

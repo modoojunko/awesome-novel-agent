@@ -15,7 +15,7 @@ for _s in (sys.stdout, sys.stderr):
     except AttributeError:
         pass
 from style_render import range_for, enum_zh, pct_zh, _pct, _num, _flatten_dists, render_card, SCENE_INJECTION
-from style_verify import verdict, should_reroll, pick_best, format_report, _is_violated, VIOLATED_STRINGS
+from style_verify import verdict, should_reroll, pick_best, format_report, _is_violated, _violated_count, VIOLATED_STRINGS
 from test_util import check, summary, exit_code
 
 CARD = {
@@ -46,6 +46,9 @@ def test_range_for():
     check("5.8@90 → '5-6'(±10%)", range_for(5.8, 90) == "5-6", range_for(5.8, 90))
     check("零值 → '0'（不虚构 0-1）", range_for(0, 75) == "0", range_for(0, 75))
     check("极低值 0.2@75 → '0'（单值）", range_for(0.2, 75) == "0", range_for(0.2, 75))
+    check("5@75 → '5-6'（half-up，非银行家舍入 4）", range_for(5, 75) == "5-6", range_for(5, 75))
+    check("15@75 → '14-17'（half-up 边界）", range_for(15, 75) == "14-17", range_for(15, 75))
+    check("25@75 → '23-28'（half-up 边界）", range_for(25, 75) == "23-28", range_for(25, 75))
     check("_num(True) → 0（bool 排除）", _num(True) == 0, _num(True))
     check("_num(nan) → 0（非有限过滤）", _num(float("nan")) == 0, _num(float("nan")))
     check("_num(inf) → 0", _num(float("inf")) == 0, _num(float("inf")))
@@ -105,10 +108,11 @@ def test_pct_normalize():
     check("23.0 → 23（整数值收敛为 int）", _pct(23.0) == 23, _pct(23.0))
     check("0 → 0", _pct(0) == 0, _pct(0))
     check("字符串 '13.4' → 13.4", _pct("13.4") == 13.4, _pct("13.4"))
-    check("None → 0", _pct(None) == 0, _pct(None))
-    check("非法串 → 0", _pct("abc") == 0, _pct("abc"))
-    check("越界 150 → 0（防御收敛）", _pct(150) == 0, _pct(150))
-    check("bool True → 0（bool 排除）", _pct(True) == 0, _pct(True))
+    check("None → None（缺键不伪造 0）", _pct(None) is None, _pct(None))
+    check("非法串 → None", _pct("abc") is None, _pct("abc"))
+    check("越界 150 → None（渲染端跳过该行，不钳 0）", _pct(150) is None, _pct(150))
+    check("负值 -5 → None", _pct(-5) is None, _pct(-5))
+    check("bool True → None（bool 排除）", _pct(True) is None, _pct(True))
 
 def test_render_percent_normalize():
     # 决策 A 修正：旧引擎 0-100 一位小数百分数按原样渲染（13.4%），不做 ×100
@@ -185,7 +189,10 @@ def test_verify_string_bool():
     check("'其余字符串' → 不违反", _is_violated("其余字符串") is False, _is_violated("其余字符串"))
     check("None → 不违反", _is_violated(None) is False, _is_violated(None))
     check("bool True/False 原样", _is_violated(True) is True and _is_violated(False) is False)
-    check("VIOLATED_STRINGS 为文档白名单 5 令牌", VIOLATED_STRINGS == frozenset({"true", "是", "yes", "1", "违反"}))
+    check("'违反了' → 违反（白名单 + 了）", _is_violated("违反了") is True, _is_violated("违反了"))
+    check("'是；' → 违反（剥分号）", _is_violated("是；") is True, _is_violated("是；"))
+    check("'违反；。' → 违反", _is_violated("违反；。") is True, _is_violated("违反；。"))
+    check("VIOLATED_STRINGS 为文档白名单 6 令牌", VIOLATED_STRINGS == frozenset({"true", "是", "yes", "1", "违反", "违反了"}))
 
 def test_verify_verdict():
     ok = [{"no": 1, "require": "禁'宛如'", "evidence": "无", "violated": False}]
@@ -207,18 +214,127 @@ def test_verify_pick_best_coerce():
     # 字符串条数收敛（LLM 可能输出 "3"）：混合 int/str 不崩、全 str 按数值选（非字典序）
     check("混合 int/str 不崩且选对", pick_best([{"violated": 3}, {"violated": "1"}])["violated"] in (1, "1"))
     check("全字符串按数值取最少（10 vs 3 → 3）", pick_best([{"violated": "10"}, {"violated": "3"}])["violated"] == "3")
-    check("None violated → 0", pick_best([{"violated": None}])["violated"] == 0 or pick_best([{"violated": None}])["violated"] is None)
+    check("None violated → 0（选 None 轮当 0 违反）", pick_best([{"violated": None}, {"violated": 2}])["violated"] is None)
+
+def test_verify_count_coerce():
+    # 收敛行为（曾因恒真断言从未被测）：'3.0' 当 3、True 不算 1、非法 → 0
+    check("'3.0' → 3（非 0）", _violated_count("3.0") == 3, _violated_count("3.0"))
+    check("'10' → 10", _violated_count("10") == 10, _violated_count("10"))
+    check("2.0 → 2", _violated_count(2.0) == 2, _violated_count(2.0))
+    check("True → 0（bool 不是条数）", _violated_count(True) == 0, _violated_count(True))
+    check("None → 0", _violated_count(None) == 0, _violated_count(None))
+    check("'abc' → 0", _violated_count("abc") == 0, _violated_count("abc"))
+    check("nan → 0", _violated_count(float("nan")) == 0, _violated_count(float("nan")))
+    check("'3.0' 轮 vs 2 轮 → 选 2 轮", pick_best([{"violated": "3.0"}, {"violated": 2}])["violated"] == 2)
+    check("True 轮 → 0 违反被选中", pick_best([{"violated": True}, {"violated": 2}])["violated"] is True)
 
 def test_verify_report():
     r = format_report([{"no": 1, "require": "禁'宛如'", "evidence": "出现1次", "violated": True, "advice": "替换"}])
     check("含表头", "原文要求" in r, r)
     check("含结论 FAIL 与汇总", "FAIL" in r and "1/1" in r, r)
 
+def test_render_missing_keys_no_fake_zero():
+    # 缺键 = 未测 → 不渲染该行（防「平均句长：0 字」类伪实测）
+    sparse = dict(CARD)
+    for k in ("syntax", "rhythm", "emotion_expression", "dialogue_style"):
+        sparse[k] = {}
+    sparse["lexicon"] = dict(CARD["lexicon"])
+    sparse["lexicon"]["name_pronoun_ratio"] = None
+    out = render_card(sparse)
+    checks = [
+        ("句式无假 0 行", not any("0 字" in x or "0 句" in x or "≥ 0%" in x or "疑问句占比" in x or "感叹句占比" in x for x in out["句式"]), out.get("句式")),
+        ("节奏无假 0 行", not out["节奏"], out.get("节奏")),
+        ("情绪表达无假 0 行", not out["情绪表达"], out.get("情绪表达")),
+        ("对话风格无假 0 行", not out["对话风格"], out.get("对话风格")),
+        ("缺 npr 不渲染人名/代词行", not any("人名/代词" in x for x in out["词汇"]), out.get("词汇")),
+    ]
+    for name, cond, detail in checks:
+        check(name, cond, detail)
+
+def test_render_out_of_range_skips_line():
+    # 越界值（幻觉 150%）→ 跳过该行，不渲染成「0%（少量）」假实测
+    bad = dict(CARD)
+    bad["syntax"] = dict(CARD["syntax"]); bad["syntax"]["question_ratio"] = 150
+    bad["lexicon"] = dict(CARD["lexicon"]); bad["lexicon"]["name_pronoun_ratio"] = 250
+    out = render_card(bad)
+    check("150% 疑问句占比行跳过", not any("疑问句占比" in x for x in out["句式"]), out.get("句式"))
+    check("250 npr 行跳过", not any("人名/代词" in x for x in out["词汇"]), out.get("词汇"))
+
+def test_render_few_shot_grouping():
+    # 按 type 分组（spec 渲染步骤 6）；缺 text/reason 标「（未填写）」而非 None
+    fse_card = dict(CARD)
+    fse_card["few_shot_examples"] = [
+        {"type": "inner_thought", "text": "好想死啊", "reason": "口头禅式吐槽"},
+        {"type": "inner_thought", "text": "又来了"},
+        {"type": "dialogue", "text": "关我屁事。", "reason": "呛人"},
+        {"type": None},
+        {"text": "裸串"},
+    ]
+    out = render_card(fse_card)
+    lines = out["风格参考例句"]
+    check("无字面 None", all("None" not in x for x in lines), lines)
+    check("同 type 合并一行", len(lines) == 3, lines)
+    check("inner_thought 行含两条例句", any(x.startswith("[inner_thought]") and "好想死啊" in x and "又来了" in x for x in lines), lines)
+    check("缺 text/reason 标未填写", any("（未填写）" in x for x in lines), lines)
+    check("非 dict 例句按未标注分组", any(x.startswith("[未标注]") and "裸串" in x for x in lines), lines)
+
+def test_render_conf_zero():
+    # conf=0：量化维不渲染（防 0-1 假区间），仅声音层透传 + 提示行
+    zero = dict(CARD); zero["confidence"] = 0
+    out = render_card(zero)
+    quant = ["词汇", "句式", "节奏", "修辞与感官", "情绪表达", "对话风格", "衔接", "视角"]
+    check("conf=0 量化节全空", all(not out[s] for s in quant), {s: out[s] for s in quant})
+    check("conf=0 含未蒸馏提示行", any("未蒸馏卡" in x for x in out["硬性规则"]), out.get("硬性规则"))
+    check("conf=0 声音层透传", any("引号包裹" in x for x in out["硬性规则"]), out.get("硬性规则"))
+
+BODY = """## 叙事身份（原 role）
+
+冷硬汉派刑警
+
+## 硬约束（原 core_principles）
+
+- 不写内心戏
+
+## AI 易犯错误（原 possible_mistakes）
+
+- 堆形容词
+
+## 描写层次和手法（原 depiction_techniques）
+
+- 先动作后环境
+
+## few-shot 例句
+
+- 蒸馏后填入
+"""
+
+def test_render_sound_layer_fallback():
+    # §6.0b：已蒸馏卡缺声音层 → 回退读正文定性四字段
+    legacy = dict(CARD)
+    legacy.pop("hard_constraints"); legacy.pop("soft_guidance"); legacy.pop("few_shot_examples")
+    out = render_card(legacy, body=BODY)
+    check("硬性规则回退正文硬约束+AI易犯错误",
+          any("不写内心戏" in x for x in out["硬性规则"]) and any("堆形容词" in x for x in out["硬性规则"]),
+          out.get("硬性规则"))
+    check("整体基调回退正文叙事身份", any("冷硬汉派刑警" in x for x in out["整体基调"]), out.get("整体基调"))
+    check("风格参考例句回退描写层次", any("先动作后环境" in x for x in out["风格参考例句"]), out.get("风格参考例句"))
+    # 无正文时：声音层保持空，不崩溃
+    out2 = render_card(legacy)
+    check("无 body 声音层为空", not out2["硬性规则"] and not out2["整体基调"] and not out2["风格参考例句"],
+          {k: out2[k] for k in ("硬性规则", "整体基调", "风格参考例句")})
+    # 部分缺失：只回退缺失的键
+    part = dict(CARD); part.pop("hard_constraints")
+    out3 = render_card(part, body=BODY)
+    check("部分缺失只回退硬性规则", any("不写内心戏" in x for x in out3["硬性规则"]) and any("整体基调：轻松吐槽向" in x for x in out3["整体基调"]),
+          out3.get("硬性规则"))
+
 test_range_for(); test_enum_zh(); test_pct_zh(); test_scene_injection()
 test_render_card(); test_render_card_verb(); test_render_card_sparse(); test_render_card_fallback()
 test_pct_normalize(); test_render_percent_normalize(); test_render_percent_all_fields_consistent()
 test_render_density_skip_unmeasured(); test_render_override_guard(); test_flatten_dists_clean()
+test_render_missing_keys_no_fake_zero(); test_render_out_of_range_skips_line()
+test_render_few_shot_grouping(); test_render_conf_zero(); test_render_sound_layer_fallback()
 test_verify_verdict(); test_verify_reroll(); test_verify_pick_best(); test_verify_pick_best_coerce()
-test_verify_report(); test_verify_string_bool()
+test_verify_count_coerce(); test_verify_report(); test_verify_string_bool()
 print(f"\n{summary()}")
 sys.exit(exit_code())
