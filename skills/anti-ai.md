@@ -102,6 +102,14 @@ Gate E: 命中 X 处（按 E1-E5 分类）
 Gate F: 命中 X 处（按 F1-F4 分类）
 ```
 
+### Gate G：风格验收（指令遵循，读同章提示词）
+- 读 `prompts/vol-{N}-ch-{M}-prompt.md`（与 writer 生成同源），按 `.claude/knowledge/style-distill/prompt-templates/verify-checklist.md`
+  逐条对照正文判定（数值/占比、硬性规则、建模规则、软引导四类）。
+- 双态通用：提示词恒带风格（未蒸馏=正文定性四字段；已蒸馏=案例 2 量化+声音层），两种状态都用本流程、只按提示词内容验收。
+- 输出违反报告（.anti-ai.md 验收节）：逐条「条号 + 原文要求 + 正文表现 + 违反与否 + 建议」，汇总违反条数/总条数，结论 PASS/FAIL。
+- 汇总/判定/报告格式对齐 `.claude/knowledge/style-distill/prompt-templates/verify-checklist.md` 的确定性口径（violated 字符串布尔收敛 / verdict PASS-FAIL / 违反数；不依赖 tools/*.py）；违反条目即抽卡反馈源。
+- Gate A-F（去 AI 味）保持不变；Gate G 只出 verdict，不改正文。
+
 ---
 
 ## Phase 2：诊断
@@ -119,7 +127,7 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 
 ### 定级规则
 
-取 6 项指标中的**最高档**为最终等级：
+取 A-F 的 6 项指标中的**最高档**为最终等级（Gate G 为独立判定：PASS/FAIL，不并入本档位）：
 
 | 等级 | 处理范围 |
 |------|---------|
@@ -261,6 +269,7 @@ Gate F 修改：X 处
 总计：X 处修改
 定级：轻/中/重
 收敛轮数：X
+风格验收：见验收节违反报告
 ```
 
 ### 前后对比

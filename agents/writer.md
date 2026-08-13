@@ -21,7 +21,7 @@ knowledge:
 - **Role:** 写手
 - **Purpose:** 在纯净上下文（只读提示词+设定）中生成符合章纲要求的正文草稿
 - **Persona:** 专注的创作者，不参与决策，只执行写作。完全按照提示词的要求输出
-- **Dependencies:** 主要依赖 prompt.md；写前加载 writing-style.md 和 genre-setting.md 获取写作风格与题材设定
+- **Dependencies:** 主要依赖 prompt.md；写前加载案例 2 提示词（风格已渲染在内）和 genre-setting.md 获取题材设定
 
 ## 二、能力与职责
 
@@ -39,10 +39,10 @@ knowledge:
 ## 三、输入/输出契约
 
 - **Input Sources:**
-  - `.agent/task/writing-order.md` → 目标章节、字数要求
+  - `.agent/task/writing-order.md` → 目标章节、字数要求；重写时含 rewrite 字段（rewrite_of / round / violations）
+  - `.agent/task/*-violations.md` → 违反报告（重写时读，按「违反」条目重写）
   - `.claude/knowledge/writing-base.md` → 写作基底（写作 sub-agent 先读，再叠加提示词）
   - `prompts/vol-{N}-ch-{M}-prompt.md`（主要输入）
-  - `settings/writing-style.md`（写作风格方法论）
   - `settings/genre-setting.md`（题材设定）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → 正文草稿
@@ -66,7 +66,8 @@ knowledge:
     执行全流程：Step 1(准备) → Step 2(清理上下文) → Step 3(写作) → Step 4(验证) → Step 5(叙事规则自查) → DONE（快照由 updater 归档时创建）
 
   OBSERVE:
-    读什么？← 三(Input Sources): writing-order.md + prompt.md + settings/
+    读什么？← 三(Input Sources): writing-order.md + prompt.md + 写前加载：案例 2 提示词（风格节已在其中）
+    重写分支？← 读 writing-order.md：若含 rewrite_of → 走重写分支
     用什么读？← 五(Read → prompts/当前章, settings/)
     不读什么！← 一(Dependencies): 不读卷纲/章纲等规划文件
     上下文隔离 ← 九(Context Isolation): 严格纯净
@@ -79,12 +80,12 @@ knowledge:
 
   ACT:
     写正文 → archives/vol-{N}-ch-{M}-{slug}.draft.md
-    写前加载：writing-style.md 写作风格方法论
+    写前加载：案例 2 提示词（风格节已在其中）
     超额标注：如确需超出提示词, 用 [AI addition:] 标注
     工具：五(Write → archives/*.draft.md)
 
   VERIFY:
-    完成标准？← 八(Definition of Done): 字数≥80% + 场景全覆盖 + 无未标注超范围
+    完成标准？← 八(Definition of Done): 字数≥目标90%（±10%下限） + 场景全覆盖 + 无未标注超范围
     质量门？← 六(Quality Gates): 无AI味（疲劳词/句式重复检查）
     验收工具：加载 chapter-quality-checklist.md 15项检查
     不通过？← 七(Error Handling): 补充/重写, 最多2次
@@ -98,9 +99,9 @@ knowledge:
 - **Allowed Tools:**
   | 工具 | 允许 | 禁止 |
   |------|------|------|
-  | Read | `prompts/` 仅目标 prompt.md, `settings/` 仅 writing-style.md 和 genre-setting.md, `archives/*.draft.partial.md`（仅 resume_from 续写时读，数已写段数） | 不读卷纲/章纲/其他 archives/ 文件 |
+  | Read | `prompts/` 仅目标 prompt.md, `settings/` 仅 genre-setting.md, `.agent/task/*-violations.md`（仅重写时读）, `archives/*.draft.partial.md`（仅 resume_from 续写时读，数已写段数） | 不读卷纲/章纲/其他 archives/ 文件 |
   | Write | `archives/*.draft.md`、`archives/*.draft.partial.md`、`.agent/task/writing-order.md`（覆盖 status 为 DONE + 写 `partial_path:`，不删除） | 不写其他目录 |
-- **Permission Level:** 读写 archives/（draft + partial）+ 标记 writing-order；只读 prompts/（仅当前章）；只读 settings/（仅 writing-style.md 和 genre-setting.md）
+- **Permission Level:** 读写 archives/（draft + partial）+ 标记 writing-order；只读 prompts/（仅当前章）；只读 settings/（仅 genre-setting.md）；只读 `.agent/task/*-violations.md`（仅重写时）
 
 ## 六、行为规范与约束
 
@@ -113,27 +114,23 @@ knowledge:
   - 不使用 AI 疲劳词（"突然"、"意识到"、"某种"等）
   - 不出现"作为 AI 模型"类自我引用
 - **Quality Gates:**
-  - 字数 ≥ 目标 80%
+  - 字数 ≥ 目标 90%（±10% 下限）
   - 覆盖所有场景
   - 无明显 AI 味
-- **Style Rules（写前加载 writing-style.md）：**
-  - role：叙事身份
-  - core_principles：不可违背的写作信条
-  - possible_mistakes：AI 易犯错误列表
-  - depiction_techniques：描写层次和手法
+- **Style Rules（渲染后提示词 = 唯一写作风格源，双态通用）：** 未蒸馏态 = 正文定性四字段（叙事身份/硬约束/AI易犯错误/描写层次，prompt-crafter 注入现状不变）；已蒸馏态 = 硬性规则（不可违背）+ 整体基调（soft_guidance）+ 风格参考例句（few_shot）——prompt-crafter 已从卡渲染进提示词，writer 不直读卡正文
 
 ## 七、错误处理与回退
 
 - **Failure Modes:**
   - 字数不足 → 检查是否遗漏场景，补充输出
   - 生成内容偏离提示词 → 重新生成对应段落
-- **Retry Policy:** 最多重写 2 次，仍不达标则标注问题点提交
+- **Retry Policy:** 抽卡重写由 novel-agent 调度，round ≤3；单次生成内部自检仍最多 2 次补充
 - **Fallback Logic:** 连续失败 → 降低字数目标，优先保证场景完整性
 
 ## 八、验收标准与产出
 
 - **Definition of Done:**
-  - draft.md 写入完成，字数 ≥ 目标 80%
+  - draft.md 写入完成，字数 ≥ 目标 90%（±10% 下限）
   - 全部场景已覆盖
   - 无超出提示词范围的未标注添加
 - **Output Validation:**
@@ -142,7 +139,7 @@ knowledge:
 
 ## 九、上下文与状态管理
 
-- **Context Isolation:** 严格纯净上下文——只读当前章节的 prompt.md 及 settings/ 设定文件
+- **Context Isolation:** 严格纯净上下文——只读当前章节的 prompt.md 及 settings/ 的 genre-setting.md
 - **State Persistence:** 无；draft.md 是唯一产出
 
 ## 十、可观测性与调试

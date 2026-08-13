@@ -14,10 +14,17 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 
 > AI 原版快照（`.agent/{chapter}-draft-ai.md`）由 **updater 在归档时创建**（从草稿复制，updater-archive Step 1），writer 不负责保存。
 
+## 重写分支（writing-order.md 含 rewrite_of 时）
+
+1. 读 writing-order.md 的 rewrite_of / round / violations 字段。
+2. 读原始案例 2 提示词 prompts/vol-{N}-ch-{M}-prompt.md + 违反报告 violations 文件。
+3. 只重写违反报告中标记「违反」的条目对应段落，向「建议」靠拢；其余段落保持原文。
+4. 完成后照常写 archives/*.draft.md，order 标 DONE（保留 round 原值，由 novel-agent 递增）。
+
 ## Step 1: 准备
 
 1. 确认卷号 `{N}` 和章号 `{M}`
-2. 读取 `prompts/vol-{N}-ch-{M}-prompt.md`，确认 4 层完整。字数和驱动力从任务层获取，叙事视角从输出·写作规范获取
+2. 读取 `prompts/vol-{N}-ch-{M}-prompt.md`，确认 6 元素完整。字数和驱动力从任务指示获取，叙事视角从输出·写作规范获取
 3. **断点检测**：读 `writing-order.md` 的 `resume_from:` 字段——有 → 读对应 partial 文件，续写（见 Step 3 的续写分支）；无 → 全新写
 
 ## Step 2: 清理上下文
@@ -31,7 +38,7 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 ```markdown
 ## 基底（先读，再叠加以下指令）
 先 Read `.claude/knowledge/writing-base.md` 作为写作基底（核心写作取舍铁律 + 输出硬性规范 + 禁用行为），
-以下指令在基底之上叠加生效；与基底冲突时以基底为准。
+以下指令在基底之上叠加生效；与提示词冲突时以提示词为准，提示词未覆盖时按基底执行。
 
 ## Role
 全章正文写作。只读提示词文件，一次性写完整章正文。章纲约束已全部注入提示词。
@@ -42,8 +49,7 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 
 ## Inputs
 - `.claude/knowledge/writing-base.md` — 写作基底（先读）
-- `prompts/vol-{N}-ch-{M}-prompt.md` — 主要输入（4 层提示词）
-- `settings/writing-style.md` — 写作风格方法论
+- `prompts/vol-{N}-ch-{M}-prompt.md` — 主要输入（6 元素提示词，风格已渲染在内）
 - `settings/genre-setting.md` — 题材设定
 
 ## Outputs
@@ -54,8 +60,8 @@ Step 5: 叙事规则自查（7 条正面规则逐条过）
 - 按提示词叙事段落 1→N 顺序写，段落间过渡流畅
 - 每个段落的写作指引必须兑现（场景/情绪/角色状态/结束画面）
 - 结尾停在最后一段 ends_with 指定的画面或状态
-- 正文不含解释、说明、引导语（不写"他感到""他意识到"）
-- 字数不低于提示词任务层目标字数的 80%
+- 正文不含解释、说明、引导语；认知动词按规则 2 节制（关键情绪节点 ≤2次/章，其余不写"他感到""他意识到"）
+- 字数不低于提示词任务指示目标字数的 90%（目标 ±10% 下限）
 - **每写完一个叙事段落，立即做两件事（不等全部写完）**：
   1. 把该段追加写入 `.draft.partial.md`（覆盖式，保留最新进度）
   2. 在 `writing-order.md` 的 `partial_path:` 字段写入该 partial 路径（覆盖更新）
@@ -97,12 +103,12 @@ partial_path 由**写作 sub-agent 每段写完同步写入 order**（见上文�
 | 检查项 | 操作 |
 |--------|------|
 | 输出文件存在？ | `archives/vol-{N}-ch-{M}-*.draft.md` 存在？不存在→重试 1 次 |
-| 字数达标？ | ≥ 章纲字数 80%？不足→**先回写提示词层再问作者**（见下"字数不足处理"），不静默接受 |
+| 字数达标？ | ≥ 章纲字数 90%（目标 ±10% 下限）？不足→**先回写提示词层再问作者**（见下"字数不足处理"），不静默接受 |
 | 文件位置正确？ | 写入到 archives/ 目录而非其他地方？ |
 | partial 清理？ | 完整 `.draft.md` 写完且验证通过后，删掉 `.draft.partial.md` + 清空 order 的 `partial_path:`（断点已完成，不留残留） |
 
 **字数不足处理（显式降级，不静默）：**
-若字数 < 目标 80%：
+若字数 < 目标 90%（±10% 下限）：
 1. **在 writing-order.md 记录缺口**：`status: DONE` 前在文件追加一行 `quality_gap: ch{M} 字数不足，目标 X 实写 Y`——让降级可追溯（writer 无 status.md 写权限，缺口记录在 order 里，novel-agent 检测 DONE 时同步到 status.md）
 2. **回写提示词层**：在下一章 prompt 的对应场景提高权重（如把低权重场景的字数分配挪给被压缩的核心场景），而非只在本次接受
 3. **再问作者**："本章字数未达目标（X/Y），已记录并会在下一章提示词回写。接受定稿还是补充重写？"
@@ -110,7 +116,7 @@ partial_path 由**写作 sub-agent 每段写完同步写入 order**（见上文�
 
 ## Step 5: 叙事规则自查
 
-通读刚写的 draft，对照 prompt 中注入的叙事规则做一轮快速检查：
+通读刚写的 draft，对照 prompt 中注入的叙事规则做一轮快速检查（规则 1-7 定义见 `.claude/knowledge/narrative-rules.md`，单一权威源；本表只列自查操作）：
 
 | 规则 | 自查 |
 |------|------|

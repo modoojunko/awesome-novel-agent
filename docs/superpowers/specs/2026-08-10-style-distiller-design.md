@@ -2,6 +2,7 @@
 
 - **日期**：2026-08-10
 - **状态**：已确认（作者审批）
+- **实施**：已按 2026-08-11 计划落地
 - **关联**：[PRD issue #84](https://github.com/modoojunko/awesome-novel-agent/issues/84)（v1.1）
 - **范围**：F1-F8 全量设计，一个设计文档；实施按 Phase 分批（对应 PRD 八章实施计划）
 

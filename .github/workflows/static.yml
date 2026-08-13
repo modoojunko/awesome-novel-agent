@@ -34,6 +34,10 @@ jobs:
         run: python tools/check-conflicts.py
       - name: Run platform tests
         run: python tools/test_platforms.py
+      - name: style-distiller 验证
+        run: |
+          python tools/test_style_distill.py
+          python tools/test_style_rules.py
 
   deploy:
     needs: lint

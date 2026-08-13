@@ -2,7 +2,7 @@
 
 ## AI 指引
 
-本项目的写作流程由 8 个 agent 协作完成，定义在 `.claude/agents/` 下。
+本项目的写作流程由 9 个 agent 协作完成，定义在 `.claude/agents/` 下。
 
 **开始写作：** 输入 `@novel-agent` 进入写作循环。
 

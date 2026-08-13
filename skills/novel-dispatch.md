@@ -14,11 +14,14 @@ novel-agent **只做三件事**：
 | phase | 该谁干 | order 文件 |
 |-------|--------|-----------|
 | setup | updater | `setting-update-order.md` |
+| setup | style-distiller | `style-distill-order.md`（文风设定环节作者选蒸馏并给样本时触发） |
+| 手动 | style-distiller | `style-distill-order.md`（作者主动触发重蒸馏/调参数） |
 | outline | volume-planner | `volume-plan-order.md` |
 | outline | chapter-planner | `chapter-plan-order.md` |
 | draft | prompt-crafter | `prompt-craft-order.md` |
 | draft | writer | `writing-order.md` |
 | anti-ai | anti-ai | `anti-ai-order.md` |
+| anti-ai FAIL | writer | `writing-order.md`（rewrite_of + round + violations） |
 | review | reader | `reader-review-order.md` |
 | archive | updater | `archive-order.md` |
 | rewrite（归档后重写某章） | updater | `rollback-order.md`（撤销该章归档追加，status 回 outline，重新规划编写） |
@@ -41,7 +44,7 @@ updater 归档 order 标 DONE 后，novel-agent 自己裁决（不写 order、�
 ## 写 order 文件的规则
 
 1. order 文件路径：`.agent/task/{type}-order.md`
-2. order 文件只包含：输入信息/文件路径 + 输出目标路径 + `status: pending`。不包含执行步骤、规则、方法论。
+2. order 文件只包含：输入信息/文件路径 + 输出目标路径 + `status: pending`。不包含执行步骤、规则、方法论。rewrite-order（anti-ai FAIL 抽卡重写）只含 rewrite_of/round/violations 路径 + 原始风格提示词路径，不含执行步骤。
 3. 子 agent 的 SKILL.md 定义执行 SOP，order 不涉及具体步骤。
 4. 只写 order 文件，调用子 agent 后不碰任何其他文件
 5. 不把多个任务塞进同一个 order

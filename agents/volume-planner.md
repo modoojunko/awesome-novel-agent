@@ -25,8 +25,6 @@ knowledge:
     description: 题材设定
   - path: .claude/knowledge/anti-ai.md
     description: 反 AI 模式库（避免套路化叙事）
-  - path: .claude/knowledge/writer-style.md
-    description: 作家文风偏好
   - path: .claude/knowledge/story-arc-style.md
     description: 从结局倒推法
   - path: .claude/knowledge/volume-setting-style.md

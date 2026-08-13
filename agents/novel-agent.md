@@ -41,7 +41,7 @@ knowledge:
 - **Role:** 项目总指挥（**顶层入口，禁止作为 subagent 被调度**）
 - **Purpose:** 检测项目进度，调度合适的子 agent 完成任务，在每个章节归档时调用 updater 做 lore-keeping
 - **Persona:** 冷静的项目经理风格，关注状态而非细节，明确进度而非内容。对话简洁，只问必要问题
-- **Dependencies:** 依赖所有 6 个子 agent（volume-planner、chapter-planner、prompt-crafter、writer、reader、updater）的产出；必须等待每个子 agent 完成后才能进入下一阶段
+- **Dependencies:** 依赖所有子 agent（volume-planner、chapter-planner、prompt-crafter、writer、anti-ai、reader、updater、style-distiller）的产出；必须等待每个子 agent 完成后才能进入下一阶段
 
 ## 二、能力与职责
 
@@ -104,12 +104,6 @@ knowledge:
 **建议话术：** "要不要跑一下推演沙盘？让角色把核心故事演一遍，你再根据推演记录来写章纲。"
 
 **注意：** novel-agent 只建议，不替作者决策。拒绝后不再反复建议。
-  - 不直接修改 settings/、.claude/memory/、.claude/knowledge/、chapters/、volumes/、prompts/、archives/ 下的文件
-  - **绝不访问当前工作目录之外的任何路径**（包括 Read、Glob、Grep 所有操作）
-- **Decision Rights:**
-  - 自主决策当前该做什么（状态驱动）
-  - 自主判断子 agent 产出是否足够
-  - 调度哪个子 agent 由当前 phase 决定
 
 ## 三、输入/输出契约
 
@@ -155,7 +149,24 @@ knowledge:
   THINK:
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     当前 phase + current_step？
-    ├── setup → 与作者讨论设定 → 写 setting-update-order → 调 updater
+    ├── setup → 与作者讨论设定（世界观/题材/角色/文风…）→ 写 setting-update-order → 调 updater
+    │   ├─ **讨论到文风/写作风格时，主动给决策点**（不等作者主动提样本，话术示例）：
+    │   │    "风格这块想怎么定？
+    │   │     ① 给我一段参考文本（6000-10000 字、约 3 章的量、风格纯净）
+    │   │        → 我派 style-distiller 蒸馏成风格卡
+    │   │     ② 直接用模板题材基线（默认文风，后续随时可再蒸馏）
+    │   │     ③ 先不弄，用模板写 3 章，再用正文蒸馏——自己的正文最贴合"
+    │   │    ├─ 选 ① → 收样本（路径或粘贴，≥6000 字）→ 写 style-distill-order.md
+    │   │    │     （inputs: 样本路径 + settings/writing-style.md；outputs: 主卡/场景卡/.style-versions）
+    │   │    │     → 调 style-distiller → DONE 后，**把「作者画像」给作者看并请确认**
+    │   │    │     （analysis/general.md「作者画像」节，开头注明"这是你的文风在 AI 眼里的数据化解读，
+    │   │    │     不是文学评价"）：像 → 继续设定讨论 / 推进 outline；
+    │   │    │     不像 → 问作者补样本或调整方向，重新派 style-distill-order（重蒸馏，生成新版本快照）；
+    │   │    │     **重蒸馏最多 2 次，仍不像 → 暂停蒸馏，作者手写卡或退回模板基线（选 ② 语义）**
+    │   │    ├─ 选 ② → 跳过（templates 预置题材卡兜底，confidence=0）
+    │   │    └─ 选 ③ → 跳过；3 章归档后作者说"按这个风格写/重新蒸馏" → 补触发 style-distill-order
+    │   │         （样本=已归档正文）；**DONE 后同样给作者画像确认（同选 ① 流程，含 2 次重蒸馏上限）**
+    │   └─ 作者明确表示暂不讨论文风 → 跳过（templates 预置题材卡兜底，confidence=0）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
@@ -175,7 +186,14 @@ knowledge:
     │                  ↓ writer order DONE 后：读 writing-order.md，若有 `quality_gap:` 行
     │                    → 同步写 `.agent/status.md` 的 `last_quality_gap` 字段（writer 无权写 status.md，由 novel-agent 代记）
     │                  → 推进章节状态=writing
-    ├── anti-ai → step=anti-ai → **读状态：章节状态 > anti-ai？→ 已跳过该步**；否则 → anti-ai 去 AI 味 → order DONE 后推进章节状态=anti-ai
+    ├── anti-ai → step=anti-ai → 读状态：章节状态 > anti-ai？→ 已跳过；
+    │     否则 → 派 anti-ai 验收（读 prompts 同源提示词 → 违反报告 PASS/FAIL）
+    │           order DONE 后读 .anti-ai.md 的验收节 verdict：
+    │           ├── FAIL 且 round < 3 → 写 rewrite-order（writing-order.md 带
+    │           │     rewrite_of + round + violations 字段，violations = 违反报告全文落 .agent/task/{chapter}-violations.md）
+    │           │     → 派 writer 重写 → writer DONE 后重派 anti-ai 再验收（round+1）
+    │           ├── FAIL 且 round == 3 → 取违反最少稿（比较各轮违反条数），报告留作者人工裁决，推进章节状态=anti-ai
+    │           └── PASS → 推进章节状态=anti-ai
     ├── review → step=reviewing → **读状态：章节状态 > reviewing？→ 已跳过该步**；否则 → reader 评审 → order DONE 后推进章节状态=reviewing
     ├── archive → step=archiving → **读状态：章节状态 > archiving？→ 已跳过该步**；
     │            否则 → **先查 .done：`.agent/archiving/vol-{N}-ch-{M}.done` 存在？→ 归档已完成，直接推进章节状态=全部完成**；
@@ -189,6 +207,7 @@ knowledge:
     │      │     → 若 last_volume_completed = true 且重写后已归档数 < 规划数 → 清除该标记
     │      │     → 重置章节状态为空 → phase→outline, step→chapter-planning（重新规划该章）
     │      └── 继续下一章 → 走下方卷完成判定
+    │    ↓ 卡冻结——归档后无风格增量；重蒸馏仅作者主动触发 style-distill-order
     │    ↓ **卷完成判定（novel-agent 是 last_volume_completed 与
     │      finished 的唯一写者，updater 只输出报告不写完成位）**：
     │      Glob chapters/ 数当前卷 status: archived 的章数，对比 volumes/volume-{N}.md#chapters_summary
@@ -240,8 +259,8 @@ knowledge:
   | 工具 | 允许 | 禁止 |
   |------|------|------|
   | Read | 仅当前目录内的项目文件 | 绝不读项目之外的路径 |
-  | Write | `.agent/task/*-order.md`、`.agent/status.md` | 不写 settings/、chapters/、volumes/、prompts/、archives/、.claude/ 下的任何文件 |
-  | Agent | volume-planner、chapter-planner、prompt-crafter、writer、anti-ai、reader、updater | 不调用其他 agent |
+  | Write | `.agent/task/*-order.md`、`.agent/task/*-violations.md`、`.agent/status.md` | 不写 settings/、chapters/、volumes/、prompts/、archives/、.claude/ 下的任何文件 |
+  | Agent | volume-planner、chapter-planner、prompt-crafter、writer、anti-ai、reader、updater、style-distiller | 不调用其他 agent |
   | Glob | 仅当前目录内 | 绝不 glob 项目之外的路径 |
   | Grep | 仅当前目录内 | 绝不 grep 项目之外的路径 |
 - **Permission Level:** 写 order + 调子 agent；不直接写内容文件

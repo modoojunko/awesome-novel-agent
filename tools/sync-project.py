@@ -52,6 +52,7 @@ SKILL_HOME = resolve_skill_home()
 AGENT_DIR = SKILL_HOME / "agents"
 SKILL_DIR = SKILL_HOME / "skills"
 KNOWLEDGE_DIR = SKILL_HOME / "knowledge"
+TEMPLATE_SETTINGS_DIR = SKILL_HOME / "templates" / "settings"
 FINGERPRINT_FILE = Path(".agent") / ".sync-fingerprint"
 VERSION_FILE = Path(".agent") / ".sync-version"
 
@@ -130,13 +131,29 @@ def get_version_info() -> tuple[str | None, str | None]:
 
 
 def compute_fingerprint() -> str:
-    """对 skill 源目录的所有 agent/skill/knowledge 文件算一个 hash"""
+    """对 skill 源目录的所有 agent/skill/knowledge/templates/settings 文件算一个 hash"""
     files = []
     for base in [AGENT_DIR, SKILL_DIR, KNOWLEDGE_DIR]:
         if base.exists():
             for f in sorted(base.rglob("*")):
                 if f.is_file() and f.name != ".gitkeep":
                     files.append(f)
+    # 风格资产（与 sync_style_assets 部署范围一致：主卡 + style-profiles/**），
+    # 非风格 settings 模板（world-setting 等）不部署也不纳入指纹，避免永久 "有更新可用"。
+    main_tpl = TEMPLATE_SETTINGS_DIR / "writing-style.md"
+    if main_tpl.is_file():
+        files.append(main_tpl)
+    profiles = TEMPLATE_SETTINGS_DIR / "style-profiles"
+    if profiles.exists():
+        for f in sorted(profiles.rglob("*.md")):
+            files.append(f)
+    # 脚手架模板（templates/ 根 + .agent/，migration/ 与 settings/ 除外）——sync_scaffold 同步范围
+    # （review #17：不进指纹则存量项目 CLAUDE.md 永远「8 个 agent」、skill_version 不更新）
+    tpl = SKILL_HOME / "templates"
+    if tpl.exists():
+        for f in sorted(tpl.rglob("*")):
+            if f.is_file() and f.name != ".gitkeep" and "migration" not in f.parts and "settings" not in f.parts:
+                files.append(f)
 
     h = hashlib.sha256()
     for f in files:
@@ -202,6 +219,14 @@ def check_freshness(project: Path, platform: Platform):
         changes = find_changes(project, platform)
         if not changes and platform.key in ("reasonix", "codex"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
+        elif not changes:
+            # 指纹含风格资产（writing-style.md + style-profiles/**，line 143-149）而 find_changes 只扫
+            # agents/skills/knowledge → 剩余变化只能是风格资产。
+            # 同步为「不覆盖已有卡」策略（review #16）：缺文件 → 可同步；已有卡不覆盖 → 仅提示源演进。
+            if _missing_style_assets(project):
+                print("有更新可用（风格资产新增文件，将同步到 settings/）。")
+            else:
+                print("风格资产源有更新，但同步为不覆盖策略（已有卡不更新）。如需刷新写作风格卡，请手动处理。")
         else:
             lines = [f"有更新可用 ({len(changes)} 个文件发生变化):"]
             for f in changes:
@@ -276,6 +301,8 @@ def do_sync(project: Path, platform: Platform):
     changes.append(sync_agents(project, platform))
     changes.append(sync_skills(project, platform))
     changes.append(sync_knowledge(project, platform))
+    changes.append(sync_scaffold(project, platform))
+    changes.append(sync_style_assets(project))
 
     total = sum(c for c in changes if c > 0)
 
@@ -386,6 +413,133 @@ def sync_knowledge(project_path: Path, platform: Platform) -> int:
         print(f"  [OK] 知识库: {count} 个文件已更新")
     else:
         print("  [i] 知识库: 已是最新")
+    return count
+
+
+def _missing_style_assets(project: Path) -> list[Path]:
+    """项目 settings/ 缺失的风格资产（与 sync_style_assets 的部署范围一致）。"""
+    missing = []
+    src_settings = TEMPLATE_SETTINGS_DIR
+    if not src_settings.exists():
+        return missing
+    candidates = [src_settings / "writing-style.md"]
+    profiles = src_settings / "style-profiles"
+    if profiles.exists():
+        candidates.extend(sorted(profiles.rglob("*.md")))
+    for f in candidates:
+        if f.is_file():
+            rel = f.relative_to(src_settings)
+            if not (project / "settings" / rel).exists():
+                missing.append(rel)
+    return missing
+
+
+def sync_scaffold(project: Path, platform: Platform) -> int:
+    """同步 templates/ 根脚手架（CLAUDE.md/AGENTS.md/.agent/status.md 等）到项目根。
+
+    与 init.py create_skeleton 同规则：仅 CLAUDE.md/AGENTS.md/AGENTS.codex.md 随模板刷新（覆盖），
+    其余文件（.agent/status.md、.agent/task/* 等）不覆盖——status.md 只在存在时更新 skill_version 行
+    （review #17：脚手架不进指纹/不同步 → 存量项目 CLAUDE.md 永远「8 个 agent」、skill_version 不更新）。
+    跳过 migration/ 与 settings/（settings 由 sync_style_assets 处理）；平台特判（codex 无 CLAUDE.md、
+    AGENTS.md 用 AGENTS.codex.md 模板）。
+    """
+    import re as _re
+    src = SKILL_HOME / "templates"
+    if not src.exists():
+        return 0
+    try:
+        from init import _rewrite_template_refs
+    except ImportError:
+        _rewrite_template_refs = None
+    generated = {"CLAUDE.md", "AGENTS.md", "AGENTS.codex.md"}
+    status_tpl = src / ".agent" / "status.md"
+    status_ver = None
+    if status_tpl.is_file():
+        m = _re.search(r"- \*\*skill_version:\*\*\s*(\S+)", status_tpl.read_text(encoding="utf-8"))
+        if m:
+            status_ver = m.group(1)
+    count = 0
+    for item in sorted(src.rglob("*")):
+        if not item.is_file() or item.name == ".gitkeep":
+            continue
+        rel = item.relative_to(src)
+        if rel.parts[0] in ("migration", "settings"):
+            continue
+        target = project / rel
+        # .agent/status.md：项目状态不覆盖，仅更新 skill_version 行
+        if item.name == "status.md" and target.exists() and status_ver:
+            cur = target.read_text(encoding="utf-8")
+            new = _re.sub(r"- \*\*skill_version:\*\*.*", f"- **skill_version:** {status_ver}", cur, count=1)
+            if new != cur:
+                target.write_text(new, encoding="utf-8")
+                count += 1
+            continue
+        if target.exists() and item.name not in generated:
+            continue          # 非脚手架生成文件不覆盖（项目状态/任务模板等）
+        if platform.key == "codex" and item.name == "CLAUDE.md":
+            continue
+        if item.name == "AGENTS.codex.md":
+            continue          # 模板源，不直接复制进项目
+        if platform.key == "codex" and item.name == "AGENTS.md":
+            codex_tpl = src / "AGENTS.codex.md"
+            if not codex_tpl.exists():
+                continue
+            content = codex_tpl.read_text(encoding="utf-8")
+        else:
+            content = item.read_text(encoding="utf-8")
+        if _rewrite_template_refs is not None and item.name in ("CLAUDE.md", "AGENTS.md") \
+                and platform.key != "claude":
+            content = _rewrite_template_refs(content, platform)
+        if target.exists() and target.read_text(encoding="utf-8") == content:
+            continue
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(content, encoding="utf-8")
+        count += 1
+    if count > 0:
+        print(f"  [OK] 项目脚手架: {count} 个文件已更新（CLAUDE.md/AGENTS.md/skill_version 等）")
+    return count
+
+
+def sync_style_assets(project: Path) -> int:
+    """同步 style-distiller 资产：主卡 + 场景卡 + genre-baselines（纯参照，无运行时引用）+ 旧卡迁移钩子。
+
+    只补缺失文件（不覆盖已有），与 init.py 的 seed 守卫同语义——
+    升级/迁移不破坏用户已编辑的写作风格卡。
+
+    范围严格限定为风格资产（templates/settings/writing-style.md + style-profiles/**），
+    不部署 world-setting/genre-setting/timeline/foreshadowing 等非风格模板（那些随 init 骨架走，
+    且含未 seed 的 {..} 占位符，不应由本函数注入）。
+    """
+    count = 0
+    src_settings = TEMPLATE_SETTINGS_DIR
+    if src_settings.exists():
+        # 主卡 + style-profiles 树（场景卡 + genre-baselines，纯参照，无运行时引用）
+        candidates = [src_settings / "writing-style.md"]
+        profiles = src_settings / "style-profiles"
+        if profiles.exists():
+            candidates.extend(sorted(profiles.rglob("*.md")))
+        for f in candidates:
+            if not f.is_file():
+                continue
+            rel = f.relative_to(src_settings)
+            dst = project / "settings" / rel
+            if not dst.exists():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                content = f.read_text(encoding="utf-8")
+                if rel == Path("writing-style.md"):
+                    # 主卡缺卡：不写裸 {role} 占位符模板（review #15）——占位符会随提示词注入，
+                    # 改为「（待设定）」占位值，由设定阶段填写
+                    for tok in ("{role}", "{principle_1}", "{mistake_1}", "{depiction_techniques}"):
+                        content = content.replace(tok, "（待设定）")
+                dst.write_text(content, encoding="utf-8")
+                count += 1
+    try:
+        from init import migrate_writing_style   # init.py main 有 __main__ 守卫，导入安全
+        migrate_writing_style(project)
+    except ImportError as e:
+        print(f"  [SKIP] 风格卡迁移跳过（init 导入失败）: {e}")
+    if count:
+        print(f"  [OK] 风格资产同步: {count} 个新文件")
     return count
 
 
