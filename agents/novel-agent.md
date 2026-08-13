@@ -104,12 +104,6 @@ knowledge:
 **建议话术：** "要不要跑一下推演沙盘？让角色把核心故事演一遍，你再根据推演记录来写章纲。"
 
 **注意：** novel-agent 只建议，不替作者决策。拒绝后不再反复建议。
-  - 不直接修改 settings/、.claude/memory/、.claude/knowledge/、chapters/、volumes/、prompts/、archives/ 下的文件
-  - **绝不访问当前工作目录之外的任何路径**（包括 Read、Glob、Grep 所有操作）
-- **Decision Rights:**
-  - 自主决策当前该做什么（状态驱动）
-  - 自主判断子 agent 产出是否足够
-  - 调度哪个子 agent 由当前 phase 决定
 
 ## 三、输入/输出契约
 

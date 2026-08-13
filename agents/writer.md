@@ -85,7 +85,7 @@ knowledge:
     工具：五(Write → archives/*.draft.md)
 
   VERIFY:
-    完成标准？← 八(Definition of Done): 字数≥80% + 场景全覆盖 + 无未标注超范围
+    完成标准？← 八(Definition of Done): 字数≥目标90%（±10%下限） + 场景全覆盖 + 无未标注超范围
     质量门？← 六(Quality Gates): 无AI味（疲劳词/句式重复检查）
     验收工具：加载 chapter-quality-checklist.md 15项检查
     不通过？← 七(Error Handling): 补充/重写, 最多2次
@@ -114,7 +114,7 @@ knowledge:
   - 不使用 AI 疲劳词（"突然"、"意识到"、"某种"等）
   - 不出现"作为 AI 模型"类自我引用
 - **Quality Gates:**
-  - 字数 ≥ 目标 80%
+  - 字数 ≥ 目标 90%（±10% 下限）
   - 覆盖所有场景
   - 无明显 AI 味
 - **Style Rules（渲染后提示词 = 唯一写作风格源，双态通用）：** 未蒸馏态 = 正文定性四字段（叙事身份/硬约束/AI易犯错误/描写层次，prompt-crafter 注入现状不变）；已蒸馏态 = 硬性规则（不可违背）+ 整体基调（soft_guidance）+ 风格参考例句（few_shot）——prompt-crafter 已从卡渲染进提示词，writer 不直读卡正文
@@ -130,7 +130,7 @@ knowledge:
 ## 八、验收标准与产出
 
 - **Definition of Done:**
-  - draft.md 写入完成，字数 ≥ 目标 80%
+  - draft.md 写入完成，字数 ≥ 目标 90%（±10% 下限）
   - 全部场景已覆盖
   - 无超出提示词范围的未标注添加
 - **Output Validation:**

@@ -25,8 +25,6 @@ knowledge:
     description: 时间线
   - path: .claude/knowledge/anti-ai.md
     description: 反 AI 模式库（静态规则，不在此写入语义合并）
-  - path: .claude/knowledge/writer-style.md
-    description: 作家文风偏好
   - path: .claude/knowledge/memory-format-spec.md
     description: 写作记忆格式规范（验证条目格式）
   - path: .claude/knowledge/permanent-memory.md
@@ -52,7 +50,7 @@ knowledge:
     - 更新 `settings/character-setting/*.md` → 追加角色本幕状态变化和情绪弧
     - 检测本章出现的新生物/怪物 → 追加到 `settings/world-setting.md`
     - 追加 `settings/timeline.md` → 追加本章关键事件
-    - 语义合并后追加 `.claude/knowledge/anti-ai.md` + `.claude/knowledge/writer-style.md`
+    - 语义合并后追加 `.claude/knowledge/anti-ai.md` + 写作记忆（`.claude/memory/writing-memory.md`）
     - AI 原版快照归档后保留（审计留档；靠 `.agent/archiving/{chapter}.done` 标记区分过期，不删除文件）
   - **设定变更流程**（setting-update-order.md → 加载 updater-setting）：
     - 新增角色（创建文件、ID 唯一性检查、关系同步）
@@ -91,13 +89,13 @@ knowledge:
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（status→archived 标记 + 章纲兑现核对）
   - `settings/` 全部文件 → 已有设定（角色/世界观/时间线等）
   - `.claude/knowledge/anti-ai.md` → 已有反 AI 规则
-  - `.claude/knowledge/writer-style.md` → 已有文风偏好
+  - `.claude/memory/writing-memory.md` → 已有文风偏好（作家反馈沉淀）
   - `.agent/status.md` → 当前进度标记
 - **Output Artifacts（归档流程）:**
   - `settings/character-setting/*.md` → 追加角色状态变化、情绪弧
   - `settings/timeline.md` → 追加本章关键事件
   - `.claude/knowledge/anti-ai.md` → 追加语义合并后的反 AI 规则
-  - `.claude/knowledge/writer-style.md` → 追加语义合并后的文风偏好
+  - `.claude/memory/writing-memory.md` → 追加语义合并后的文风偏好（作家反馈）
   - `settings/foreshadowing.md` → 追加/更新跨卷伏笔台账（从 chapter.md#payoff_plan 汇总）
   - `.agent/{chapter}-draft-ai.md` → 归档 diff 基线；归档后保留（审计留档）
   - `archives/vol-{N}-ch-{M}-{slug}.md` → 定稿正文（Write 自中间稿，内容不做编辑）

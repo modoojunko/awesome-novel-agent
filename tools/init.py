@@ -258,7 +258,10 @@ def create_skeleton(project_path: Path, platform: Platform):
                 rel_path = item.relative_to(SOURCE_TEMPLATES)
                 if rel_path.parts[0] == "migration":
                     continue
-                target = project_path / rel_path
+                # 路径穿越防御：先规范化（消解符号链接/..），再校验位于项目根内
+                target = (project_path / rel_path).resolve()
+                if not target.is_relative_to(project_path.resolve()):
+                    continue
                 if target.exists() and item.name not in _GENERATED_SCAFFOLD:
                     continue          # 已存在不覆盖（settings/ 等用户内容），脚手架文件随模板刷新
                 target.parent.mkdir(parents=True, exist_ok=True)
@@ -273,15 +276,13 @@ def create_skeleton(project_path: Path, platform: Platform):
                     if codex_tpl.exists():
                         content = codex_tpl.read_text(encoding="utf-8")
                         content = _rewrite_template_refs(content, platform)
-                        with open(target, "w", encoding="utf-8", newline="") as f:
-                            f.write(content)
+                        target.write_text(content, encoding="utf-8")
                         continue
                 if item.name in ("CLAUDE.md", "AGENTS.md") and platform.key != "claude":
                     with open(item, encoding="utf-8", newline="") as f:
                         content = f.read()
                     content = _rewrite_template_refs(content, platform)
-                    with open(target, "w", encoding="utf-8", newline="") as f:
-                        f.write(content)
+                    target.write_text(content, encoding="utf-8")
                 else:
                     shutil.copy2(item, target)
         print("  ✅ 已拷贝项目模板")
@@ -303,6 +304,9 @@ def deploy_agents(project_path: Path, platform: Platform):
         if item.is_file() and item.suffix == ".md":
             rel_path = item.relative_to(SOURCE_AGENTS)
             dest = agent_dir / rel_path
+            # 路径穿越防御：规范化后必须仍位于 agent 目录内（防符号链接/.. 逃逸）
+            if not dest.resolve().is_relative_to(agent_dir.resolve()):
+                continue
             dest.parent.mkdir(parents=True, exist_ok=True)
             content = item.read_text(encoding="utf-8")
             if is_opencode:
@@ -355,18 +359,6 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
         )
         count += 1
         print(f"  ✅ 已继承反 AI 规则 (通用 + {genre})")
-
-    # 文风偏好占位文件（保证文件存在；内容由 updater 归档 diff 时按作者修改追加）
-    # 注：memory/ 已删除（迁移到 knowledge/），无社区默认文风，此处只落占位，
-    #     writer-style.md 由 updater 首次归档时填充。
-    style_placeholder = knowledge_dir / "writer-style.md"
-    if not style_placeholder.exists():
-        style_placeholder.write_text(
-            f"# 文风偏好\n\n> 作家个人文风偏好。由 updater 在归档 diff 时追加，标注 [writer-preference]。\n\n"
-            f"> [community-defaults] 题材: {genre}\n\n---\n\n",
-            encoding="utf-8",
-        )
-        count += 1
 
     # 永久记忆占位文件（空，后续由 updater 晋升填充）
     permanent_memory = knowledge_dir / "permanent-memory.md"

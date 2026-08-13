@@ -15,8 +15,6 @@ knowledge:
     description: 分场景风格卡目录
   - path: settings/.style-versions/
     description: 蒸馏版本快照目录（备份与 locked 前置版本）
-  - path: .claude/knowledge/writer-style.md
-    description: 作家文风偏好（只读基线，不写入）
   - path: .claude/knowledge/distilled-style-spec.md
     description: 蒸馏风格卡格式规范（frontmatter schema + 9 维度）
   - path: .claude/knowledge/style-distill/

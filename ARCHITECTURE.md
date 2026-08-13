@@ -113,7 +113,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   │        判定定稿并 Write 生成 archives/*.md（中间稿 .draft.md/.anti-ai.md 保留不删）
   │        chapter.md#status → archived
   │        character-setting 追加角色状态（按 `## vol-N-ch-M` 锚点查重）→ timeline 追加事件（查重）
-  │        快照 vs 定稿 diff → 语义合并到 .claude/knowledge/anti-ai.md / writer-style.md（查重）
+  │        快照 vs 定稿 diff → 语义合并到 .claude/knowledge/anti-ai.md + 动态记忆（writing-memory.md）（查重）
   │        写 {chapter}.done → 推进 status.md → order 标记 DONE
 ```
 
@@ -280,7 +280,7 @@ Step 4  验收自检 → 写入 prompts/vol-{N}-ch-{M}-prompt.md
 3. 场景重叠 → 扩展已有条目场景范围
 4. 冲突 → 询问作家确认
 
-结果写入 `.claude/knowledge/anti-ai.md` 和 `writer-style.md`，标注 `[writer-preference]`。
+结果写入 `.claude/knowledge/anti-ai.md` 和写作记忆（`.claude/memory/writing-memory.md`），标注 `[writer-preference]`。
 
 ---
 

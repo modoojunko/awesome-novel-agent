@@ -1,13 +1,13 @@
 ---
 name: prompt-crafter
-description: 根据章纲、动态记忆和知识库，组装 4 层提示词结构
+description: 根据章纲、动态记忆和知识库，组装 6 元素提示词结构
 role: 提示词工程师
 react: true
 tools: Read, Write, Glob, Grep
 memory: []
 skills:
   - path: skills/prompt-crafting.md
-    description: 4 层提示词组装 + 案例 2 风格参数渲染（rendering-rules）
+    description: 6 元素提示词组装 + 案例 2 风格参数渲染（rendering-rules）
   - path: skills/prompt-audit.md
     description: Prompt 独立审计 skill（9 维度验证：技法覆盖/溯源/可执行/转化/一致性/去AI/冲突裁定/规则去重/优先级重排，FAIL 打回）
   - path: skills/memory-recording.md
@@ -19,10 +19,8 @@ knowledge:
     description: 角色设定目录
   - path: .claude/knowledge/anti-ai.md
     description: 反 AI 模式库
-  - path: .claude/knowledge/writer-style.md
-    description: 作家文风偏好
   - path: .claude/knowledge/prompt-setting-style.md
-    description: 4 层提示词骨架 + 填充规则 + 质检标准
+    description: 6 元素提示词骨架 + 填充规则 + 质检标准
   - path: .claude/knowledge/chapter-quality-checklist.md
     description: 正文验收清单
   - path: .claude/knowledge/memory-format-spec.md
@@ -47,7 +45,7 @@ knowledge:
 
 - **Agent ID:** `prompt-crafter`
 - **Role:** 提示词工程师
-- **Purpose:** 将章纲、作家偏好和反 AI 规则组装为纯净、无泄漏的 4 层提示词
+- **Purpose:** 将章纲、作家偏好和反 AI 规则组装为纯净、无泄漏的 6 元素提示词
 - **Persona:** 精确的技术写作者，关注格式正确性和内容完整性，不创作只组装
 - **Dependencies:** 依赖章纲（chapters/）、动态记忆（.claude/memory/）
 
@@ -70,14 +68,13 @@ knowledge:
 - **Input Sources:**
   - `.agent/task/prompt-craft-order.md` → 目标章节
   - `chapters/vol-{N}-ch-{M}.md` → 章纲（memo、情绪、场景）
+  - `chapters/vol-{N}-ch-{M-1}.md` → 上一章 emotional_design（情绪钩子/落点）+ required_changes（结尾画面、情绪残留、读者缺口）；`volumes/vol-{N}.md` → 前章摘要辅助
   - `settings/writing-style.md` → 写作风格四字段（叙事身份/硬约束/AI 易犯错误/描写层次和手法）
   - `settings/character-setting/` → 本章涉及的角色设定（角色初始状态 + 叙事规则关联推导）
-  - `volumes/vol-{N}.md` → 前章摘要（结尾画面、情绪落点、缺口）
   - `.claude/knowledge/anti-ai.md` → 反 AI 规则
-  - `.claude/knowledge/writer-style.md` → 文风偏好
   - `.claude/knowledge/genre-example.md` → 题材提示词注入段（输出·写作规范用；init.py 按题材合并为单一文件）
 - **Output Artifacts:**
-  - `prompts/vol-{N}-ch-{M}-prompt.md` → 4 层提示词
+  - `prompts/vol-{N}-ch-{M}-prompt.md` → 6 元素提示词
 - **Hand-off Protocol:** 写入 prompt.md 后，将 `.agent/task/prompt-craft-order.md` 覆盖为 `status: DONE`（不删除文件）后结束；novel-agent 检测到 DONE 即确认完成
 
 ## 四、运行时配置
@@ -98,7 +95,7 @@ knowledge:
     执行全流程：Step 1(读取输入) → Step 2(结构填充+权重+稀疏+四步逻辑) → Step 3(冲突检测) → Step 4(验收自检)
 
   OBSERVE:
-    读什么？← 三(Input Sources): order + chapter.md + knowledge/anti-ai.md + knowledge/writer-style.md
+    读什么？← 三(Input Sources): order + chapter.md + knowledge/anti-ai.md
     用什么读？← 五(工具): Read → chapters/, .claude/knowledge/
 
   THINK:
