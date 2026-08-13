@@ -16,7 +16,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("claude-code", "opencode", "codex")]
+    [ValidateSet("claude-code", "opencode", "codex", "zcode")]
     [string]$Platform
 )
 
@@ -31,6 +31,9 @@ switch ($Platform) {
     }
     "codex" {
         $DEST_DIR = "$HOME_DIR\.codex\skills\awesome-novel"
+    }
+    "zcode" {
+        $DEST_DIR = "$HOME_DIR\.zcode\skills\awesome-novel"
     }
 }
 
@@ -48,9 +51,9 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# pyyaml 门槛：opencode / codex 的 agent 转换依赖 pyyaml（与 tools/platforms.py
-# ensure_yaml 的运行时规则对齐）；claude-code 纯复制不转换，不需要。
-if ($Platform -in @("opencode", "codex")) {
+# pyyaml 门槛：opencode / codex / zcode 的 agent/skill 转换依赖 pyyaml（与
+# tools/platforms.py ensure_yaml 的运行时规则对齐）；claude-code 纯复制不转换，不需要。
+if ($Platform -in @("opencode", "codex", "zcode")) {
     & $PY_BIN "$SCRIPT_DIR\tools\check-yaml.py" $Platform
     if ($LASTEXITCODE -ne 0) {
         Write-Host "安装中止：缺少 pyyaml。请先执行 pip install pyyaml 后重试。"
