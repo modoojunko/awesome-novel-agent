@@ -44,5 +44,5 @@ knowledge:
 
 完成 order 后：把 order 覆盖为 `status: DONE`；报告分两部分——
 - **给 novel-agent 的技术摘要**：更新了哪些维度 + confidence + 分析稿摘要（内部语言，不转述给作者）。
-- **给作者确认的画像**：analysis/general.md「作者画像」节原文（见 skills/style-distill.md 第 10 步）——开头注明「这是你的文风在 AI 眼里的数据化解读，不是文学评价」，全部用作者语言，结尾带确认问句。
+- **给作者确认的画像**：analysis/general.md「作者画像」节原文（见 skills/style-distill.md 第 10 步）——开头注明「这是你的文风在 AI 眼里的理解，不是文学评价」，**全文用作者语言，不得出现 卡/主卡/场景卡/confidence/维度/蒸馏/量化 等内部词**，结尾带确认问句。
 发现样本质量不足（<6000 字、多题材混杂）时向作者/novel-agent 说明并挂起。
