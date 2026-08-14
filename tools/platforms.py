@@ -9,6 +9,9 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
   - codex    → .codex/    agents=agents（TOML 转换产物）, skills=skills, knowledge, memory
   - zcode    → .zcode/    agents=None（agents 即 skills，ZCode 无项目级 agents 目录）,
                           skills=skills, knowledge, memory
+  - dsh      → .dsh/      agents=None（agents 即 skills，DeepSeek Harness 无项目级
+                          agents 目录，.dsh/skills 为其项目级 skill 根）, skills=skills,
+                          knowledge, memory
 
 模块名用 platforms（复数）是刻意避开标准库 platform（单数）同名冲突。
 """
@@ -62,6 +65,8 @@ PLATFORMS = {
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".codex",)),
     "zcode":    Platform("zcode", "ZCode", ".zcode", agents=None,
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".zcode",)),
+    "dsh":      Platform("dsh", "DeepSeek Harness", ".dsh", agents=None,
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".dsh",)),
 }
 
 
@@ -397,6 +402,127 @@ def deploy_zcode_skills(project: Path, skill_home: Path, platform: Platform) -> 
         sf = skills_dir / f"{skill_name}.md"
         if sf.exists():
             body = _convert_zcode_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
+            body = rewrite_refs(body, platform)
+            skill_dir = target / skill_name
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+
+# ---------------------------------------------------------------
+# DeepSeek Harness（dsh）skill 生成（agents + skills 源 → .dsh/skills/<name>/SKILL.md）
+# ---------------------------------------------------------------
+
+def _convert_to_dsh(text: str, inline_sops=None) -> str:
+    """Claude Code agent frontmatter → dsh skill frontmatter。
+
+    dsh 与 ZCode 同为「agents 即 skills」：无项目级 agents 目录，skill 根为
+    <project>/.dsh/skills/<name>/SKILL.md（dsh 自动发现）。差异：
+    - frontmatter 只保留 name/description——dsh 不识别 allowed-tools/runAs，
+      其余键仅进 metadata 不参与加载，产物保持干净
+    - body: agent 身份段 + 内联的专属 SOP 全文
+    - novel-agent（入口调度者）追加 dsh 调度适配段；其余为 subagent
+    """
+    data, body = split_frontmatter(text)    # 单源解析（review #38：坏 split 已弃用）
+    if not data:
+        return text
+
+    name = str(data.get("name", "unknown")).strip()
+    desc = str(data.get("description", "") or "").strip().replace('"', "'")
+
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc}\"\n"
+        f"---\n"
+    )
+
+    agent_body = body.strip()
+    if name == "novel-agent":
+        agent_body += (
+            "\n\n## DeepSeek Harness 调度适配（本环境子 agent 即 skill）\n"
+            "在 dsh 环境调度子 agent 用 `subagent` 工具：\n"
+            "- 子 agent 名即 `.dsh/skills/` 下的 skill 名（writer / volume-planner / "
+            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
+            "- 子 agent 是隔离上下文，prompt 里要求它先调用 `skill(name=\"<子agent名>\")` "
+            "加载自身指令，再执行 order 文件任务\n"
+            "- 把 order 文件路径与任务要求写进 prompt；order 文件协议（status: DONE）不变\n"
+            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+        )
+    sop_sections = []
+    for sop in (inline_sops or []):
+        if sop and sop.exists():
+            sop_sections.append(
+                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
+            )
+    return fm + "\n" + agent_body + "\n".join(sop_sections)
+
+
+def _convert_dsh_inline_skill(text: str, name: str) -> str:
+    """纯正文 SOP → dsh inline skill（无 SOP 依赖的独立交互工具）。"""
+    desc = ""
+    for ln in text.split("\n"):
+        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
+            desc = ln.strip().lstrip("# ").strip()
+            break
+    fm = (
+        f"---\n"
+        f"name: {name}\n"
+        f"description: \"{desc or name}（由 awesome-novel 自动生成的 dsh skill）\"\n"
+        f"---\n"
+    )
+    return fm + "\n" + text.strip()
+
+
+def deploy_dsh_skills(project: Path, skill_home: Path, platform: Platform) -> None:
+    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
+
+    仅 dsh 平台调用（agents=None）。产物与 reasonix/zcode 同构
+    （9 个 agent + memory-recording/roleplay-sandbox 独立工具）。
+    """
+    if platform.key != "dsh":
+        return
+    agents_dir = skill_home / "agents"
+    skills_dir = skill_home / "skills"
+    target = platform.skills_dir(project)
+    if target is None:
+        return
+    target.mkdir(parents=True, exist_ok=True)
+
+    exec_agents = {
+        "writer": ["writing-execution"],
+        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
+        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
+        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
+        "anti-ai": ["anti-ai"],
+        "reader": ["reader-review"],
+        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
+        "style-distiller": ["style-distill"],
+    }
+    for agent_name, sops in exec_agents.items():
+        agent_file = agents_dir / f"{agent_name}.md"
+        if not agent_file.exists():
+            continue
+        sop_files = [skills_dir / f"{s}.md" for s in sops]
+        body = _convert_to_dsh(agent_file.read_text(encoding="utf-8"),
+                               inline_sops=sop_files)
+        body = rewrite_refs(body, platform)
+        skill_dir = target / agent_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    novel_file = agents_dir / "novel-agent.md"
+    if novel_file.exists():
+        body = _convert_to_dsh(novel_file.read_text(encoding="utf-8"),
+                               inline_sops=[skills_dir / "novel-dispatch.md"])
+        body = rewrite_refs(body, platform)
+        skill_dir = target / "novel-agent"
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+
+    for skill_name in ("memory-recording", "roleplay-sandbox"):
+        sf = skills_dir / f"{skill_name}.md"
+        if sf.exists():
+            body = _convert_dsh_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
             body = rewrite_refs(body, platform)
             skill_dir = target / skill_name
             skill_dir.mkdir(parents=True, exist_ok=True)

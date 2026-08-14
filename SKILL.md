@@ -35,6 +35,14 @@ description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成
 
 **调度机制：** novel-agent 写 order 文件到 `.agent/task/`（`status: pending`）→ 用 `Agent` 工具调度子 agent（子 agent 名 = `.zcode/skills/` 下的 skill 名）→ 子 agent 读取 order 执行 → 完成后将 order 覆盖为 `status: DONE` 后退回。order 文件协议与其余平台完全一致。
 
+## dsh 集成说明
+
+本 skill 也支持 DeepSeek Harness（dsh，DeepSeek 官方的开源 agent harness）。dsh 的 skill 约定（目录 + `SKILL.md`，frontmatter 只认 `name`/`description`）与 Claude Code 同源，天然兼容；但 dsh 无项目级 agents 目录（subagent 是运行时能力），agents 即 skills。skill 本体**用户级安装**到 `~/.dsh/skills/awesome-novel/`；`init.py --platform dsh` 初始化小说项目时，把 9 个 agent 部署为项目级 `.dsh/skills/<name>/SKILL.md`（与 ZCode 同构，另含 memory-recording、roleplay-sandbox 独立工具，共 11 个 skill；`<项目根>/.dsh/skills/` 是 dsh 的项目级 skill 根，自动发现且优先级最高）：
+- novel-agent — 总指挥（入口调度者，由 dsh 按 name/description 自动路由，无 `@` 语法）
+- writer、volume-planner、chapter-planner 等 — 子 agent（subagent skill，由 novel-agent 用 `subagent` 工具调度）
+
+**调度机制：** novel-agent 写 order 文件到 `.agent/task/`（`status: pending`）→ 用 `subagent` 工具调度子 agent（prompt 中要求子 agent 先调用 `skill(name="<子agent名>")` 加载自身指令；子 agent 名 = `.dsh/skills/` 下的 skill 名）→ 子 agent 读取 order 执行 → 完成后将 order 覆盖为 `status: DONE` 后退回。order 文件协议与其余平台完全一致。
+
 ## 检测流程 — 严格按此执行，禁止跳过
 
 ```
@@ -60,7 +68,7 @@ description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成
 - 确认后必须运行 `init.py`，禁止手动创建目录结构替代
 - **禁止在 skill 安装目录（含 `skills/awesome-novel` 路径）内运行 `init.py`** — 此目录是技能仓库，不是小说项目
 - 如果当前目录是 skill 安装目录，应提示作者切换到目标目录后再执行
-- `init.py` 执行完毕后，确认 `.agent/status.md` 与平台部署目录已生成（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix → `.reasonix/skills/`；Codex → `.codex/agents/`；ZCode → `.zcode/skills/`），方可进入 novel-agent
+- `init.py` 执行完毕后，确认 `.agent/status.md` 与平台部署目录已生成（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix → `.reasonix/skills/`；Codex → `.codex/agents/`；ZCode → `.zcode/skills/`；dsh → `.dsh/skills/`），方可进入 novel-agent
 - 如果 `init.py` 报错，必须先修复问题重新执行，不允许绕过
 
 ## 初始化 — 先询问，确认后执行，不可跳过
@@ -70,15 +78,15 @@ description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成
 python <本 skill 安装目录>/tools/init.py [project-path] [--genre <编号>]
 ```
 
-`<本 skill 安装目录>` 即本 SKILL.md 所在目录（如 `~/.claude/skills/awesome-novel/`、`~/.config/opencode/skills/awesome-novel/`、`~/.codex/skills/awesome-novel/`、`~/.zcode/skills/awesome-novel/`）。AI 用绝对路径调用，避免在项目目录找不到 `tools/init.py`。
+`<本 skill 安装目录>` 即本 SKILL.md 所在目录（如 `~/.claude/skills/awesome-novel/`、`~/.config/opencode/skills/awesome-novel/`、`~/.codex/skills/awesome-novel/`、`~/.zcode/skills/awesome-novel/`、`~/.dsh/skills/awesome-novel/`）。AI 用绝对路径调用，避免在项目目录找不到 `tools/init.py`。
 
 **禁止以任何理由跳过 init.py：** 手动创建目录、复制模板、直接调用 agent 都属于违规行为。`init.py` 是初始化入口，必须执行且完整运行。
 
 `init.py` 会：
 1. 选题材
 2. 创建项目骨架（settings/、volumes/、chapters/、prompts/、archives/）
-3. 部署 agent/skill 到当前平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix / ZCode 不部署 agents，agents 即 `.reasonix/skills/` / `.zcode/skills/`；Codex → `.codex/agents/*.toml`）
-4. 按题材继承反 AI 规则和文风偏好到平台 knowledge 目录（`.claude/knowledge/` / `.opencode/knowledge/` / `.reasonix/knowledge/` / `.codex/knowledge/` / `.zcode/knowledge/`）
+3. 部署 agent/skill 到当前平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix / ZCode / dsh 不部署 agents，agents 即 `.reasonix/skills/` / `.zcode/skills/` / `.dsh/skills/`；Codex → `.codex/agents/*.toml`）
+4. 按题材继承反 AI 规则和文风偏好到平台 knowledge 目录（`.claude/knowledge/` / `.opencode/knowledge/` / `.reasonix/knowledge/` / `.codex/knowledge/` / `.zcode/knowledge/` / `.dsh/knowledge/`）
 5. 按题材继承格式规范、题材案例到平台 knowledge 目录
 6. 创建空白的写作记忆文件（平台 memory 目录）
 7. 创建永久记忆占位文件（平台 knowledge 目录）
@@ -244,29 +252,33 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 ├── .agent/
 │   ├── status.md         # 进度追踪
 │   └── task/             # agent 间 order 文件
-├── .claude/             # Claude Code 用（平台一，五选一）
+├── .claude/             # Claude Code 用（平台一，六选一）
 │   ├── agents/          # Agent 定义
 │   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
 │   └── memory/          # 写作动态记忆
-├── .opencode/           # OpenCode 用（平台二，五选一）
+├── .opencode/           # OpenCode 用（平台二，六选一）
 │   ├── agents/          # Agent 定义
 │   ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
 │   └── memory/          # 写作动态记忆
-├── .reasonix/           # Reasonix 用（平台三，五选一）
+├── .reasonix/           # Reasonix 用（平台三，六选一）
     ├── skills/          # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
     └── memory/          # 写作动态记忆
-├── .codex/              # Codex 用（平台四，五选一）
+├── .codex/              # Codex 用（平台四，六选一）
     ├── agents/          # 9 个自定义 agent（TOML）
     ├── skills/          # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
     └── memory/          # 写作动态记忆
-└── .zcode/              # ZCode 用（平台五，五选一）
+├── .zcode/              # ZCode 用（平台五，六选一）
+    ├── skills/          # 11 个 SKILL.md（agents 即 skills）
+    ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
+    └── memory/          # 写作动态记忆
+└── .dsh/                # DeepSeek Harness 用（平台六，六选一）
     ├── skills/          # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/       # 反 AI 规则、文风偏好、永久记忆、格式规范
     └── memory/          # 写作动态记忆
 ```
-> 实际项目只生成五选一的一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` 不会同时存在。
+> 实际项目只生成六选一的一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` / `.dsh/` 不会同时存在。
 
 ## Agent 协作架构
 
@@ -282,7 +294,7 @@ novel-agent（总指挥）
   └─ 归档完成 → 卷完成判定 → 下一章 / 卷 N+1 / 完本
 ```
 
-各 agent 定义在平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix / ZCode → `.reasonix/skills/` / `.zcode/skills/`；Codex → `.codex/agents/*.toml`），skill SOP 在 `skills/`。agent 间通过 `.agent/task/*-order.md` 文件通信。
+各 agent 定义在平台约定目录（Claude Code → `.claude/agents/`；OpenCode → `.opencode/agents/`；Reasonix / ZCode / dsh → `.reasonix/skills/` / `.zcode/skills/` / `.dsh/skills/`；Codex → `.codex/agents/*.toml`），skill SOP 在 `skills/`。agent 间通过 `.agent/task/*-order.md` 文件通信。
 
 **可选工具：** 剧情推演沙盘（`skills/roleplay-sandbox.md`）是独立的交互式工具，不在 agent 调度链中。作者卡剧情时主动调用，产出推演记录（`sandbox/`）供编写章纲时参考。
 

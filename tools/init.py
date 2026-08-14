@@ -2,7 +2,7 @@
 """
 awesome-novel-skill 项目初始化工具
 
-用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode>]
+用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode|dsh>]
 
 平台缺省：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude。
 
@@ -24,6 +24,7 @@ from platforms import (
     detect_platform,
     deploy_codex_agents,
     deploy_codex_skills,
+    deploy_dsh_skills,
     deploy_reasonix_skills,
     deploy_zcode_skills,
     ensure_yaml,
@@ -104,7 +105,7 @@ def main():
         a = args[i]
         if a == "--platform":
             if i + 1 >= len(args) or args[i + 1].startswith("--"):
-                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode）")
+                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode|dsh）")
                 sys.exit(1)
             platform_override = args[i + 1]
             i += 2
@@ -165,11 +166,13 @@ def main():
     else:
         deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署平台 skills（reasonix/zcode 生成 11 个 SKILL.md；codex 只部署独立工具）
+    # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex 只部署独立工具）
     if platform.key == "reasonix":
         deploy_reasonix_skills(project_path, SKILL_HOME, platform)
     elif platform.key == "zcode":
         deploy_zcode_skills(project_path, SKILL_HOME, platform)
+    elif platform.key == "dsh":
+        deploy_dsh_skills(project_path, SKILL_HOME, platform)
     elif platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
 
@@ -198,6 +201,8 @@ def main():
         print("在 Codex 中打开项目目录，调用 @novel-agent 开始写作")
     elif platform.key == "zcode":
         print("在 ZCode 中打开项目目录，说“帮我写本小说”或调用 novel-agent skill 开始写作")
+    elif platform.key == "dsh":
+        print("在 DeepSeek Harness（dsh）中打开项目目录，说“帮我写本小说”或调用 novel-agent skill 开始写作")
     else:
         print("在 Reasonix 中运行 `reasonix code`，然后调用 @novel-agent 开始写作")
 
@@ -229,6 +234,9 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
     elif platform.key == "zcode":
         text = text.replace(".claude/agents/", ".zcode/skills/")
         text = text.replace(".opencode/agents/", ".zcode/skills/")
+    elif platform.key == "dsh":
+        text = text.replace(".claude/agents/", ".dsh/skills/")
+        text = text.replace(".opencode/agents/", ".dsh/skills/")
     elif platform.key == "codex":
         text = text.replace(".claude/agents/", ".codex/agents/")
         text = text.replace(".opencode/agents/", ".codex/agents/")

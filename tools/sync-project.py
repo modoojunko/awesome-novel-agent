@@ -35,6 +35,7 @@ from platforms import (
     convert_to_opencode,
     detect_platform,
     deploy_codex_skills,
+    deploy_dsh_skills,
     deploy_reasonix_skills,
     deploy_zcode_skills,
     ensure_yaml,
@@ -218,7 +219,7 @@ def check_freshness(project: Path, platform: Platform):
         sys.exit(0)
     else:
         changes = find_changes(project, platform)
-        if not changes and platform.key in ("reasonix", "codex", "zcode"):
+        if not changes and platform.key in ("reasonix", "codex", "zcode", "dsh"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
         elif not changes:
             # 指纹含风格资产（writing-style.md + style-profiles/**，line 143-149）而 find_changes 只扫
@@ -239,7 +240,7 @@ def check_freshness(project: Path, platform: Platform):
 
 
 def find_changes(project: Path, platform: Platform) -> list[str]:
-    """返回与源不同的文件列表（相对路径）。reasonix/zcode 的 skills 是派生产物，不枚举。"""
+    """返回与源不同的文件列表（相对路径）。reasonix/zcode/dsh 的 skills 是派生产物，不枚举。"""
     changed = []
     targets = {
         "agents": platform.agents_dir(project),
@@ -256,7 +257,7 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
         src_dir = src_dirs[name]
         if dst_base is None or not src_dir.exists():
             continue
-        if platform.key in ("reasonix", "zcode") and name == "skills":
+        if platform.key in ("reasonix", "zcode", "dsh") and name == "skills":
             continue  # 派生产物靠源指纹检测，同步时重新生成
         if platform.key == "codex" and name in ("agents", "skills"):
             continue  # TOML/SKILL.md 是派生产物，靠源指纹检测，同步时重新生成
@@ -372,6 +373,11 @@ def sync_skills(project_path: Path, platform: Platform) -> int:
         deploy_zcode_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
         print(f"  [OK] zcode skills: {n} 个 SKILL.md 已重新生成")
+        return n
+    if platform.key == "dsh":
+        deploy_dsh_skills(project_path, SKILL_HOME, platform)
+        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
+        print(f"  [OK] dsh skills: {n} 个 SKILL.md 已重新生成")
         return n
     if platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
