@@ -197,11 +197,11 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── .agent/               # Agent 进度 + 任务通信
 │   ├── status.md         # 进度标记（phase/volume/chapter）
 │   └── task/             # 子 agent 间 order 文件
-├── .opencode/            # OpenCode 用（五选一，由 init.py --platform 决定）
+├── .opencode/            # OpenCode 用（六选一，由 init.py --platform 决定）
 │   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆
-├── .claude/              # Claude Code 用（五选一）
+├── .claude/              # Claude Code 用（六选一）
 │   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆（各环节作者反馈）
@@ -209,22 +209,26 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 │       ├── chapter-memory.md
 │       ├── prompt-memory.md
 │       └── writing-memory.md
-├── .reasonix/            # Reasonix 用（五选一）
+├── .reasonix/            # Reasonix 用（六选一）
     ├── skills/           # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
-├── .codex/               # Codex 用（五选一）
+├── .codex/               # Codex 用（六选一）
     ├── agents/           # 9 个自定义 agent（TOML，初始化时部署）
     ├── skills/           # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
-└── .zcode/               # ZCode 用（五选一）
-    ├── skills/           # 10 个 SKILL.md（agents 即 skills，初始化时部署）
+├── .zcode/               # ZCode 用（六选一）
+    ├── skills/           # 11 个 SKILL.md（agents 即 skills，初始化时部署）
+    ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
+    └── memory/           # 写作动态记忆
+└── .dsh/                 # DeepSeek Harness 用（六选一）
+    ├── skills/           # 11 个 SKILL.md（agents 即 skills，初始化时部署）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
 ```
 
-这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` 不会同时存在。
+这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` / `.dsh/` 不会同时存在。
 
 ### 规划故事骨架
 
