@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-awesome-novel-skill 项目初始化工具
+awesome-novel-agent 项目初始化工具
 
 用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode|dsh>]
 

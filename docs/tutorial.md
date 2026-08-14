@@ -1,4 +1,4 @@
-# awesome-novel-skill 操作手册
+# awesome-novel-agent 操作手册
 
 以修仙小说《青云志》为案例，完整演示从零开始写小说的全流程。
 
@@ -27,7 +27,7 @@
 
 把下面这段话复制给 AI：
 
-> "帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill"
+> "帮我安装 awesome-novel-agent，仓库在 https://github.com/modoojunko/awesome-novel-agent"
 
 ---
 
@@ -58,7 +58,7 @@
 
 **如果 AI 说不知道这个项目，再试试：**
 
-> "去 https://github.com/modoojunko/awesome-novel-skill/releases 下载最新的 release，然后按 README 安装"
+> "去 https://github.com/modoojunko/awesome-novel-agent/releases 下载最新的 release，然后按 README 安装"
 
 （Reasonix 不走 install.sh：克隆后用 `python tools/init.py <项目路径> --platform reasonix` 初始化。）
 
@@ -1644,4 +1644,4 @@ AI 会指出具体问题，修改后重新验收。
 ---
 
 **手册版本：** v4.12.0
-**适用版本：** awesome-novel-skill v4.12.0+
+**适用版本：** awesome-novel-agent v4.12.0+

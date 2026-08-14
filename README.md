@@ -57,7 +57,7 @@
 
 </div>
 
-<video src="https://raw.githubusercontent.com/modoojunko/awesome-novel-skill/main/reference/video/4.0%E5%AE%A3%E4%BC%A0%E8%A7%86%E9%A2%91.mp4" controls width="100%" style="max-width: 640px; display: block; margin: 24px auto; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"></video>
+<video src="https://raw.githubusercontent.com/modoojunko/awesome-novel-agent/main/reference/video/4.0%E5%AE%A3%E4%BC%A0%E8%A7%86%E9%A2%91.mp4" controls width="100%" style="max-width: 640px; display: block; margin: 24px auto; border-radius: 8px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);"></video>
 
 ---
 
@@ -80,9 +80,9 @@
 
 **不用复制粘贴命令。** 打开你正在使用的 AI 工具（Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness），对它说：
 
-> **帮我安装 awesome-novel-skill**
+> **帮我安装 awesome-novel-agent**
 
-AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-skill> 下载（若它说找不到，就把这个仓库地址发给它），并运行准备好的安装脚本 `./install.sh <平台>`，把 skill 本体装到你机器上：
+AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-agent> 下载（若它说找不到，就把这个仓库地址发给它），并运行准备好的安装脚本 `./install.sh <平台>`，把 skill 本体装到你机器上：
 
 | 平台 | 安装位置 |
 |------|---------|
@@ -96,10 +96,10 @@ AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-skill> 下载
 
 **Reasonix：**
 
-Reasonix 的 skill 是**项目级部署**（装在每个小说项目的 `.reasonix/skills/`），不走 install.sh。对 Reasonix 说 **"帮我安装 awesome-novel-skill"**，它会克隆仓库并用 `init.py` 在你的目标目录直接初始化小说项目：
+Reasonix 的 skill 是**项目级部署**（装在每个小说项目的 `.reasonix/skills/`），不走 install.sh。对 Reasonix 说 **"帮我安装 awesome-novel-agent"**，它会克隆仓库并用 `init.py` 在你的目标目录直接初始化小说项目：
 
 ```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+git clone https://github.com/modoojunko/awesome-novel-agent.git && cd awesome-novel-agent
 python tools/init.py <小说项目路径> --platform reasonix
 cd <小说项目路径> && reasonix code
 ```
@@ -302,7 +302,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix、Codex 或 ZCode。
+能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-agent，仓库在 https://github.com/modoojunko/awesome-novel-agent"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix、Codex 或 ZCode。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
@@ -322,8 +322,8 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 ## Star History
 
-<a href="https://star-history.com/#modoojunko/awesome-novel-skill">
-  <img src="https://api.star-history.com/svg?repos=modoojunko/awesome-novel-skill&type=date" alt="Star History">
+<a href="https://star-history.com/#modoojunko/awesome-novel-agent">
+  <img src="https://api.star-history.com/svg?repos=modoojunko/awesome-novel-agent&type=date" alt="Star History">
 </a>
 
 ## 致谢
@@ -336,10 +336,10 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 | 方式 | 说明 |
 |------|------|
-| [Bug 反馈](https://github.com/modoojunko/awesome-novel-skill/issues/new) | 报告功能异常、安装问题 |
-| [功能建议](https://github.com/modoojunko/awesome-novel-skill/issues/new) | 提出新功能或改进想法 |
-| [素材扩充](https://github.com/modoojunko/awesome-novel-skill/issues) | 补充题材档案、文风特征库 |
-| [提交 PR](https://github.com/modoojunko/awesome-novel-skill/pulls) | 修复 bug、优化代码或文档 |
+| [Bug 反馈](https://github.com/modoojunko/awesome-novel-agent/issues/new) | 报告功能异常、安装问题 |
+| [功能建议](https://github.com/modoojunko/awesome-novel-agent/issues/new) | 提出新功能或改进想法 |
+| [素材扩充](https://github.com/modoojunko/awesome-novel-agent/issues) | 补充题材档案、文风特征库 |
+| [提交 PR](https://github.com/modoojunko/awesome-novel-agent/pulls) | 修复 bug、优化代码或文档 |
 
 ### 写作风格贡献（作家）
 
@@ -381,7 +381,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **项目结构：**
 ```
-awesome-novel-skill/
+awesome-novel-agent/
 ├── agents/              # 多 Agent 协作
 │   ├── novel-agent.md   # 总指挥
 │   ├── volume-planner.md# 叙事架构师
@@ -421,7 +421,7 @@ awesome-novel-skill/
 
 ### 安装
 
-在 OpenCode 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh opencode`，安装到 `~/.config/opencode/skills/awesome-novel/`。
+在 OpenCode 里输入 **"帮我安装 awesome-novel-agent"**，它会自动运行 `./install.sh opencode`，安装到 `~/.config/opencode/skills/awesome-novel/`。
 
 ### 初始化项目
 
@@ -472,7 +472,7 @@ OpenCode 项目与 Claude Code 项目结构一致，唯一区别是 agent 定义
 
 ### 安装框架源码
 
-对 Reasonix 说 **"帮我安装 awesome-novel-skill"**，它会克隆仓库到本地（项目级部署，不装到全局）。
+对 Reasonix 说 **"帮我安装 awesome-novel-agent"**，它会克隆仓库到本地（项目级部署，不装到全局）。
 
 ### 初始化项目
 
@@ -515,7 +515,7 @@ Reasonix 项目把 agent 定义以 skill 形式部署在 `.reasonix/skills/`，�
 
 ### 安装
 
-在 Codex 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh codex`，安装到 `~/.codex/skills/awesome-novel/`。
+在 Codex 里输入 **"帮我安装 awesome-novel-agent"**，它会自动运行 `./install.sh codex`，安装到 `~/.codex/skills/awesome-novel/`。
 
 ### 初始化项目
 
@@ -553,7 +553,7 @@ python ~/.codex/skills/awesome-novel/tools/init.py <小说项目路径> --genre 
 
 ### 安装
 
-在 ZCode 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh zcode`，安装到 `~/.zcode/skills/awesome-novel/`。
+在 ZCode 里输入 **"帮我安装 awesome-novel-agent"**，它会自动运行 `./install.sh zcode`，安装到 `~/.zcode/skills/awesome-novel/`。
 
 ### 初始化项目
 
@@ -592,7 +592,7 @@ python ~/.zcode/skills/awesome-novel/tools/init.py <小说项目路径> --genre 
 
 ### 安装
 
-在 dsh 里输入 **"帮我安装 awesome-novel-skill"**，它会自动运行 `./install.sh dsh`，安装到 `~/.dsh/skills/awesome-novel/`。
+在 dsh 里输入 **"帮我安装 awesome-novel-agent"**，它会自动运行 `./install.sh dsh`，安装到 `~/.dsh/skills/awesome-novel/`。
 
 ### 初始化项目
 

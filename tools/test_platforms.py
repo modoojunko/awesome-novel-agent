@@ -64,7 +64,7 @@ def test_detect():
     check("path dsh",
           p.detect_platform(Path("d:/proj/.dsh/skills/awesome-novel")).key == "dsh")
     check("default claude",
-          p.detect_platform(Path("d:/code/awesome-novel-skill")).key == "claude")
+          p.detect_platform(Path("d:/code/awesome-novel-agent")).key == "claude")
 
 
 def test_rewrite():

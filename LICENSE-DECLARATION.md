@@ -6,7 +6,7 @@
 
 ## 版权信息
 
-**项目**: awesome-novel-skilll — AI-assisted novel writing workflow system
+**项目**: awesome-novel-agent — AI-assisted novel writing workflow system
 
 **版权人**: Copyright (C) 2026  modoojunko
 
