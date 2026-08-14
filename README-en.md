@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex / ZCode</em>
+  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness</em>
 </p>
 
 <p align="center">
@@ -9,6 +9,7 @@
   <img src="https://img.shields.io/badge/Reasonix-%E2%9C%93%20%E6%94%AF%E6%8C%81-16A34A?style=flat-square" alt="Reasonix">
   <a href="#codex-integration"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
   <a href="#zcode-integration"><img src="https://img.shields.io/badge/ZCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-0EA5E9?style=flat-square" alt="ZCode"></a>
+  <a href="#dsh-integration"><img src="https://img.shields.io/badge/DeepSeek%20Harness-%E2%9C%93%20%E6%94%AF%E6%8C%81-1F6FEB?style=flat-square" alt="DeepSeek Harness"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
 </p>
@@ -48,14 +49,14 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## What You Need
 
-- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, **Codex** or **ZCode** installed
+- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, **Codex**, **ZCode** or **DeepSeek Harness (dsh)** installed
 - Python 3.9+ (the one bundled with macOS works; 3.11+ recommended)
-- pyyaml for OpenCode / Codex / ZCode (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
+- pyyaml for OpenCode / Codex / ZCode / dsh (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
 - About 1 minute to install
 
 ## Installation
 
-**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode) and tell it:
+**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness) and tell it:
 
 > **Install awesome-novel-skill for me**
 
@@ -67,8 +68,9 @@ The agent will download from <https://github.com/modoojunko/awesome-novel-skill>
 | OpenCode | `~/.config/opencode/skills/awesome-novel/` |
 | Codex | `~/.codex/skills/awesome-novel/` |
 | ZCode | `~/.zcode/skills/awesome-novel/` |
+| DeepSeek Harness | `~/.dsh/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex` / `zcode`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex / zcode only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex` / `zcode` / `dsh`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex / zcode / dsh only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
 
 **Reasonix:**
 
@@ -91,9 +93,18 @@ ZCode's skill convention (directory + `SKILL.md`) is compatible with Claude Code
 python ~/.zcode/skills/awesome-novel/tools/init.py <novel-project-path> --platform zcode
 ```
 
+**DeepSeek Harness (dsh):**
+
+dsh's skill convention (directory + `SKILL.md`) is compatible with Claude Code's, but it has **no project-level agents directory** (subagents are a runtime capability) — the 9 agents are deployed as skills (agents == skills), and `<projectRoot>/.dsh/skills/` is dsh's project-level skill root (auto-discovered, highest priority). The skill itself is installed globally via `install.sh`; project contents are deployed per-project to `.dsh/` by `init.py --platform dsh`:
+
+```bash
+./install.sh dsh
+python ~/.dsh/skills/awesome-novel/tools/init.py <novel-project-path> --platform dsh
+```
+
 ## Start Writing
 
-After the skill is installed, launch Claude Code / OpenCode / Codex / ZCode in the directory where you want your novel project and type:
+After the skill is installed, launch Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness in the directory where you want your novel project and type:
 
 > **/awesome-novel**
 
@@ -101,7 +112,7 @@ After the skill is installed, launch Claude Code / OpenCode / Codex / ZCode in t
 
 The skill detects the directory state: for a new directory it confirms with you, then runs `init.py` to scaffold the novel workspace locally (project skeleton, agent definitions, knowledge base, memory files) before entering the writing flow. The system uses 8 AI agents working together — novel-agent (the director) dispatches specialized sub-agents based on progress:
 
-Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow. ZCode users: just say **"帮我写本小说"** or **"帮我继续写"** in the project directory (ZCode has no `@` syntax — agents are skills and novel-agent is auto-discovered).
+Reasonix users: run `reasonix code` in the project directory, then type `@novel-agent` to enter the writing flow. ZCode users: just say **"帮我写本小说"** or **"帮我继续写"** in the project directory (ZCode has no `@` syntax — agents are skills and novel-agent is auto-discovered). DeepSeek Harness users do the same — dsh routes skills by name/description automatically.
 
 ```
 novel-agent (top-level entry — loaded via @novel-agent)
@@ -303,6 +314,45 @@ The 9 agents are deployed as `.zcode/skills/<name>/SKILL.md` (11 skills in total
 Open the project directory in ZCode and say **"帮我写本小说"** or **"帮我继续写"** to enter the writing loop (ZCode has no `@` syntax — novel-agent is auto-discovered as a skill). In ZCode, novel-agent dispatches sub-agents with the `Agent` tool (sub-agent name = skill name under `.zcode/skills/`); the order-file protocol is identical to the other platforms.
 
 Upgrade later with `python tools/sync-project.py <novel-project-path> --platform zcode`.
+
+## dsh Integration
+
+This skill also supports [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (dsh, DeepSeek's open-source agent harness). dsh's skill convention (directory + `SKILL.md`, frontmatter reading `name`/`description`) is compatible with Claude Code's — **natively supported** — but it has no project-level agents directory (subagents are a runtime capability), so the 9 agents are deployed as skills (agents == skills). The skill itself is installed **user-level**, while project contents (agents/skills/knowledge/memory) are deployed **project-level** into `.dsh/` (`<projectRoot>/.dsh/skills/` is dsh's project-level skill root, auto-discovered with the highest priority).
+
+### Install
+
+Tell dsh "帮我安装 awesome-novel-skill" and it runs `./install.sh dsh` itself, installing to `~/.dsh/skills/awesome-novel/`.
+
+### Initialize a project
+
+Open the target directory in dsh and say "帮我写本小说" — the skill initializes automatically. You can also run:
+
+```bash
+python ~/.dsh/skills/awesome-novel/tools/init.py <novel-project-path> --genre <number> --platform dsh
+```
+
+The 9 agents are deployed as `.dsh/skills/<name>/SKILL.md` (11 skills in total, same layout as Reasonix/ZCode: 9 agents + memory-recording / roleplay-sandbox standalone tools), with frontmatter trimmed to the `name`/`description` keys dsh recognizes; anti-AI rules, style preferences, format specs, and writing memory land in `.dsh/knowledge/` / `.dsh/memory/`.
+
+### Start writing
+
+Open the project directory in dsh and say **"帮我写本小说"** or **"帮我继续写"** to enter the writing loop (dsh routes skills by name/description automatically). In dsh, novel-agent dispatches sub-agents with the `subagent` tool (the prompt tells the sub-agent to load its own instructions first via `skill(name="<sub-agent-name>")`; sub-agent name = skill name under `.dsh/skills/`); the order-file protocol is identical to the other platforms.
+
+### Project structure differences
+
+```
+.dsh/
+├── skills/               # 11 SKILL.md files (agents == skills)
+│   ├── novel-agent/      # director (entry dispatcher)
+│   ├── writer/           # prose writer (subagent)
+│   ├── volume-planner/   # volume planning (subagent)
+│   ├── ...
+│   ├── memory-recording/ # standalone interactive tool
+│   └── roleplay-sandbox/ # standalone interactive tool
+├── knowledge/            # anti-AI rules, style preferences, permanent memory, format specs
+└── memory/               # dynamic writing memory
+```
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform dsh`.
 
 ## Star History
 

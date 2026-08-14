@@ -21,7 +21,7 @@ set -e
 
 usage() {
     echo "用法: $0 <平台>"
-    echo "平台: claude-code, opencode, codex, zcode, hermes, openclaw, deepseek-tui"
+    echo "平台: claude-code, opencode, codex, zcode, dsh, hermes, openclaw, deepseek-tui"
     exit 1
 }
 
@@ -53,6 +53,9 @@ case "$PLATFORM" in
     zcode)
         SKILLS_DIR="$HOME/.zcode/skills"
         ;;
+    dsh)
+        SKILLS_DIR="$HOME/.dsh/skills"
+        ;;
     *)
         echo "不支持的平台: $PLATFORM"
         usage
@@ -83,7 +86,7 @@ fi
 # hermes/openclaw/deepseek-tui 未走转换，均不需要。缺失时同样在任何目录创建/
 # 删除前 fail-fast，而不是等 init.py / sync-project.py 执行时才报错。
 case "$PLATFORM" in
-    opencode|codex|zcode)
+    opencode|codex|zcode|dsh)
         if ! "$PY_BIN" "$SCRIPT_DIR/tools/check-yaml.py" "$PLATFORM"; then
             echo "安装中止：缺少 pyyaml。请先执行 pip install pyyaml（系统 Python 权限受限时可用 pip install --user pyyaml），再重试。"
             exit 1
