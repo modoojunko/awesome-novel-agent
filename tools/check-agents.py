@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""awesome-novel-skill agent 定义静态检查
+"""awesome-novel-agent agent 定义静态检查
 
 校验 agents/*.md 的 frontmatter：
   1. YAML 合法

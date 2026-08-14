@@ -1,8 +1,8 @@
-# awesome-novel-skill 项目贡献说明
+# awesome-novel-agent 项目贡献说明
 
 ## 1. 项目简介
 
-awesome-novel-skill 是一款免费开源的 AI 小说创作助手工具，基于 DeepSeek TUI、Claude Code、Hermes、OpenClaw 等 AI 终端工具运行，遵循 GPLv3 开源协议。项目旨在降低小说创作门槛，为创作者提供世界观搭建、角色塑造、章节大纲、正文撰写、文风优化、伏笔追踪等一站式小说创作能力，个人用户永久免费使用，商业使用需获得作者官方授权。
+awesome-novel-agent 是一款免费开源的 AI 小说创作助手工具，基于 DeepSeek TUI、Claude Code、Hermes、OpenClaw 等 AI 终端工具运行，遵循 GPLv3 开源协议。项目旨在降低小说创作门槛，为创作者提供世界观搭建、角色塑造、章节大纲、正文撰写、文风优化、伏笔追踪等一站式小说创作能力，个人用户永久免费使用，商业使用需获得作者官方授权。
 
 本项目依靠社区驱动维护，欢迎各类技术人员、网文创作者、爱好者参与贡献，无需高深编程能力，文案优化、素材补充、bug 反馈均为有效贡献方式。
 

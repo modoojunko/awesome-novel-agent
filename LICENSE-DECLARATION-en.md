@@ -6,7 +6,7 @@
 
 ## Copyright Information
 
-**Project**: awesome-novel-skilll — AI-assisted novel writing workflow system
+**Project**: awesome-novel-agent — AI-assisted novel writing workflow system
 
 **Copyright Holder**: Copyright (C) 2026  modoojunko
 

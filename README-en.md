@@ -58,9 +58,9 @@ Let AI be your novel writing partner, from world-building to character developme
 
 **No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness) and tell it:
 
-> **Install awesome-novel-skill for me**
+> **Install awesome-novel-agent for me**
 
-The agent will download from <https://github.com/modoojunko/awesome-novel-skill> (if it can't find it, paste this repo URL to it) and run the prepared installer `./install.sh <platform>` itself:
+The agent will download from <https://github.com/modoojunko/awesome-novel-agent> (if it can't find it, paste this repo URL to it) and run the prepared installer `./install.sh <platform>` itself:
 
 | Platform | Install location |
 |----------|------------------|
@@ -74,10 +74,10 @@ You're done once you see **"安装完成"** (Installation complete). To install 
 
 **Reasonix:**
 
-Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not globally — no `install.sh`. Tell Reasonix **"Install awesome-novel-skill for me"** and it will clone the repo and run `init.py` to initialize your novel project directly:
+Reasonix skills are deployed **per-project** (into `.reasonix/skills/`), not globally — no `install.sh`. Tell Reasonix **"Install awesome-novel-agent for me"** and it will clone the repo and run `init.py` to initialize your novel project directly:
 
 ```bash
-git clone https://github.com/modoojunko/awesome-novel-skill.git && cd awesome-novel-skill
+git clone https://github.com/modoojunko/awesome-novel-agent.git && cd awesome-novel-agent
 python tools/init.py <novel-project-path> --platform reasonix
 cd <novel-project-path> && reasonix code
 ```
@@ -249,7 +249,7 @@ Agent asks if you want to choose one during setup.
 
 **Q: I'm not a programmer, can I install it?**
 
-Yes. Tell your AI tool "帮我安装 awesome-novel-skill，仓库在 https://github.com/modoojunko/awesome-novel-skill" — the agent runs the installer for you. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
+Yes. Tell your AI tool "帮我安装 awesome-novel-agent，仓库在 https://github.com/modoojunko/awesome-novel-agent" — the agent runs the installer for you. The only requirement is having Claude Code, OpenCode, Reasonix, or Codex installed.
 
 **Q: I upgraded the skill, how do I migrate my existing novel projects to the new format?**
 
@@ -273,7 +273,7 @@ This skill also supports [Codex](https://developers.openai.com/codex) (OpenAI's 
 
 ### Install
 
-Tell Codex "帮我安装 awesome-novel-skill" and it runs `./install.sh codex` itself, installing to `~/.codex/skills/awesome-novel/`.
+Tell Codex "帮我安装 awesome-novel-agent" and it runs `./install.sh codex` itself, installing to `~/.codex/skills/awesome-novel/`.
 
 ### Initialize a project
 
@@ -297,7 +297,7 @@ This skill also supports [ZCode](https://zcode.z.ai) (open-source AI coding agen
 
 ### Install
 
-Tell ZCode "帮我安装 awesome-novel-skill" and it runs `./install.sh zcode` itself, installing to `~/.zcode/skills/awesome-novel/`.
+Tell ZCode "帮我安装 awesome-novel-agent" and it runs `./install.sh zcode` itself, installing to `~/.zcode/skills/awesome-novel/`.
 
 ### Initialize a project
 
@@ -321,7 +321,7 @@ This skill also supports [DeepSeek Harness](https://github.com/deepseek-ai/deeps
 
 ### Install
 
-Tell dsh "帮我安装 awesome-novel-skill" and it runs `./install.sh dsh` itself, installing to `~/.dsh/skills/awesome-novel/`.
+Tell dsh "帮我安装 awesome-novel-agent" and it runs `./install.sh dsh` itself, installing to `~/.dsh/skills/awesome-novel/`.
 
 ### Initialize a project
 
@@ -356,8 +356,8 @@ Upgrade later with `python tools/sync-project.py <novel-project-path> --platform
 
 ## Star History
 
-<a href="https://star-history.com/#modoojunko/awesome-novel-skill">
-  <img src="https://api.star-history.com/svg?repos=modoojunko/awesome-novel-skill&type=date" alt="Star History">
+<a href="https://star-history.com/#modoojunko/awesome-novel-agent">
+  <img src="https://api.star-history.com/svg?repos=modoojunko/awesome-novel-agent&type=date" alt="Star History">
 </a>
 
 ## Acknowledgments

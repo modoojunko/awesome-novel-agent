@@ -1,4 +1,4 @@
-# awesome-novel-skill 架构文档
+# awesome-novel-agent 架构文档
 
 > 面向开发者理解实现细节。面向使用者的内容见 [README.md](./README.md)。
 > 当前版本：v4.13.0
