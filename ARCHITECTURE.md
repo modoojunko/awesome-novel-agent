@@ -78,7 +78,7 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   │     ├── archive → updater          （archive-order.md / memory-sweep-order.md）
   │     └── # 卡冻结：归档后无风格增量更新
   ├── 子 agent 完成后将 order 覆盖为 status: DONE
-  └── 检测到 order 标记 DONE → 推进下一阶段
+  └── 检测到 order 标记 DONE → 推进下一阶段（setup 例外：setting-update-order DONE 后需作者确认设定，再推进 phase）
 ```
 
 **关键规则：**

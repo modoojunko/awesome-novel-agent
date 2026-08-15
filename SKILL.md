@@ -106,9 +106,12 @@ python <本 skill 安装目录>/tools/init.py [project-path] [--genre <编号>]
 3. novel-agent 通过 **Agent 工具调用 updater**
 4. **updater 读取 order**，写入 `settings/world-setting.md`、`settings/genre-setting.md`、`settings/character-setting/*.md` 等设定文件
 5. updater 将 order 覆盖为 `status: DONE` 并结束
-6. **novel-agent 确认 order 标记 DONE**，推进 phase → outline，进入卷纲规划
+6. **novel-agent 确认 order 标记 DONE**（只代表写入完成），展示已写入的设定摘要给作者确认：文件清单（对照 order 的 outputs 逐项列出）+ 世界观/题材/角色/文风要点，参照 `docs/tutorial.md` 3.8 完成报告样式，面向作者用日常语言，结尾话术："设定已写入 settings/。哪里不对直接说；没问题就说'可以'，我开始规划卷纲。"
+7. **作者明确确认（"可以/没问题/就这样"；或说"之前已确认过"）→ 才可推进 phase → outline**，进入卷纲规划。作者要求修改 → novel-agent 写 setting-update-order（order 内嵌修改意见）→ 调 updater → 改完重新展示确认，循环受重试/断路器约束，连续修改仍不满意 → 暂停，请作者直接给最终文案。作者回复模糊（"差不多""你看着办""都行"）→ 追问具体哪项不确定；未明确前一律视为未确认。**未确认前不得推进 phase。**（作者说"你全权写"全自动模式 → 展示摘要后视为已确认直接推进）
 
 **权限规则：** novel-agent 不得直接写 `settings/` 下的文件，设定写入必须通过 updater 的 setting-update 模式完成。
+
+**幂等约定：** phase=setup 且 setting-update-order 已 DONE（outputs 存在非空）→ 视为「已写入、待作者确认」，中断重启后直接展示摘要等确认——不新增状态字段、不重派 updater、不推进 phase；order 缺失但 outputs 已存在 → 同样直接进入展示确认。
 
 ## 自动迁移（2.x → 3.0）
 
