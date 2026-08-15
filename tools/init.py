@@ -24,9 +24,7 @@ from platforms import (
     detect_platform,
     deploy_codex_agents,
     deploy_codex_skills,
-    deploy_dsh_skills,
-    deploy_reasonix_skills,
-    deploy_zcode_skills,
+    deploy_inline_skills,
     ensure_yaml,
     rewrite_refs,
     resolve_skill_home,
@@ -79,6 +77,12 @@ GENRE_LABELS = {
     "anime-derivative": "动漫衍生",
     "derivative": "衍生类",
     "male-derivative": "男频衍生",
+}
+
+# 反 AI 规则跨题材复用（对应题材文件头部「适用题材」注释声明，缺同名文件属有意设计）
+_ANTI_AI_REUSE = {
+    "urban-cultivation": "urban-brained",
+    "urban-high-martial": "urban-brained",
 }
 
 SKILL_HOME = resolve_skill_home()
@@ -153,6 +157,10 @@ def main():
         genre = select_genre()
     else:
         print(f"题材: {GENRE_LABELS.get(genre, genre)}（{genre}）")
+    gaps = _genre_gaps(genre)
+    if gaps:
+        print(f"  ⚠️ 该题材知识库不完整：{'、'.join(gaps)}"
+              f"（选题列表中标 ⚠️ 的题材同样存在缺口，设定阶段需作者补全）")
 
     # Step 1.5: 旧 4 字段 writing-style.md → 新格式（必须先于模板拷贝/题材预填，否则旧卡被覆盖）
     migrate_writing_style(project_path)
@@ -167,14 +175,10 @@ def main():
         deploy_agents(project_path, platform)
 
     # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex 只部署独立工具）
-    if platform.key == "reasonix":
-        deploy_reasonix_skills(project_path, SKILL_HOME, platform)
-    elif platform.key == "zcode":
-        deploy_zcode_skills(project_path, SKILL_HOME, platform)
-    elif platform.key == "dsh":
-        deploy_dsh_skills(project_path, SKILL_HOME, platform)
-    elif platform.key == "codex":
+    if platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)
+    else:
+        deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
 
     # Step 4: 按题材继承知识
     deploy_knowledge(project_path, genre, platform)
@@ -207,11 +211,27 @@ def main():
         print("在 Reasonix 中运行 `reasonix code`，然后调用 @novel-agent 开始写作")
 
 
+def _genre_gaps(genre: str) -> list:
+    """题材支持缺口（知识库文件缺失）→ 缺口标签列表，空 = 完整。
+
+    反 AI 规则允许跨题材复用（见 _ANTI_AI_REUSE 对应文件「适用题材」注释）。
+    选题列表标注与部署警告共用，避免静默选到空壳题材。
+    """
+    gaps = []
+    if not (SOURCE_GENRE_EXAMPLE / f"{genre}.md").exists():
+        gaps.append("题材档案待补")
+    if genre not in _ANTI_AI_REUSE and not (SOURCE_ANTI_AI / f"{genre}.md").exists():
+        gaps.append("反AI规则待补")
+    return gaps
+
+
 def select_genre() -> str:
-    """交互式选题材"""
+    """交互式选题材（知识库不完整的题材标注缺口，防止静默选到空壳）"""
     print("\n可选题材:")
     for i, g in enumerate(GENRES, 1):
-        print(f"  {i:2d}. {GENRE_LABELS[g]}（{g}）")
+        gaps = _genre_gaps(g)
+        mark = f"　⚠️ {'、'.join(gaps)}" if gaps else ""
+        print(f"  {i:2d}. {GENRE_LABELS[g]}（{g}）{mark}")
 
     while True:
         try:
@@ -348,6 +368,9 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
     if genre_example_src.exists():
         shutil.copy2(genre_example_src, knowledge_dir / "genre-example.md")
         count += 1
+    else:
+        print(f"  ⚠️  缺题材档案 knowledge/genre-example/{genre}.md——"
+              f"不生成 genre-example.md，settings 保留占位（请在设定阶段与作者补全）")
 
     # 反 AI 规则：通用 + 题材 + 方法论 + 误杀防护（合并为单个 anti-ai.md）
     # 注：common-rules / anti-ai-writing / boundary-cases 是 anti-ai agent 的三个必需输入，
@@ -363,6 +386,17 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
     if genre_rules.exists():
         anti_ai_content.append(f"\n---\n\n[community-defaults] 题材: {genre}\n")
         anti_ai_content.append(genre_rules.read_text(encoding="utf-8"))
+    elif genre in _ANTI_AI_REUSE:
+        reuse = _ANTI_AI_REUSE[genre]
+        anti_ai_content.append(
+            f"\n---\n\n[community-defaults] 题材: {genre}（复用 {reuse}.md 规则）\n"
+        )
+        anti_ai_content.append(
+            (SOURCE_ANTI_AI / f"{reuse}.md").read_text(encoding="utf-8")
+        )
+    else:
+        print(f"  ⚠️  缺题材反 AI 规则 knowledge/anti-ai/{genre}.md——仅继承通用规则"
+              f"（选到该题材时反 AI 检测无题材正反例）")
 
     if anti_ai_content:
         (knowledge_dir / "anti-ai.md").write_text(
@@ -627,7 +661,7 @@ def write_status(project_path: Path):
     """初始化 .agent/status.md"""
     status = """# 项目状态
 
-- **skill_version:** 4.13.0
+- **skill_version:** 4.16.0
 - **phase:** setup
 - **current_step:** setting        # volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving
 # phase 取值：setup / outline / draft / anti-ai / review / archive / finished

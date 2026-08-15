@@ -5,6 +5,12 @@
   1. YAML 合法
   2. frontmatter 里引用的 skills/knowledge 路径在仓库真实存在（或是有意的占位/部署后路径）
   3. tools 字段只含合法工具名（若存在）
+  4. .claude/knowledge/ 引用按部署后布局校验（对照 init.deploy_knowledge 产物）
+
+附加校验（防「仓库内看不出来」的断链/孤儿，arch-review 2026-08）：
+  5. skills/*.md 正文的 knowledge 引用——skills 会被内联进项目，仓库相对路径必断链
+  6. 孤儿 knowledge——被部署进每个项目的文件必须被 agents/skills/SKILL.md 引用
+  7. skill.json files 清单含 knowledge/（与 install.sh 复制范围一致）
 
 用法: python tools/check-agents.py
 返回码 0 = 通过，非 0 = 有问题（CI 用）。
@@ -15,18 +21,28 @@
 - knowledge: 引用两类——
     (a) 仓库内相对路径（settings/、.claude/ 等，按仓库根解析，需存在）
     (b) 部署后路径（.claude/knowledge/...，由 init.py 生成，仓库可能没有源文件）
-  对 (b) 类做"路径模式"白名单校验，不要求文件存在。
+  对 (b) 类做"路径模式"白名单校验；knowledge 路径额外按部署产物清单校验存在性。
 """
 
 from __future__ import annotations  # str | None 等注解在 Python 3.9 下延迟求值，避免 import 即 TypeError
 
 import sys
 import re
+import io
+import json
+import contextlib
+import tempfile
 import yaml
 from pathlib import Path
 
 from style_common import (frontmatter_text, force_utf8, pct_ok,
                           STYLE_CARD_DIMS, STYLE_CARD_SCENE_TYPES)
+
+try:
+    from platforms import PLATFORMS as _PLATFORMS
+    PLATFORM_CLAUDE = _PLATFORMS["claude"]
+except Exception:                        # platforms 不可用（独立安装等场景）→ 跳过部署布局校验
+    PLATFORM_CLAUDE = None
 
 force_utf8()
 
@@ -156,6 +172,246 @@ def _is_deployed(rel: str) -> bool:
         if pat.match(rel):
             return True
     return False
+
+
+# ---------------------------------------------------------------
+# 部署后 knowledge 布局校验（arch-review 2026-08）
+# ---------------------------------------------------------------
+# init.deploy_knowledge 的产物布局 ≠ 仓库 knowledge/ 布局：
+#   format-specs/*.md          → <根>/knowledge/*.md（拍平）
+#   genre-example/{genre}.md   → <根>/knowledge/genre-example.md（合并）
+#   anti-ai 四源 + 题材规则     → <根>/knowledge/anti-ai.md（合并）
+#   craft 目录 + style-distill/ → <根>/knowledge/<目录>/（原样拷贝）
+# 引用方写的是部署后路径（基座 .claude/knowledge/...，rewrite_refs 按平台重写前缀），
+# 仓库内无源文件 → 只能对照 init.py 逻辑计算产物清单校验。
+
+# 生成类产物：init.py 每次运行必生成（引用它们合法）
+_KNOWLEDGE_GENERATED = {"anti-ai.md", "genre-example.md", "permanent-memory.md"}
+
+# 仓库 knowledge/ 中面向作者、不经 agent 消费的参考文件（部署清单豁免，孤儿检测白名单）
+_KNOWLEDGE_AUTHOR_REFS = {
+    "knowledge/anti-ai/fanqie.md",       # 1200+ 行作者学习材料，自述「AI 不主动读取」
+    "knowledge/README.md",               # 知识库自述
+    "knowledge/genre-example/index.md",  # 题材注册表（init 选题材的数据源，非部署产物）
+    "knowledge/plot-craft/README.md",
+    "knowledge/scene-craft/README.md",
+    "knowledge/scene-craft/index.md",
+    "knowledge/title-craft/index.md",    # SKILL.md 取书名方法论（作者交互入口引用）
+}
+
+
+def _deployed_knowledge_files() -> set[str] | None:
+    """模拟 init.deploy_knowledge，计算部署后 <根>/knowledge/ 产物清单（相对路径集合）。
+
+    直接 import init 复用其真实逻辑（含 ensure_yaml 平台检测），防止本清单与 init 漂移。
+    init 依赖 pyyaml；缺失时返回 None，调用方跳过本组校验（CI 已装 pyyaml）。
+    """
+    try:
+        import init as init_mod
+    except ImportError:
+        return None
+    if PLATFORM_CLAUDE is None:
+        return None
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        fake_project = tmp / "proj"
+        fake_project.mkdir()
+        # deploy_knowledge 假定 knowledge 目录已存在（init 流程由 create_skeleton 先建）
+        PLATFORM_CLAUDE.knowledge_dir(fake_project).mkdir(parents=True, exist_ok=True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            init_mod.deploy_knowledge(fake_project, "xianxia", PLATFORM_CLAUDE)
+        know = fake_project / ".claude" / "knowledge"
+        if not know.is_dir():
+            return None
+        return {str(p.relative_to(know)) for p in know.rglob("*") if p.is_file()}
+
+
+def check_deployed_knowledge_refs() -> list:
+    """校验 agents frontmatter + skills 正文的 knowledge 引用按部署后布局真实存在。
+
+    - 基座引用写作 `.claude/knowledge/<相对路径>`，rewrite_refs 只替换前缀 → 相对路径即产物路径
+    - 引用带 {}（如 scene-craft/{genre}.md）→ 只校验目录存在
+    - 仓库相对路径（knowledge/format-specs/...）在 skills 正文出现 → 必断链（skills 会被内联进项目）
+    """
+    files = _deployed_knowledge_files()
+    if files is None:
+        return []                      # pyyaml 缺失等场景跳过（CI 有 pyyaml）
+    errors = []
+
+    # agents frontmatter 的 knowledge 路径（只校验 .claude/knowledge/ 前缀；
+    # settings/、story.md、.agent/ 等其他条目由 check_file 的白名单逻辑管）
+    for f in sorted(AGENTS_DIR.glob("*.md")):
+        fm = _parse_frontmatter(f)
+        if fm is None:
+            continue
+        for entry in fm.get("knowledge") or []:
+            if not isinstance(entry, dict):
+                continue
+            rel = str(entry.get("path") or "")
+            if rel.startswith(".claude/knowledge/"):
+                err = _check_knowledge_ref(rel[len(".claude/knowledge/"):], files, f"{f.name} frontmatter")
+                if err:
+                    errors.append(err)
+
+    # agents 正文的 knowledge 引用（agent 定义会部署进项目，引用需同基座规则）
+    for f in sorted(AGENTS_DIR.glob("*.md")):
+        text = f.read_text(encoding="utf-8-sig")
+        for m in re.finditer(r"\.claude/knowledge/([A-Za-z0-9_./{}-]+)", text):
+            err = _check_knowledge_ref(m.group(1), files, f"{f.name} 正文")
+            if err:
+                errors.append(err)
+        for m in re.finditer(r"(?<![.a-zA-Z0-9_/-])knowledge/(format-specs|genre-example|anti-ai)/"
+                             r"([A-Za-z0-9_./{}-]+)", text):
+            errors.append(
+                f"{f.name}: 正文引用仓库相对路径 knowledge/{m.group(1)}/{m.group(2)}，"
+                f"部署后不存在（format-specs 拍平 / genre-example 合并 / anti-ai 合并；"
+                f"请改写为 .claude/knowledge/ 基座路径）"
+            )
+
+    # skills 正文的 knowledge 引用（skills 被内联进 reasonix/zcode/dsh/codex 产物，引用需同规则）
+    for f in sorted(SKILLS_DIR.glob("*.md")):
+        text = f.read_text(encoding="utf-8-sig")
+        for m in re.finditer(r"\.claude/knowledge/([A-Za-z0-9_./{}-]+)", text):
+            err = _check_knowledge_ref(m.group(1), files, f"{f.name} 正文")
+            if err:
+                errors.append(err)
+        # 仓库相对 knowledge/ 引用 = 未按部署后基座写 → 内联后必断链（roleplay-sandbox 类问题）
+        for m in re.finditer(r"(?<![.a-zA-Z0-9_/-])knowledge/(format-specs|genre-example|anti-ai)/"
+                             r"([A-Za-z0-9_./{}-]+)", text):
+            errors.append(
+                f"{f.name}: 正文引用仓库相对路径 knowledge/{m.group(1)}/{m.group(2)}，"
+                f"部署后不存在（format-specs 拍平 / genre-example 合并 / anti-ai 合并；"
+                f"请改写为 .claude/knowledge/ 基座路径）"
+            )
+
+    # 被部署的 knowledge 文件正文引用（同角色play-sandbox 断链类；仓库专用文档
+    # README/index/fanqie 不在部署产物集，自动跳过）
+    for repo_path in sorted((ROOT / "knowledge").rglob("*.md")):
+        rel = _repo_knowledge_to_deployed(repo_path)
+        if rel is None or rel not in files:
+            continue
+        text = repo_path.read_text(encoding="utf-8-sig")
+        where = f"{repo_path.relative_to(ROOT)} 正文"
+        for m in re.finditer(r"\.claude/knowledge/([A-Za-z0-9_./{}-]+)", text):
+            err = _check_knowledge_ref(m.group(1), files, where)
+            if err:
+                errors.append(err)
+        for m in re.finditer(r"(?<![.a-zA-Z0-9_/-])knowledge/([A-Za-z0-9_./{}-]+)", text):
+            ref = m.group(1).rstrip("/")
+            if not ref or "{" in ref:
+                continue
+            # craft 目录按原样部署，但其下文件也必须走 .claude/knowledge/ 基座——
+            # 项目根的裸 knowledge/ 目录不存在（见 roleplay-sandbox 断链同源问题）
+            errors.append(
+                f"{where}: 引用仓库相对路径 knowledge/{ref}，部署后不存在"
+                f"（format-specs 拍平 / genre-example 合并 / anti-ai 合并；"
+                f"请改写为 .claude/knowledge/ 基座路径）"
+            )
+    return errors
+
+
+def _repo_knowledge_to_deployed(repo_path: Path) -> str | None:
+    """仓库 knowledge/ 文件 → 部署后相对路径；不部署的文件返回 None。"""
+    rel = repo_path.relative_to(ROOT / "knowledge")
+    if rel.parts[0] == "format-specs":
+        return rel.name                      # 拍平到 knowledge/ 根
+    if rel.parts[0] in ("plot-craft", "scene-craft", "character-craft",
+                        "title-craft", "style-distill"):
+        return rel.as_posix()                # 目录原样拷贝
+    return None                              # README/index/fanqie/antia 题材源等不直接部署
+
+
+def _parse_frontmatter(path: Path) -> dict | None:
+    """agent .md frontmatter → dict；无 frontmatter / 解析失败 / 非 map → None。"""
+    text = path.read_text(encoding="utf-8-sig")
+    fm_text = _split_frontmatter(text)
+    if fm_text is None:
+        return None
+    try:
+        fm = yaml.safe_load(fm_text)
+    except Exception:
+        return None
+    return fm if isinstance(fm, dict) else None
+
+
+def _check_knowledge_ref(base: str, files: set[str], where: str) -> str | None:
+    """单个 knowledge 引用 → 错误消息或 None。base 为部署后 knowledge/ 下相对路径
+    （可带尾 / 表目录级引用、可含 {} 占位符）。"""
+    base = base.replace("\\", "/").strip()
+    if not base or base in _KNOWLEDGE_GENERATED:
+        return None                     # anti-ai.md / genre-example.md / permanent-memory.md 必生成
+    if base.endswith("/") or "{" in base:
+        # 目录级引用（scene-craft/）或占位符（scene-craft/{genre}.md）→ 校验目录存在
+        d = base if base.endswith("/") else base.rsplit("/", 1)[0]
+        if not any(x == d.rstrip("/") or x.startswith(d) for x in files):
+            return f"{where}: knowledge 引用目录 {base} 不在部署产物中"
+        return None
+    if base not in files:
+        return f"{where}: knowledge 引用 {base} 不在部署产物中（init.deploy_knowledge 不生成它）"
+    return None
+
+
+def check_orphan_knowledge() -> list:
+    """被部署进每个项目的 knowledge 文件必须被 agents/skills/SKILL.md 引用。
+
+    产出文件（anti-ai.md 等 3 个生成物）由部署逻辑生成，视为已消费。
+    """
+    deployed = _deployed_knowledge_files()
+    if deployed is None:
+        return []
+    # 汇总全仓引用（agents frontmatter + agents/skills/SKILL.md 正文，统一抽 .claude/knowledge/ 路径）
+    referenced: set[str] = set(_KNOWLEDGE_GENERATED)
+    sources = list(AGENTS_DIR.glob("*.md")) + list(SKILLS_DIR.glob("*.md")) + [ROOT / "SKILL.md"]
+    # 被部署的 knowledge 文件正文引用也算消费（如 chapter-quality-checklist → writing-style.md）
+    sources += [p for p in (ROOT / "knowledge").rglob("*.md")
+                if _repo_knowledge_to_deployed(p) in deployed]
+    for f in sources:
+        if not f.exists():
+            continue
+        text = f.read_text(encoding="utf-8-sig")
+        for m in re.finditer(r"\.claude/knowledge/([A-Za-z0-9_./{}-]+)", text):
+            referenced.add(m.group(1))
+        # SKILL.md 的仓库相对引用（title-craft）也计入消费
+        for m in re.finditer(r"(?<![.a-zA-Z0-9_/-])knowledge/((?:plot|scene|character|title)-craft/"
+                             r"[A-Za-z0-9_./{}-]+)", text):
+            referenced.add(m.group(1))
+        # 目录级引用（.claude/knowledge/scene-craft/）消费该目录下全部文件
+        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill)/", text):
+            referenced.add(m.group(1) + "/")
+    errors = []
+    for rel in sorted(deployed):
+        if rel in _KNOWLEDGE_AUTHOR_REFS:
+            continue
+        if any(rel.startswith(d) for d in referenced if d.endswith("/")):
+            continue                    # 被目录级引用覆盖
+        if rel in referenced:
+            continue
+        errors.append(
+            f"孤儿 knowledge: {rel} 被部署进每个项目但无任何 agent/skill/SKILL.md 引用"
+            f"（接线或删除；确属作者参考请加入 _KNOWLEDGE_AUTHOR_REFS 豁免）"
+        )
+    # 仓库内豁免文件本身也随 craft 目录拷贝进项目（copytree），同样要求被引用或显式豁免
+    # —— 已在上面 deployed 集合覆盖（README/index 属 _KNOWLEDGE_AUTHOR_REFS，其余文件走同一判定）。
+    return errors
+
+
+def check_skill_json() -> list:
+    """skill.json 打包清单与 install.sh 复制范围一致性。"""
+    sj = ROOT / "skill.json"
+    if not sj.exists():
+        return []
+    try:
+        data = json.loads(sj.read_text(encoding="utf-8"))
+    except Exception as e:
+        return [f"skill.json 解析失败: {e}"]
+    errors = []
+    files = data.get("files") or []
+    if "knowledge/" not in files:
+        errors.append(
+            "skill.json files 缺 knowledge/（install.sh 会复制 knowledge/，"
+            "按此清单打包将丢失整个知识库）"
+        )
+    return errors
 
 
 # 风格卡场景/维度枚举——单源见 style_common.SCENE_INJECTION（review #36）
@@ -483,6 +739,16 @@ def main() -> int:
     for s in missing_skills:
         print(f"  ❌ skills 引用缺失: skills/{s}")
         all_errors.append(f"skills/{s}")
+
+    # 部署后 knowledge 布局校验 + 孤儿检测 + skill.json 完整性（arch-review 2026-08）
+    for label, errs in (
+        ("knowledge 引用", check_deployed_knowledge_refs()),
+        ("孤儿", check_orphan_knowledge()),
+        ("skill.json", check_skill_json()),
+    ):
+        for e in errs:
+            print(f"  ❌ [{label}] {e}")
+        all_errors.extend(errs)
 
     style_errs = check_style_cards()
     for e in style_errs:

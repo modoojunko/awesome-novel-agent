@@ -290,7 +290,7 @@ xianxia — 东方仙侠
 
 | 字段 | 谁用 | 怎么用 |
 |------|------|--------|
-| 选定类型 | `prompt-crafter agent` 组装提示词 | 读 genre_profile，去 `knowledge/genre-example/` 取 `prompt_segment` 注入提示词 |
+| 选定类型 | `prompt-crafter agent` 组装提示词 | 读 genre_profile，去 `.claude/knowledge/genre-example.md` 取 `prompt_segment` 注入提示词 |
 | 满足类型 | `chapter-planner agent` 方向提案 | 本章提案必须兑现至少 1 种满足类型，一段不兑现=读者白等一章 |
 | 节奏倾向 | `chapter-planner agent` 方向提案 | 控制连续同类型章节数（比如"行动偏多"也不能连续 3 章全是高潮，读者绷不住） |
 | 张力周期 | `updater-archive skill` 滑动窗口审视 | 超过张力周期上限还没小高潮 → 提醒作者"节奏可能有风险" |
@@ -312,7 +312,7 @@ xianxia — 东方仙侠
 |---------|--------|
 | 有没有 | 有类型 id 或"暂无选择"，非空 |
 | 该不该 | 是作者确认过的，不是 Agent 猜的 |
-| 对不对 | 后续 `prompt-crafter agent` 要根据这个 id 去 `knowledge/genre-example/` 找对应文件。id 写错了就找不到。→ 验证：去 knowledge/genre-example/ 看一眼对应的文件存在吗？ |
+| 对不对 | 后续 `prompt-crafter agent` 要根据这个 id 去 `.claude/knowledge/genre-example.md` 找对应文件。id 写错了就找不到。→ 验证：去 `.claude/knowledge/genre-example.md` 看一眼对应的文件存在吗？ |
 
 ### 满足类型
 
@@ -348,4 +348,4 @@ xianxia — 东方仙侠
 
 ### 参考案例
 
-指南中每个字段已内联了多题材示例（仙侠/都市/悬疑/历史），不需要额外读外部文件。如果你需要某题材的完整配置参考（含 story_arc_templates、prompt_segment 等未在指南中覆盖的字段），可以打开 `knowledge/genre-example/{类型id}.md` 查看——但这不在正常对话流程内。
+指南中每个字段已内联了多题材示例（仙侠/都市/悬疑/历史），不需要额外读外部文件。如果你需要某题材的完整配置参考（含 story_arc_templates、prompt_segment 等未在指南中覆盖的字段），可以打开 `.claude/knowledge/genre-example.md` 查看（部署时已按选题合并为单文件）——但这不在正常对话流程内。

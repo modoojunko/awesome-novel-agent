@@ -58,7 +58,7 @@
 - `skills/` — 各 agent 的 SOP 指令，按 `{环节}-{动作}.md` 命名。
 - `knowledge/` — 知识库：`genre-example/` 题材档案、`anti-ai/` 反 AI 规则、`format-specs/` 格式规范、`{plot|scene|character|title}-craft/` 创作方法论。
 - `templates/` — 项目初始化模板（`settings/`、`migration/` 旧项目迁移）。
-- `tools/` — Python 工具：`init.py`（初始化）、`sync-project.py`（同步）、`platforms.py`（平台适配）、`check-agents.py` / `check-conflicts.py` / `check-python.py` / `check-yaml.py`（静态检查）、`style_render.py` / `style_verify.py` / `style_common.py`（style-distill 渲染/验收/共享）、`test_platforms.py` / `test_style_rules.py` / `test_style_distill.py`（测试）、`test_util.py`（测试共享）。
+- `tools/` — Python 工具：`init.py`（初始化）、`sync-project.py`（同步）、`platforms.py`（平台适配）、`check-agents.py` / `check-conflicts.py` / `check-version.py` / `check-python.py` / `check-yaml.py`（静态检查）、`style_render.py` / `style_verify.py` / `style_common.py`（style-distill 渲染/验收/共享）、`test_platforms.py` / `test_style_rules.py` / `test_style_distill.py`（测试）、`test_util.py`（测试共享）。
 - 根目录：`README.md` / `README-en.md`、`SKILL.md`、`skill.json`、`ARCHITECTURE.md`、`CONTRIBUTING.md`、`install.sh` / `install.ps1`；图片素材在 `reference/images/`。
 
 ## 构建、测试与开发命令

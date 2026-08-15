@@ -599,7 +599,7 @@ subagent 生成正文后，主 Agent 对正文进行逐项检查。但这些检�
 
 ### 1. 与写作风格对齐
 
-对照 `knowledge/format-specs/writing-style.md` 的四字段：
+对照 `.claude/knowledge/writing-style.md` 的四字段：
 
 | 字段 | 判定标准 |
 |------|---------|
@@ -647,7 +647,7 @@ subagent 生成正文后，主 Agent 对正文进行逐项检查。但这些检�
 
 **优先级：Agent Teams > subAgent > 自检**
 
-1. **Agent Teams（最优）**：开独立 reviewer agent，传入本章正文 + 本章章纲（chapter.md）+ `knowledge/format-specs/writing-style.md` + `anti-ai.md`（如存在）+ 本清单。reviewer agent 逐项核查，对每项给出"通过/不通过 + 证据（引用正文原文）"。疲劳词扫描和句式扫描让 agent 自动做（正则匹配），人工只做确认。
+1. **Agent Teams（最优）**：开独立 reviewer agent，传入本章正文 + 本章章纲（chapter.md）+ `.claude/knowledge/writing-style.md` + `anti-ai.md`（如存在）+ 本清单。reviewer agent 逐项核查，对每项给出"通过/不通过 + 证据（引用正文原文）"。疲劳词扫描和句式扫描让 agent 自动做（正则匹配），人工只做确认。
 2. **subAgent（次优）**：同上，使用 subagent 执行审查。subagent 对"内容质量"和"风格一致性"的判断力弱于完整 agent，建议 AI 味检测（疲劳词/句式规则）用 subagent，内容质量部分主 Agent 亲自过。
 3. **主 Agent 自检（兜底）**：严格按本清单逐项过。特别注意三个高危盲区：
    - **疲劳词脱敏**：主 Agent 刚读完生成文本，对疲劳词已脱敏。不依赖"读起来的感觉"——必须跑一遍关键词搜索，逐词核对阈值。

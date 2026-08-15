@@ -2,7 +2,7 @@
 
 > Phase 2 第二步——给选定的一卷填充内容。包括定方向、定核心冲突、拆章节列表、追加新角色/设定。产出写入 `volume-{N}.md` 的 `chapters_summary`。
 
-**前置条件：** story.md 已有本卷的 story_arc 定位（主线哪一步+核心冲突一句话）。见 `knowledge/format-specs/story-arc-style.md`——那里定的是"这卷在主线哪一步"，这里定的是"这卷里面怎么走"。
+**前置条件：** story.md 已有本卷的 story_arc 定位（主线哪一步+核心冲突一句话）。见 `.claude/knowledge/story-arc-style.md`——那里定的是"这卷在主线哪一步"，这里定的是"这卷里面怎么走"。
 
 ---
 
@@ -64,7 +64,7 @@
 
 **写什么：** 选一个结构模板，把各阶段的功能和章节数分配清楚。
 
-**怎么聊：** 读项目的 `genre_profile` 配置。有值就去 `knowledge/genre-example/` 找对应类型的 `story_arc_templates`；无值用下面通用模板。Agent 直接输出提案（**不问"你想要哪种"**）：
+**怎么聊：** 读项目的 `genre_profile` 配置。有值就去 `.claude/knowledge/genre-example.md` 找对应类型的 `story_arc_templates`；无值用下面通用模板。Agent 直接输出提案（**不问"你想要哪种"**）：
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

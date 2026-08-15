@@ -2,7 +2,7 @@
 """平台适配层：不同 coding agent 对 agent/skill/knowledge/memory 的目录约定不同，
 init.py / sync-project.py 共用本模块完成平台检测、目录派发、引用改写与 skill 生成。
 
-支持平台（扩展新平台 = 往 PLATFORMS 加一行 + 处理 agents=None 语义）：
+支持平台（目录约定在 PLATFORMS 注册表声明，一行一条）：
   - claude   → .claude/   agents=agents, knowledge, memory
   - opencode → .opencode/ agents=agents, knowledge, memory
   - reasonix → .reasonix/ agents=None（agents 即 skills）, skills=skills, knowledge, memory
@@ -12,6 +12,12 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
   - dsh      → .dsh/      agents=None（agents 即 skills，DeepSeek Harness 无项目级
                           agents 目录，.dsh/skills 为其项目级 skill 根）, skills=skills,
                           knowledge, memory
+
+扩展新平台（除 PLATFORMS 加一行外，按目录约定二选一）：
+  - agents 即 skills 型：_DISPATCH_SECTIONS 加调度适配段 + _convert_standalone_skill
+    的 description 后缀，deploy_inline_skills 自动覆盖
+  - 独立 agents 目录型：仿 convert_to_opencode/convert_to_codex 写转换器，
+    并在 init.main 与 sync-project.sync_agents/sync_skills 各接一行分发
 
 模块名用 platforms（复数）是刻意避开标准库 platform（单数）同名冲突。
 """
@@ -136,7 +142,12 @@ def resolve_skill_home() -> Path:
 
 
 # ---------------------------------------------------------------
-# Reasonix skill 生成（agents + skills 源 → .reasonix/skills/<name>/SKILL.md）
+# inline-skill 平台生成（reasonix / zcode / dsh）
+# agents + skills 源 → <平台根>/skills/<name>/SKILL.md（11 个）
+# 三平台产物同构，差异集中在 _INLINE_PLATFORM_SPEC 差异表：
+#   - frontmatter：zcode 带 allowed-tools（裸名）；reasonix 另带 runAs 且工具名
+#     经 _REASONIX_TOOL_MAP 映射、规划类 agent 补 read_skill；dsh 只留 name/description
+#   - novel-agent 调度适配段文本按平台注入
 # ---------------------------------------------------------------
 
 _REASONIX_TOOL_MAP = {
@@ -147,151 +158,91 @@ _REASONIX_TOOL_MAP = {
     "Grep": "grep",
 }
 
+# 子 agent 名单单源：novel-agent 各平台调度适配段与 Codex 调度说明共用
+# （新增执行 agent 只改这里 + EXEC_AGENT_SOPS，无需逐平台改文案）
+SUBAGENT_NAMES = (
+    "writer", "volume-planner", "chapter-planner", "prompt-crafter",
+    "anti-ai", "reader", "updater", "style-distiller",
+)
 
-def _convert_to_reasonix(text: str, run_as: str = "subagent", inline_sops=None) -> str:
-    """Claude Code agent frontmatter → Reasonix skill frontmatter。
+# agent → 专属 SOP 映射单源（三平台 deploy 与 Codex SOP 内联共用此契约）
+EXEC_AGENT_SOPS = {
+    "writer": ["writing-execution"],
+    "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
+    "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
+    "prompt-crafter": ["prompt-crafting", "prompt-audit"],
+    "anti-ai": ["anti-ai"],
+    "reader": ["reader-review"],
+    "updater": ["updater-archive", "updater-setting", "updater-rollback"],
+    "style-distiller": ["style-distill"],
+}
 
-    - frontmatter: 保留 name/description，tools→allowed-tools（Agent 丢弃，
-      role/react/memory/knowledge 丢弃），需要加载共享 SOP 的 agent 补 read_skill
-    - tools 映射: 已知名经 _REASONIX_TOOL_MAP 映射为 Reasonix 名，未知名原样保留
-    - body: agent 身份段 + 内联的专属 SOP 全文
-    - runAs: subagent（执行 agent）/ inline（调度者）
+# reasonix 需加载共享 SOP 的 agent（frontmatter 补 read_skill 工具）
+_READ_SKILL_AGENTS = ("volume-planner", "chapter-planner", "prompt-crafter", "updater")
+
+# 不进调度链的独立交互工具（各平台均按 inline skill 部署）
+STANDALONE_SKILLS = ("memory-recording", "roleplay-sandbox")
+
+# 各平台 novel-agent 调度适配段（{names} 注入 SUBAGENT_NAMES）
+_DISPATCH_SECTIONS = {
+    "reasonix": (
+        "\n\n## Reasonix 调度适配（本环境无 Agent 工具）\n"
+        "在 Reasonix 环境调度子 agent 用 `run_skill` 工具：\n"
+        "- `run_skill(name=\"<子agent名>\", arguments=\"{order 内容}\")` 调单个子 agent\n"
+        "- 子 agent 名即 .reasonix/skills/ 下的 skill 名（{names}）\n"
+        "- 子 agent 是 subagent 类型，run_skill 的 arguments 会作为它唯一的 task 输入\n"
+        "- 并发调度只读子 agent 可用 `parallel_tasks`；order 文件协议（status: DONE）不变\n"
+    ),
+    "zcode": (
+        "\n\n## ZCode 调度适配（本环境子 agent 即 skill）\n"
+        "在 ZCode 环境调度子 agent 用 `Agent` 工具：\n"
+        "- 子 agent 名即 `.zcode/skills/` 下的 skill 名（{names}）\n"
+        "- 用 Agent 工具按子 agent 名 spawn，把 order 文件内容作为它的任务输入\n"
+        "- 子 agent 是隔离上下文，只读 order 与指定文件；order 文件协议（status: DONE）不变\n"
+        "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+    ),
+    "dsh": (
+        "\n\n## DeepSeek Harness 调度适配（本环境子 agent 即 skill）\n"
+        "在 dsh 环境调度子 agent 用 `subagent` 工具：\n"
+        "- 子 agent 名即 `.dsh/skills/` 下的 skill 名（{names}）\n"
+        "- 子 agent 是隔离上下文，prompt 里要求它先调用 `skill(name=\"<子agent名>\")` "
+        "加载自身指令，再执行 order 文件任务\n"
+        "- 把 order 文件路径与任务要求写进 prompt；order 文件协议（status: DONE）不变\n"
+        "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+    ),
+}
+
+
+def _allowed_tools(data: dict, name: str, platform_key: str) -> list | None:
+    """agent frontmatter tools → 平台 allowed-tools 名单。dsh 无此字段返回 None。
+
+    Agent（调度工具）统一丢弃——子 agent 无调度权；reasonix 经 _REASONIX_TOOL_MAP
+    映射为平台工具名并给规划类 agent 补 read_skill（加载共享 SOP 用）。
     """
-    data, body = split_frontmatter(text)    # 单源解析（review #38：坏 split 已弃用）
-    if not data:
-        return text
-
-    name = str(data.get("name", "unknown")).strip()
-    desc = str(data.get("description", "")).strip().replace('"', "'")
+    if platform_key == "dsh":
+        return None
     tools_raw = str(data.get("tools", "") or "")
+    tool_map = _REASONIX_TOOL_MAP if platform_key == "reasonix" else {}
     allowed = []
     for t in tools_raw.split(","):
         t = t.strip()
         if not t or t == "Agent":
             continue
-        mapped = _REASONIX_TOOL_MAP.get(t, t)
+        mapped = tool_map.get(t, t)
         if mapped not in allowed:
             allowed.append(mapped)
-    if name in ("volume-planner", "chapter-planner", "prompt-crafter", "updater"):
-        if "read_skill" not in allowed:
-            allowed.append("read_skill")
-
-    fm = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: \"{desc}\"\n"
-        f"runAs: {run_as}\n"
-        f"allowed-tools: [{', '.join(allowed)}]\n"
-        f"---\n"
-    )
-
-    agent_body = body.strip()
-    if name == "novel-agent":
-        agent_body += (
-            "\n\n## Reasonix 调度适配（本环境无 Agent 工具）\n"
-            "在 Reasonix 环境调度子 agent 用 `run_skill` 工具：\n"
-            "- `run_skill(name=\"<子agent名>\", arguments=\"{order 内容}\")` 调单个子 agent\n"
-            "- 子 agent 名即 .reasonix/skills/ 下的 skill 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
-            "- 子 agent 是 subagent 类型，run_skill 的 arguments 会作为它唯一的 task 输入\n"
-            "- 并发调度只读子 agent 可用 `parallel_tasks`；order 文件协议（status: DONE）不变\n"
-        )
-    sop_sections = []
-    for sop in (inline_sops or []):
-        if sop and sop.exists():
-            sop_sections.append(
-                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
-            )
-    return fm + "\n" + agent_body + "\n".join(sop_sections)
+    if platform_key == "reasonix" and name in _READ_SKILL_AGENTS \
+            and "read_skill" not in allowed:
+        allowed.append("read_skill")
+    return allowed
 
 
-def _convert_inline_skill(text: str, name: str) -> str:
-    """纯正文 SOP → Reasonix inline skill。"""
-    desc = ""
-    for ln in text.split("\n"):
-        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
-            desc = ln.strip().lstrip("# ").strip()
-            break
-    fm = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: \"{desc or name}（由 awesome-novel 自动生成的 inline skill）\"\n"
-        f"runAs: inline\n"
-        f"---\n"
-    )
-    return fm + "\n" + text.strip()
+def _convert_agent_to_skill(text: str, platform_key: str, inline_sops=None) -> str:
+    """Claude Code agent frontmatter → inline-skill 平台（reasonix/zcode/dsh）skill。
 
-
-def deploy_reasonix_skills(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
-
-    仅 reasonix 平台调用（agents=None）。产物引用 platform.root/knowledge、memory。
-    """
-    if platform.key != "reasonix":
-        return
-    agents_dir = skill_home / "agents"
-    skills_dir = skill_home / "skills"
-    target = platform.skills_dir(project)
-    if target is None:
-        return
-    target.mkdir(parents=True, exist_ok=True)
-
-    exec_agents = {
-        "writer": ["writing-execution"],
-        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
-        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
-        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
-        "anti-ai": ["anti-ai"],
-        "reader": ["reader-review"],
-        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
-        "style-distiller": ["style-distill"],
-    }
-    for agent_name, sops in exec_agents.items():
-        agent_file = agents_dir / f"{agent_name}.md"
-        if not agent_file.exists():
-            continue
-        sop_files = [skills_dir / f"{s}.md" for s in sops]
-        body = _convert_to_reasonix(agent_file.read_text(encoding="utf-8"),
-                                    run_as="subagent", inline_sops=sop_files)
-        body = rewrite_refs(body, platform)
-        skill_dir = target / agent_name
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-    novel_file = agents_dir / "novel-agent.md"
-    if novel_file.exists():
-        body = _convert_to_reasonix(novel_file.read_text(encoding="utf-8"),
-                                    run_as="inline",
-                                    inline_sops=[skills_dir / "novel-dispatch.md"])
-        body = rewrite_refs(body, platform)
-        skill_dir = target / "novel-agent"
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-    for skill_name in ("memory-recording", "roleplay-sandbox"):
-        sf = skills_dir / f"{skill_name}.md"
-        if sf.exists():
-            body = _convert_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
-            body = rewrite_refs(body, platform)
-            skill_dir = target / skill_name
-            skill_dir.mkdir(parents=True, exist_ok=True)
-            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-
-# ---------------------------------------------------------------
-# ZCode skill 生成（agents + skills 源 → .zcode/skills/<name>/SKILL.md）
-# ---------------------------------------------------------------
-
-def _convert_to_zcode(text: str, inline_sops=None) -> str:
-    """Claude Code agent frontmatter → ZCode skill frontmatter。
-
-    ZCode 与 Claude Code 约定同源（目录 + SKILL.md，工具名一致），无项目级
-    agents 目录——agents 即 skills。转换要点：
-    - frontmatter: 保留 name/description，tools → allowed-tools（裸名原样，
-      与 ZCode 工具名一致；Agent 丢弃，子 agent 无调度权，与 reasonix 同规则；
-      ZCode skill 无 runAs 字段，subagent/inline 由调用方式区分）
-    - body: agent 身份段 + 内联的专属 SOP 全文
-    - novel-agent（入口调度者）追加 ZCode 调度适配段；其余为 subagent
+    - frontmatter: 保留 name/description；role/react/memory/knowledge 丢弃；
+      工具字段差异见 _allowed_tools（reasonix 另带 runAs：novel-agent=inline，其余 subagent）
+    - body: agent 身份段 + novel-agent 调度适配段 + 内联的专属 SOP 全文
     """
     data, body = split_frontmatter(text)    # 单源解析（review #38：坏 split 已弃用）
     if not data:
@@ -299,34 +250,26 @@ def _convert_to_zcode(text: str, inline_sops=None) -> str:
 
     name = str(data.get("name", "unknown")).strip()
     desc = str(data.get("description", "") or "").strip().replace('"', "'")
-    tools_raw = str(data.get("tools", "") or "")
-    allowed = []
-    for t in tools_raw.split(","):
-        t = t.strip()
-        if not t or t == "Agent":
-            continue
-        if t not in allowed:
-            allowed.append(t)
+    allowed = _allowed_tools(data, name, platform_key)
 
-    fm = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: \"{desc}\"\n"
-        f"allowed-tools: {', '.join(allowed)}\n"
-        f"---\n"
-    )
+    fm_lines = [
+        "---",
+        f"name: {name}",
+        f'description: "{desc}"',
+    ]
+    if platform_key == "reasonix":
+        fm_lines.append(f"runAs: {'inline' if name == 'novel-agent' else 'subagent'}")
+    if allowed is not None:
+        joined = ", ".join(allowed)
+        fm_lines.append(f"allowed-tools: [{joined}]" if platform_key == "reasonix"
+                        else f"allowed-tools: {joined}")
+    fm = "\n".join(fm_lines) + "\n---\n"
 
     agent_body = body.strip()
     if name == "novel-agent":
-        agent_body += (
-            "\n\n## ZCode 调度适配（本环境子 agent 即 skill）\n"
-            "在 ZCode 环境调度子 agent 用 `Agent` 工具：\n"
-            "- 子 agent 名即 `.zcode/skills/` 下的 skill 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
-            "- 用 Agent 工具按子 agent 名 spawn，把 order 文件内容作为它的任务输入\n"
-            "- 子 agent 是隔离上下文，只读 order 与指定文件；order 文件协议（status: DONE）不变\n"
-            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
-        )
+        # {names} 是唯一占位符；调度段文本含字面 `{order 内容}`，用 safe 替换防 str.format 报 KeyError
+        agent_body += _DISPATCH_SECTIONS[platform_key].replace(
+            "{names}", " / ".join(SUBAGENT_NAMES))
     sop_sections = []
     for sop in (inline_sops or []):
         if sop and sop.exists():
@@ -336,54 +279,52 @@ def _convert_to_zcode(text: str, inline_sops=None) -> str:
     return fm + "\n" + agent_body + "\n".join(sop_sections)
 
 
-def _convert_zcode_inline_skill(text: str, name: str) -> str:
-    """纯正文 SOP → ZCode inline skill（无 SOP 依赖的独立交互工具）。"""
+def _convert_standalone_skill(text: str, name: str, platform_key: str) -> str:
+    """纯正文 SOP → 平台 inline skill（不进调度链的独立交互工具）。"""
     desc = ""
     for ln in text.split("\n"):
         if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
             desc = ln.strip().lstrip("# ").strip()
             break
+    suffix = {
+        "reasonix": "（由 awesome-novel 自动生成的 inline skill）",
+        "zcode": "（由 awesome-novel 自动生成的 ZCode skill）",
+        "dsh": "（由 awesome-novel 自动生成的 dsh skill）",
+    }[platform_key]
     fm = (
         f"---\n"
         f"name: {name}\n"
-        f"description: \"{desc or name}（由 awesome-novel 自动生成的 ZCode skill）\"\n"
-        f"---\n"
+        f"description: \"{desc or name}{suffix}\"\n"
     )
+    if platform_key == "reasonix":
+        fm += "runAs: inline\n"
+    fm += "---\n"
     return fm + "\n" + text.strip()
 
 
-def deploy_zcode_skills(project: Path, skill_home: Path, platform: Platform) -> None:
+def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform) -> bool:
     """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
 
-    仅 zcode 平台调用（agents=None）。ZCode 无项目级 agents 目录，agents 即 skills，
-    产物与 reasonix 同构（9 个 agent + memory-recording/roleplay-sandbox 独立工具）。
+    仅 reasonix/zcode/dsh 调用（agents=None，agents 即 skills）；其余平台返回 False。
+    产物 = 9 个 agent（EXEC_AGENT_SOPS 8 执行 + novel-agent 内联 novel-dispatch）
+    + STANDALONE_SKILLS 独立工具，frontmatter/调度适配段差异见差异表注释。
     """
-    if platform.key != "zcode":
-        return
+    if platform.key not in _DISPATCH_SECTIONS:
+        return False
     agents_dir = skill_home / "agents"
     skills_dir = skill_home / "skills"
     target = platform.skills_dir(project)
     if target is None:
-        return
+        return False
     target.mkdir(parents=True, exist_ok=True)
 
-    exec_agents = {
-        "writer": ["writing-execution"],
-        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
-        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
-        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
-        "anti-ai": ["anti-ai"],
-        "reader": ["reader-review"],
-        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
-        "style-distiller": ["style-distill"],
-    }
-    for agent_name, sops in exec_agents.items():
+    for agent_name, sops in EXEC_AGENT_SOPS.items():
         agent_file = agents_dir / f"{agent_name}.md"
         if not agent_file.exists():
             continue
         sop_files = [skills_dir / f"{s}.md" for s in sops]
-        body = _convert_to_zcode(agent_file.read_text(encoding="utf-8"),
-                                 inline_sops=sop_files)
+        body = _convert_agent_to_skill(agent_file.read_text(encoding="utf-8"),
+                                       platform.key, inline_sops=sop_files)
         body = rewrite_refs(body, platform)
         skill_dir = target / agent_name
         skill_dir.mkdir(parents=True, exist_ok=True)
@@ -391,142 +332,24 @@ def deploy_zcode_skills(project: Path, skill_home: Path, platform: Platform) -> 
 
     novel_file = agents_dir / "novel-agent.md"
     if novel_file.exists():
-        body = _convert_to_zcode(novel_file.read_text(encoding="utf-8"),
-                                 inline_sops=[skills_dir / "novel-dispatch.md"])
+        body = _convert_agent_to_skill(novel_file.read_text(encoding="utf-8"),
+                                       platform.key,
+                                       inline_sops=[skills_dir / "novel-dispatch.md"])
         body = rewrite_refs(body, platform)
         skill_dir = target / "novel-agent"
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
 
-    for skill_name in ("memory-recording", "roleplay-sandbox"):
+    for skill_name in STANDALONE_SKILLS:
         sf = skills_dir / f"{skill_name}.md"
         if sf.exists():
-            body = _convert_zcode_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
+            body = _convert_standalone_skill(sf.read_text(encoding="utf-8"), skill_name,
+                                             platform.key)
             body = rewrite_refs(body, platform)
             skill_dir = target / skill_name
             skill_dir.mkdir(parents=True, exist_ok=True)
             (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-
-# ---------------------------------------------------------------
-# DeepSeek Harness（dsh）skill 生成（agents + skills 源 → .dsh/skills/<name>/SKILL.md）
-# ---------------------------------------------------------------
-
-def _convert_to_dsh(text: str, inline_sops=None) -> str:
-    """Claude Code agent frontmatter → dsh skill frontmatter。
-
-    dsh 与 ZCode 同为「agents 即 skills」：无项目级 agents 目录，skill 根为
-    <project>/.dsh/skills/<name>/SKILL.md（dsh 自动发现）。差异：
-    - frontmatter 只保留 name/description——dsh 不识别 allowed-tools/runAs，
-      其余键仅进 metadata 不参与加载，产物保持干净
-    - body: agent 身份段 + 内联的专属 SOP 全文
-    - novel-agent（入口调度者）追加 dsh 调度适配段；其余为 subagent
-    """
-    data, body = split_frontmatter(text)    # 单源解析（review #38：坏 split 已弃用）
-    if not data:
-        return text
-
-    name = str(data.get("name", "unknown")).strip()
-    desc = str(data.get("description", "") or "").strip().replace('"', "'")
-
-    fm = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: \"{desc}\"\n"
-        f"---\n"
-    )
-
-    agent_body = body.strip()
-    if name == "novel-agent":
-        agent_body += (
-            "\n\n## DeepSeek Harness 调度适配（本环境子 agent 即 skill）\n"
-            "在 dsh 环境调度子 agent 用 `subagent` 工具：\n"
-            "- 子 agent 名即 `.dsh/skills/` 下的 skill 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
-            "- 子 agent 是隔离上下文，prompt 里要求它先调用 `skill(name=\"<子agent名>\")` "
-            "加载自身指令，再执行 order 文件任务\n"
-            "- 把 order 文件路径与任务要求写进 prompt；order 文件协议（status: DONE）不变\n"
-            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
-        )
-    sop_sections = []
-    for sop in (inline_sops or []):
-        if sop and sop.exists():
-            sop_sections.append(
-                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
-            )
-    return fm + "\n" + agent_body + "\n".join(sop_sections)
-
-
-def _convert_dsh_inline_skill(text: str, name: str) -> str:
-    """纯正文 SOP → dsh inline skill（无 SOP 依赖的独立交互工具）。"""
-    desc = ""
-    for ln in text.split("\n"):
-        if ln.strip().startswith("# ") and not ln.strip().startswith("## "):
-            desc = ln.strip().lstrip("# ").strip()
-            break
-    fm = (
-        f"---\n"
-        f"name: {name}\n"
-        f"description: \"{desc or name}（由 awesome-novel 自动生成的 dsh skill）\"\n"
-        f"---\n"
-    )
-    return fm + "\n" + text.strip()
-
-
-def deploy_dsh_skills(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
-
-    仅 dsh 平台调用（agents=None）。产物与 reasonix/zcode 同构
-    （9 个 agent + memory-recording/roleplay-sandbox 独立工具）。
-    """
-    if platform.key != "dsh":
-        return
-    agents_dir = skill_home / "agents"
-    skills_dir = skill_home / "skills"
-    target = platform.skills_dir(project)
-    if target is None:
-        return
-    target.mkdir(parents=True, exist_ok=True)
-
-    exec_agents = {
-        "writer": ["writing-execution"],
-        "volume-planner": ["volume-arc", "volume-direction", "volume-writing"],
-        "chapter-planner": ["chapter-reference", "chapter-outline", "chapter-verify"],
-        "prompt-crafter": ["prompt-crafting", "prompt-audit"],
-        "anti-ai": ["anti-ai"],
-        "reader": ["reader-review"],
-        "updater": ["updater-archive", "updater-setting", "updater-rollback"],
-        "style-distiller": ["style-distill"],
-    }
-    for agent_name, sops in exec_agents.items():
-        agent_file = agents_dir / f"{agent_name}.md"
-        if not agent_file.exists():
-            continue
-        sop_files = [skills_dir / f"{s}.md" for s in sops]
-        body = _convert_to_dsh(agent_file.read_text(encoding="utf-8"),
-                               inline_sops=sop_files)
-        body = rewrite_refs(body, platform)
-        skill_dir = target / agent_name
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-    novel_file = agents_dir / "novel-agent.md"
-    if novel_file.exists():
-        body = _convert_to_dsh(novel_file.read_text(encoding="utf-8"),
-                               inline_sops=[skills_dir / "novel-dispatch.md"])
-        body = rewrite_refs(body, platform)
-        skill_dir = target / "novel-agent"
-        skill_dir.mkdir(parents=True, exist_ok=True)
-        (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-
-    for skill_name in ("memory-recording", "roleplay-sandbox"):
-        sf = skills_dir / f"{skill_name}.md"
-        if sf.exists():
-            body = _convert_dsh_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
-            body = rewrite_refs(body, platform)
-            skill_dir = target / skill_name
-            skill_dir.mkdir(parents=True, exist_ok=True)
-            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+    return True
 
 
 # ---------------------------------------------------------------
@@ -686,8 +509,7 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
         body += (
             "\n\n## Codex 调度适配（本环境无 Agent 工具）\n"
             "在 Codex 环境调度子 agent 用 `spawn_agent` 工具：\n"
-            "- 子 agent 名即 `.codex/agents/` 下的 TOML 名（writer / volume-planner / "
-            "chapter-planner / prompt-crafter / anti-ai / reader / updater / style-distiller）\n"
+            f"- 子 agent 名即 `.codex/agents/` 下的 TOML 名（{' / '.join(SUBAGENT_NAMES)}）\n"
             "- 把 order 文件内容作为任务消息传给子 agent；order 文件协议（status: DONE）不变\n"
             "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
             "- 你是本项目唯一调度者：spawn 后留意 agent 树，子 agent 若尝试再派生，立即 interrupt 并按规范重派\n"
