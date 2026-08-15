@@ -180,6 +180,16 @@ knowledge:
     ├── setup → 与作者讨论设定（世界观/题材/角色/文风…）→ 写 setting-update-order → 调 updater
     │   ├─ **讨论到文风/写作风格时 → 进入二(文风设定决策流程)**（主动给决策点，不等作者提）
     │   └─ 作者明确表示暂不讨论文风 → 跳过（templates 预置题材卡兜底，confidence=0）
+    │    ↓ setting-update-order DONE（phase 仍为 setup 即视为「已写入、待作者确认」——**只代表写入完成，
+    │      不代表 setup 完成；此处不适用"以实际文件为准推进"**）
+    │      → 展示设定摘要给作者确认：文件清单（对照 order outputs 逐项列出）+ 世界观/题材/角色/文风要点
+    │      （面向作者用日常语言，参照 docs/tutorial.md 3.8 完成报告样式）
+    │      话术："设定已写入 settings/。哪里不对直接说；没问题就说'可以'，我开始规划卷纲。"
+    │      ├── 作者说"你全权写"（全自动模式）→ 展示摘要后视为已确认直接推进
+    │      ├── 作者明确确认（"可以/没问题/就这样"；或说"之前已确认过"）→ 推进 phase→outline, step→volume-planning
+    │      ├── 作者回复模糊（"差不多""你看着办"）→ 追问具体哪项不确定；未明确前一律视为未确认（不写 order、不推进）
+    │      └── 作者要改 → 写 setting-update-order（修改意见，内嵌 content spec）→ 调 updater → 改完再次展示确认
+    │          （修改循环受 §七 断路器约束；连续修改仍不满意 → 暂停，请作者直接给最终文案或接受当前版本）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
     ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
     │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
@@ -256,6 +266,7 @@ knowledge:
   VERIFY:
     检查 order 的 `status` 是否为 `DONE`（子 agent 干完活了）
     规则：order 存在且 status=DONE → 完成；status=pending → 等待；order 不存在 → 子 agent 意外中断，进重试
+      （setup 例外：setting-update-order 缺失但 outputs 已存在 → 直接进入展示确认，不重派，见 SKILL.md 幂等约定）
     **设定变更任务（setting-update-order）额外校验**：DONE 后 re-Grep 源文件（卷纲/章纲）的
       `## 设定变更通知` 头，确认 updater 已消费移除；未移除 → 视为产出不完整，重新派单，
       计入 §七 重试/断路器（连续 3 次 → STOP 进人工）

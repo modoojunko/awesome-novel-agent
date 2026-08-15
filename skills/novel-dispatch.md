@@ -76,6 +76,7 @@ outputs:
 
 | 阶段 | 已完成信号 | 判断 |
 |------|-----------|------|
+| setup | `setting-update-order` DONE 且 outputs 非空 | 不推进 phase——展示设定摘要等作者确认 |
 | volume-planning | `章节状态 > volume-planning` | 成立 → 跳过 |
 | chapter-planning | `章节状态 > chapter-planning` | 成立 → 跳过 |
 | prompt-crafting | `章节状态 > prompt-crafting` | 成立 → 跳过 |
