@@ -35,9 +35,7 @@ from platforms import (
     convert_to_opencode,
     detect_platform,
     deploy_codex_skills,
-    deploy_dsh_skills,
-    deploy_reasonix_skills,
-    deploy_zcode_skills,
+    deploy_inline_skills,
     ensure_yaml,
     resolve_skill_home,
     rewrite_refs,
@@ -364,20 +362,10 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
 
 
 def sync_skills(project_path: Path, platform: Platform) -> int:
-    if platform.key == "reasonix":
-        deploy_reasonix_skills(project_path, SKILL_HOME, platform)
+    if platform.key in ("reasonix", "zcode", "dsh"):
+        deploy_inline_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
-        print(f"  [OK] reasonix skills: {n} 个 SKILL.md 已重新生成")
-        return n
-    if platform.key == "zcode":
-        deploy_zcode_skills(project_path, SKILL_HOME, platform)
-        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
-        print(f"  [OK] zcode skills: {n} 个 SKILL.md 已重新生成")
-        return n
-    if platform.key == "dsh":
-        deploy_dsh_skills(project_path, SKILL_HOME, platform)
-        n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
-        print(f"  [OK] dsh skills: {n} 个 SKILL.md 已重新生成")
+        print(f"  [OK] {platform.key} skills: {n} 个 SKILL.md 已重新生成")
         return n
     if platform.key == "codex":
         deploy_codex_skills(project_path, SKILL_HOME, platform)

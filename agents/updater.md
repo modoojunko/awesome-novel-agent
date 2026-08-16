@@ -29,6 +29,12 @@ knowledge:
     description: 写作记忆格式规范（验证条目格式）
   - path: .claude/knowledge/permanent-memory.md
     description: 永久记忆（晋升/降级维护）
+  - path: .claude/knowledge/world-setup-style.md
+    description: 世界观设定指南（聊三项：地理/政治/规则，写完过自检）
+  - path: .claude/knowledge/genre-style.md
+    description: 题材设定指南（五字段逐个聊，写完过自检）
+  - path: .claude/knowledge/character-setting-style.md
+    description: 角色设定指南（基础信息 + 认知 6 层模型，反派模板经它引用）
 ---
 
 # updater
@@ -63,7 +69,7 @@ knowledge:
     - 读所有 memory 文件，检查条目格式（必填字段缺失 → 补或删）
     - 条目查重（相同结论+相同场景 → 去重）
     - 超过 50 条的文件执行压缩（保留最近 30 条 + 摘要旧条目）
-    - 永久记忆晋升（use_count >= 4 的条目 → 移至 knowledge/permanent-memory.md）
+    - 永久记忆晋升（use_count >= 4 的条目 → 移至 .claude/knowledge/permanent-memory.md）
     - 永久记忆降级（连续 3 次 sweep 未使用 → 展示给作者确认后删除）
     - 询问作者"还有要记的吗？"→ 有则追加
   - 更新 `.agent/status.md` → 推进进度标记

@@ -280,7 +280,7 @@ ______ 不会 ______
 | 通用反AI | anti-ai/common-rules.md | 疲劳词阈值 + 句式规则 + 元叙事禁止 |
 | 题材反AI | anti-ai/{genre}.md（如存在） | 题材正反例 |
 
-**场景写作方法论注入：** 根据场景原材料识别的场景类型（可选值：dialogue / fight / environment / inner-mono / transition / group-scene），从 `knowledge/scene-craft/` 读取对应文件。**必须经过上下文过滤**——结合本章的角色状态、信息差、情绪走向改写方法论，不能生搬硬套。**每个场景类型只抽取 1-2 条，不要求全部覆盖。**
+**场景写作方法论注入：** 根据场景原材料识别的场景类型（可选值：dialogue / fight / environment / inner-mono / transition / group-scene），从 `.claude/knowledge/scene-craft/` 读取对应文件。**必须经过上下文过滤**——结合本章的角色状态、信息差、情绪走向改写方法论，不能生搬硬套。**每个场景类型只抽取 1-2 条，不要求全部覆盖。**
 
 **第一章特殊处理：** 视角/描写追加"前三段以人物动作作为开篇第一句，不堆砌多层环境描写"；第一个场景强制高权重。
 
@@ -304,7 +304,7 @@ ______ 不会 ______
 | 案例 | scene-craft 方法论（四步转化） | 角色设定, 信息差关系 |
 | 输入·场景原材料 | 章纲 场景卡（场景三要素+信息差关系） | — |
 | 输出·约束红线 | 章纲 memo, 作者补充, 章纲 冲突阶梯 | — |
-| 输出·写作规范 | genre-example/, anti-ai/, knowledge/scene-craft/ | 场景类型识别结果 |
+| 输出·写作规范 | genre-example.md, anti-ai.md, .claude/knowledge/scene-craft/ | 场景类型识别结果 |
 | 输出·质感要求 | 章纲 memo, 作者补充 | writing-style.md |
 
 

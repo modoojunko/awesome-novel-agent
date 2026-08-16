@@ -10,3 +10,5 @@ video-script-input.md
 .superpowers/
 .mimosa/
 .zcode/
+# 工作交接文档（跨会话手记，不入库）
+handoff.md

@@ -232,7 +232,7 @@ Step 6: 产出推演记录
 
 ## Step 6: 产出推演记录
 
-按 `knowledge/format-specs/roleplay-sandbox-style.md` 的格式，将完整的推演过程写入：
+按 `.claude/knowledge/roleplay-sandbox-style.md` 的格式，将完整的推演过程写入：
 
 `sandbox/vol-{N}-ch-{M}/推演{序号}.md`
 

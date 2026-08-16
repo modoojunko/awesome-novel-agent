@@ -95,7 +95,7 @@ knowledge:
     执行全流程：Step 1(读取输入) → Step 2(结构填充+权重+稀疏+四步逻辑) → Step 3(冲突检测) → Step 4(验收自检)
 
   OBSERVE:
-    读什么？← 三(Input Sources): order + chapter.md + knowledge/anti-ai.md
+    读什么？← 三(Input Sources): order + chapter.md + .claude/knowledge/anti-ai.md
     用什么读？← 五(工具): Read → chapters/, .claude/knowledge/
 
   THINK:

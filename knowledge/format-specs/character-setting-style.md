@@ -1,7 +1,7 @@
 # 角色设定指南
 
 > 先填基本信息，再逐层聊认知6层模型。聊完写进 `settings/character-setting/<id>.md`。
-> 反派设定参考 `knowledge/character-craft/villain-types.md`——三类高智商反派模板（棋手型/殉道者型/拟态者型）。
+> 反派设定参考 `.claude/knowledge/character-craft/villain-types.md`——三类高智商反派模板（棋手型/殉道者型/拟态者型）。
 > 6 层从第 1 层开始层层向下影响。1-3 层务虚（决定为什么做），4-6 层务实（决定怎么做）。
 
 ---
