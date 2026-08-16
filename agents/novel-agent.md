@@ -174,6 +174,7 @@ knowledge:
       注意：dispatch 前**不**改章节状态（dispatch 进行中的状态由 `current_step` 表达）。
 
   THINK:
+    （调度表权威源：skills/novel-dispatch.md——本树是其执行细则，order 类型清单以该表为准）
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     作者说"修改文风设定/更新文风/换个风格/按这个风格写/文风不对"（任何 phase）？→ 二(文风设定决策流程)
     当前 phase + current_step？

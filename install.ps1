@@ -16,7 +16,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("claude-code", "opencode", "codex", "zcode", "dsh")]
+    [ValidateSet("claude-code", "opencode", "codex", "zcode", "dsh", "hermes", "openclaw", "deepseek-tui")]
     [string]$Platform
 )
 
@@ -25,6 +25,15 @@ $HOME_DIR = $env:USERPROFILE
 switch ($Platform) {
     "claude-code" {
         $DEST_DIR = "$HOME_DIR\.claude\skills\awesome-novel"
+    }
+    "hermes" {
+        $DEST_DIR = "$HOME_DIR\.hermes\skills\awesome-novel"
+    }
+    "openclaw" {
+        $DEST_DIR = "$HOME_DIR\.openclaw\skills\awesome-novel"
+    }
+    "deepseek-tui" {
+        $DEST_DIR = "$HOME_DIR\.deepseek\skills\awesome-novel"
     }
     "opencode" {
         $DEST_DIR = "$HOME_DIR\.config\opencode\skills\awesome-novel"
@@ -80,7 +89,7 @@ foreach ($item in $INCLUDES) {
     }
 }
 
-# memory/ 含 writer-style 等静态参考素材（可选）
+# memory/ 已废弃（writer-style 已迁至 knowledge/format-specs/）；保留守卫兼容旧仓库
 $memoryDir = Join-Path $SCRIPT_DIR "memory"
 if (Test-Path $memoryDir) {
     Copy-Item -Recurse $memoryDir "$DEST_DIR\"

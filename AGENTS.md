@@ -76,7 +76,7 @@ CI：`.github/workflows/static.yml`，push main 时运行语法/agent/规则检�
 ## 编码风格与命名约定
 
 - Python：snake_case 文件名；仅标准库；入口脚本顶部用 `reconfigure(encoding="utf-8")` 防 Windows 中文乱码；docstring 写明用法与退出码。
-- Markdown：中文正文、UTF-8；frontmatter 引用路径相对仓库根解析。
+- Markdown：中文正文、UTF-8；frontmatter 与正文中引用的项目内文件一律写**部署后路径**——knowledge 用 `.claude/knowledge/...` 基座（format-specs 拍平/合并后仓库相对路径会断链，check-agents.py 按部署布局校验），skills/ 引用用 `skills/xxx.md`（仓库内路径，必存在），settings/ 等项目生成文件用相对项目根的路径。部署后路径由 init.py 的 rewrite_refs 按平台改写前缀。
 - 命名：agent 定义 `{role}-agent.md`；章节 `vol-{N}-ch-{M}.md`、卷纲 `volume-{N}.md`；知识文件按 `knowledge/<分类>/<题材或主题>.md` 组织。
 - 改动贴合项目定位（AI 辅助小说创作），不引入无关功能或依赖。
 

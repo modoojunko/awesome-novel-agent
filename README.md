@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode</em>
+  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness</em>
 </p>
 
 <p align="center">
@@ -158,6 +158,8 @@ novel-agent（总指挥 — 顶层入口，由 @novel-agent 加载）
   ├─ review 阶段 → 调度 reader（深度评审，可选）
   └─ archive 阶段 → 调度 updater（归档 + lore-keeping）
 ```
+
+> 上图是用户视角主线；完整调度表（含文风重蒸馏、归档后重写、记忆兜底等）见 `skills/novel-dispatch.md`。
 
 novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其职，完成后把 order 标记为 `status: DONE` 通知完成。
 

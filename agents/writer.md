@@ -11,6 +11,10 @@ skills:
 knowledge:
   - path: .claude/knowledge/chapter-quality-checklist.md
     description: 正文验收清单
+  - path: .claude/knowledge/writing-base.md
+    description: 写作基底（写作 sub-agent 动笔前先读，与基底冲突时以基底为准）
+  - path: settings/genre-setting.md
+    description: 题材设定（写前获取题材设定）
 ---
 
 # writer
