@@ -85,7 +85,7 @@ CI：`.github/workflows/static.yml`，push main 时运行语法/agent/规则检�
 - 无第三方测试框架；`tools/test_platforms.py` 自写断言，stdout 打印 `ok/FAIL`，非 0 退出码表示失败。
 - 测试函数以 `test_` 开头；E2E 用临时目录验证 init/sync 在 claude/opencode/reasonix/codex/zcode/dsh 六平台的输出。
 - 涉及 agent 定义跑 `check-agents.py`，涉及反 AI 规则跑 `check-conflicts.py`。
-- 行为变更遵循先红后绿：先加失败用例，再实现（见 `docs/superpowers/` 计划）。
+- 行为变更遵循先红后绿：先加失败用例，再实现。
 
 ## 提交与 PR 指南
 
