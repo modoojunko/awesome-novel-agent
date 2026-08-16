@@ -260,7 +260,7 @@
 | "字数不重要" | 没有目标写起来没边 | "不求精确，2500 左右大概的量，太长或太短下次调整" |
 | "你就帮我规划吧" | 全甩给AI，失去作者意图 | "我先给个建议版本，然后你调整——这是你的章纲，不是我的" |
 
-**产出：** 大纲概要（outline.summary，1 句概括）+ 大纲关键点（outline.key_points，条数按字数倒推法——默认 2500 字 ≈ 5 条，每条覆盖 2-3 分钟故事时间 + 功能类型）+ 大纲出场角色（outline.characters）+ 大纲场景地点（outline.location）+ 大纲时间（outline.time）+ 大纲视角（outline.pov，默认第一主角有限POV）+ 读者获得（micro_payoffs，每章至少1个）+ 字数目标 + 角色信息状态（knowledge_state）。
+**产出：** 大纲概要（outline.summary，1 句概括）+ 大纲关键点（outline.key_points，条数按字数倒推法——默认 2500 字 ≈ 5 条，每条覆盖 2-3 分钟故事时间 + 功能类型）+ 大纲出场角色（outline.characters）+ 大纲场景地点（outline.location）+ 大纲时间（outline.time）+ 大纲视角（outline.pov，本章 POV 角色——在设定视角类型 settings/writing-style.md narrative.perspective 内选择，默认第一主角有限 POV）+ 读者获得（micro_payoffs，每章至少1个）+ 字数目标 + 角色信息状态（knowledge_state）。
 
 > 关键点用 `[功能类型]` 标注功能（推进剧情/造悬念/过渡），有对话的加 `[对话]`：`[推进剧情·对话]`、`[造悬念]`、`[过渡]`。
 
