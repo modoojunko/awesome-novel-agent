@@ -634,8 +634,9 @@ def test_install_ps1_fresh_home():
                 cwd=str(TOOLS.parent), env=env)
         check("ps1 fresh home install exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         check("ps1 输出含安装完成", "安装完成" in r.stdout, r.stdout[-300:])
-        # Linux pwsh 下反斜杠是字面文件名（Windows 语义等价：$HOME\.claude\skills\awesome-novel）
-        dest = Path(str(fake_home) + r"\.claude\skills\awesome-novel")
+        # install.ps1 用 Join-Path 拼接：Windows 落 $HOME\.claude\skills\awesome-novel，
+        # Linux pwsh 落 $USERPROFILE/.claude/skills/awesome-novel（真实嵌套目录）
+        dest = fake_home / ".claude" / "skills" / "awesome-novel"
         check("ps1 fresh home SKILL.md 存在", (dest / "SKILL.md").exists())
         check("ps1 fresh home agents 存在", (dest / "agents").is_dir())
 
