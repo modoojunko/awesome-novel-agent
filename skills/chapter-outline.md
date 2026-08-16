@@ -136,7 +136,7 @@ POV 确定后进入拆场景卡（e），场景卡的三段锚点以此 POV 角�
 
 **h. Emotional Design（完善）** — 按 §四(情绪设计) 填充情绪细节：mood_progression（已在 a 完成）、intensity_peak、intensity_level、emotional_hook、micro_payoffs。
 
-**i. Hooks 操作** — 写入本章的钩子操作（埋/推进/收束）到 `payoff_plan`。参考 `.claude/knowledge/plot-craft/hook-techniques.md` 中的三种钩子设计手法（认知错位/信息差/倒计时）。不读写全局 hooks.md——章级钩子真相源在各 chapter.md 的 `payoff_plan` 字段，角色级钩子真相源在 `settings/character-setting/*.md` 的 hooks 字段。
+**i. Hooks 操作** — 写入本章的钩子操作（埋/推进/收束）到 `payoff_plan`。参考 `.claude/knowledge/plot-craft/hook-techniques.md` 中的三种钩子设计手法（认知错位/信息差/倒计时）。章级钩子真相源在各 chapter.md 的 `payoff_plan` 字段，角色级钩子真相源在 `settings/character-setting/*.md` 的 hooks 字段。
 
 **j. 设变通知（可选）** — 规划/校准过程中发现的设定变更需求。用于通知 novel-agent 调度 updater。按需在章纲末尾追加：
 

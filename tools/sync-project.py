@@ -31,14 +31,12 @@ from pathlib import Path
 
 from platforms import (
     Platform,
-    convert_to_codex,
-    convert_to_opencode,
+    convert_agent_to_platform,
     detect_platform,
     deploy_codex_skills,
     deploy_inline_skills,
     ensure_yaml,
     resolve_skill_home,
-    rewrite_refs,
 )
 
 for s in (sys.stdin, sys.stdout, sys.stderr):
@@ -265,8 +263,8 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
             rel = item.relative_to(src_dir)
             target = dst_base / rel
             if name == "agents" and platform.key == "opencode":
-                expected = convert_to_opencode(item.read_text(encoding="utf-8"))
-                expected = rewrite_refs(expected, platform)
+                expected = convert_agent_to_platform(item.read_text(encoding="utf-8"),
+                                                     platform)
                 if not target.exists() or target.read_text(encoding="utf-8") != expected:
                     changed.append(f"{name}/{rel}")
             else:
@@ -324,29 +322,17 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
         print(f"  [i] {platform.label} 平台无 agents 目录（agents 即 skills）")
         return 0
     target.mkdir(parents=True, exist_ok=True)
-    if platform.key == "opencode":
-        # opencode agents 是转换产物（permission: 格式 + 引用改写），与 init 保持一致
+    if platform.key in ("opencode", "codex"):
+        # 转换产物（opencode: permission 格式 + 引用改写；codex: TOML），
+        # 转换逻辑单源见 platforms.convert_agent_to_platform（与 init.deploy_agents 一致）
         count = 0
         for item in sorted(AGENT_DIR.rglob("*.md")):
             if item.name == ".gitkeep":
                 continue
             rel = item.relative_to(AGENT_DIR)
-            dest = target / rel
-            content = convert_to_opencode(item.read_text(encoding="utf-8"))
-            content = rewrite_refs(content, platform)
-            if dest.exists() and dest.read_text(encoding="utf-8") == content:
-                continue
-            dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(content, encoding="utf-8")
-            count += 1
-    elif platform.key == "codex":
-        # codex agents 是转换产物（.codex/agents/*.toml），与 init 保持一致
-        count = 0
-        for item in sorted(AGENT_DIR.rglob("*.md")):
-            if item.name == ".gitkeep":
-                continue
-            content = convert_to_codex(item.read_text(encoding="utf-8"), SKILL_HOME)
-            dest = target / (item.stem + ".toml")
+            dest = target / (item.stem + ".toml") if platform.key == "codex" else target / rel
+            content = convert_agent_to_platform(item.read_text(encoding="utf-8"),
+                                                platform, SKILL_HOME)
             if dest.exists() and dest.read_text(encoding="utf-8") == content:
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
@@ -448,10 +434,12 @@ def sync_scaffold(project: Path, platform: Platform) -> int:
     if not src.exists():
         return 0
     try:
-        from init import _rewrite_template_refs
+        from init import _GENERATED_SCAFFOLD, _rewrite_template_refs
     except ImportError:
+        _GENERATED_SCAFFOLD = None
         _rewrite_template_refs = None
-    generated = {"CLAUDE.md", "AGENTS.md", "AGENTS.codex.md"}
+    generated = _GENERATED_SCAFFOLD if _GENERATED_SCAFFOLD is not None \
+        else {"CLAUDE.md", "AGENTS.md", "AGENTS.codex.md"}
     status_tpl = src / ".agent" / "status.md"
     status_ver = None
     if status_tpl.is_file():

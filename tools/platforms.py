@@ -413,6 +413,23 @@ def convert_to_opencode(text: str) -> str:
     return "---" + new_fm + "---" + body
 
 
+def convert_agent_to_platform(text: str, platform: Platform,
+                              skill_home: Path | None = None) -> str:
+    """agent 源内容 → 平台部署内容（init.deploy_agents / sync.sync_agents / find_changes 共用单份逻辑）。
+
+    - opencode: frontmatter → permission 格式 + 引用改写
+    - codex: → TOML（SOP 内联需 skill_home；convert_to_codex 内部已含引用改写）
+    - 其余平台（claude）: 原样（纯复制）
+    """
+    if platform.key == "opencode":
+        return rewrite_refs(convert_to_opencode(text), platform)
+    if platform.key == "codex":
+        if skill_home is None:
+            raise ValueError("codex 平台 agent 转换需要 skill_home（SOP 内联）")
+        return convert_to_codex(text, skill_home)
+    return text
+
+
 # ---------------------------------------------------------------
 # Codex agent 转换（Claude Code agent frontmatter → Codex 自定义 agent TOML）
 # ---------------------------------------------------------------

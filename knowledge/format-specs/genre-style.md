@@ -290,7 +290,7 @@ xianxia — 东方仙侠
 
 | 字段 | 谁用 | 怎么用 |
 |------|------|--------|
-| 选定类型 | `prompt-crafter agent` 组装提示词 | 读 genre_profile，去 `.claude/knowledge/genre-example.md` 取 `prompt_segment` 注入提示词 |
+| 选定类型 | `prompt-crafter agent` 组装提示词 | 读 settings/genre-setting.md 的选定类型，去 `.claude/knowledge/genre-example.md` 取 `prompt_segment` 注入提示词 |
 | 满足类型 | `chapter-planner agent` 方向提案 | 本章提案必须兑现至少 1 种满足类型，一段不兑现=读者白等一章 |
 | 节奏倾向 | `chapter-planner agent` 方向提案 | 控制连续同类型章节数（比如"行动偏多"也不能连续 3 章全是高潮，读者绷不住） |
 | 张力周期 | `updater-archive skill` 滑动窗口审视 | 超过张力周期上限还没小高潮 → 提醒作者"节奏可能有风险" |
