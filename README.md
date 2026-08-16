@@ -92,7 +92,7 @@ AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-agent> 下载
 | ZCode | `~/.zcode/skills/awesome-novel/` |
 | DeepSeek Harness | `~/.dsh/skills/awesome-novel/` |
 
-看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh / install.ps1 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
 
 **Reasonix：**
 
