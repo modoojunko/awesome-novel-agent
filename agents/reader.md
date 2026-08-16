@@ -31,6 +31,8 @@ knowledge:
     description: 场景写作方法论索引（维度 10 检查时对照注入的方法论）
   - path: .claude/knowledge/plot-craft/opening-hooks.md
     description: 开篇钩子方法论（维度 11 首章留存力检查时对照）
+  - path: .claude/knowledge/author-communication.md
+    description: 作者沟通用语规范（反馈对作者用大白话，不写评审报告腔）
 ---
 
 # reader

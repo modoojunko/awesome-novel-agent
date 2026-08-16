@@ -19,6 +19,8 @@ knowledge:
     description: 蒸馏风格卡格式规范（frontmatter schema + 9 维度）
   - path: .claude/knowledge/style-distill/
     description: feature-extract 方法论模板目录
+  - path: .claude/knowledge/author-communication.md
+    description: 作者沟通用语规范（作者画像用作者语言，禁内部词）
 ---
 
 # style-distiller
