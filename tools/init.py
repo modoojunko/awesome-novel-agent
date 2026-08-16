@@ -20,7 +20,7 @@ from pathlib import Path
 
 from platforms import (
     Platform,
-    convert_to_opencode,
+    convert_agent_to_platform,
     detect_platform,
     deploy_codex_agents,
     deploy_codex_skills,
@@ -346,8 +346,7 @@ def deploy_agents(project_path: Path, platform: Platform):
             dest.parent.mkdir(parents=True, exist_ok=True)
             content = item.read_text(encoding="utf-8")
             if is_opencode:
-                content = convert_to_opencode(content)
-                content = rewrite_refs(content, platform)
+                content = convert_agent_to_platform(content, platform)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
 

@@ -11,10 +11,13 @@
 
 用法: python tools/check-version.py
 返回码 0 = 一致，1 = 有漂移（CI 用）。仅标准库。
+
+测试注入：NOVEL_REPO_ROOT 指向迷你仓库目录（test_platforms 构造漂移场景用）。
 """
 
 from __future__ import annotations  # str | None 注解在 Python 3.9 下延迟求值
 
+import os
 import re
 import sys
 
@@ -24,7 +27,7 @@ from style_common import force_utf8
 
 force_utf8()
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(os.environ.get("NOVEL_REPO_ROOT") or Path(__file__).resolve().parent.parent)
 
 
 def _version_from_version_file() -> str:

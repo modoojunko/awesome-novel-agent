@@ -10,6 +10,11 @@ A. 阈值冲突：同一对象在不同文件里定义了不同的数量阈值�
 B. 边界越界：方法论/豁免类文件（anti-ai-writing.md、boundary-cases.md）
    职责是解释"为什么"和"怎么做"，禁止出现数量线。检出即报越界。
 
+C. 术语/反模式禁现（审计 2026-08-13 §3-C5，决策 P2-10）：
+   提示词结构已统一为「6 元素」，以下遗留词禁止出现在注入侧
+   （agents/skills/knowledge）；「叙事规则优先级高于所有约束」反模式句
+   除 prompt-audit.md（验收探针定义，必须保留）外禁现——防止旧表述回潮。
+
 用法: python tools/check-conflicts.py
 返回码 0 = 通过，非 0 = 有问题（CI 用）。
 
@@ -59,6 +64,25 @@ CODE_RE = re.compile(r"单章阈值[:：]\s*(\d+)\s*(次)(?:/(章|500字|段|千
 ANY_COUNT_RE = re.compile(r"(?:≤|≤)?\d+\s*次(?:/(?:章|500字|段|千字))?")
 # 引用 common-rules 的行（豁免越界）
 REFERENCE_RE = re.compile(r"common-rules\.md")
+
+# --- C5 术语/反模式禁现（审计 2026-08-13 §3-C5，决策 P2-10）---
+# 提示词结构已统一为「6 元素」，遗留术语禁现防回潮。
+# 正则精确化：排除「2-4 层」（冲突阶梯）、opening-hooks.md（文件名）等合法命中。
+BANNED_TERMS = [
+    (re.compile(r"(?<![0-9-])4 层"), "「4 层」遗留术语（已统一为 6 元素）"),
+    (re.compile(r"9 层"), "「9 层」遗留术语（已统一为 6 元素）"),
+    (re.compile(r"任务层"), "「任务层」遗留术语"),
+    (re.compile(r"prompt 模块 5"), "「prompt 模块 5」遗留术语"),
+    (re.compile(r"\bGoals\b"), "「Goals」遗留字段名（已改名叙事目标）"),
+    (re.compile(r"(?<!-)hooks\.md"), "「hooks.md」遗留文件名"),
+    (re.compile(r"genre_profile"), "「genre_profile」遗留字段名（读 settings/genre-setting.md 的选定类型）"),
+]
+
+# 反模式句：审计修正记录（prompt-crafting）与验收探针（prompt-audit）已清理/豁免后，
+# 其余出现即视为旧表述回潮
+BANNED_ANTI_PATTERN = re.compile(r"叙事规则优先级高于所有约束")
+# 验收探针把旧表述列为 FAIL 信号，属检测器定义，豁免
+ANTI_PATTERN_EXEMPT = {"skills/prompt-audit.md"}
 
 # 对象名规范化：取第一个关键词，去掉括号、斜杠组、顿号枚举
 def norm_obj(raw: str) -> str:
@@ -161,10 +185,31 @@ def check_boundary() -> list:
     return errors
 
 
+def check_banned_terms() -> list:
+    """C5 防回潮：遗留术语 + 反模式句在注入侧（agents/skills/knowledge）禁现。"""
+    errors = []
+    for base, label in SCAN_GLOBS:
+        for f in sorted(base.rglob("*.md")):
+            rel = f.relative_to(ROOT).as_posix()
+            text = f.read_text(encoding="utf-8")
+            for pat, desc in BANNED_TERMS:
+                for m in pat.finditer(text):
+                    line = text[:m.start()].count("\n") + 1
+                    errors.append(f"{rel}:{line} 出现{desc}（防回潮禁现，删除或改写）")
+            if rel in ANTI_PATTERN_EXEMPT:
+                continue
+            for m in BANNED_ANTI_PATTERN.finditer(text):
+                line = text[:m.start()].count("\n") + 1
+                errors.append(f"{rel}:{line} 出现反模式「叙事规则优先级高于所有约束」"
+                              f"（已修正为低于第1-5层，见 prompt-crafting 冲突裁定表）")
+    return errors
+
+
 def main() -> int:
     all_errors = []
     all_errors += check_conflicts()
     all_errors += check_boundary()
+    all_errors += check_banned_terms()
 
     for e in all_errors:
         print(f"  ❌ {e}")
@@ -172,7 +217,7 @@ def main() -> int:
     if all_errors:
         print(f"\n共 {len(all_errors)} 个问题")
         return 1
-    print("✅ 规则冲突检查通过（无阈值冲突、无边界越界）")
+    print("✅ 规则冲突检查通过（无阈值冲突、无边界越界、无遗留术语）")
     return 0
 
 

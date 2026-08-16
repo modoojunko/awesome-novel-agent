@@ -13,6 +13,7 @@
 """
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -178,6 +179,62 @@ def test_check_yaml():
         env["PYTHONPATH"] = str(td) + os.pathsep + env.get("PYTHONPATH", "")
         r = run([sys.executable, str(TOOLS / "check-yaml.py"), "opencode"], env=env)
         check("有 yaml exit 0", r.returncode == 0, (r.stdout + r.stderr)[-200:])
+
+
+def _fake_version_repo(tmp: Path, version: str, drift: dict) -> None:
+    """迷你仓库：VERSION 权威 + 四处副本（check-version.py 测试注入 NOVEL_REPO_ROOT 用）。
+
+    drift: {相对路径: 漂移版本号}，构造单处不一致场景。
+    """
+    (tmp / "VERSION").write_text(f"v{version}\n", encoding="utf-8")
+    (tmp / "ARCHITECTURE.md").write_text(f"# x\n\n> 当前版本：v{version}\n", encoding="utf-8")
+    (tmp / "skill.json").write_text(f'{{"version": "{version}"}}\n', encoding="utf-8")
+    tpl = tmp / "templates" / ".agent"
+    tpl.mkdir(parents=True)
+    (tpl / "status.md").write_text(f"- **skill_version:** {version}\n", encoding="utf-8")
+    tools = tmp / "tools"
+    tools.mkdir(parents=True)
+    (tools / "init.py").write_text(f'status = """- **skill_version:** {version}"""\n',
+                                   encoding="utf-8")
+    for name, ver in drift.items():
+        if name == "ARCHITECTURE.md":
+            (tmp / name).write_text(f"# x\n\n> 当前版本：v{ver}\n", encoding="utf-8")
+        elif name == "skill.json":
+            (tmp / name).write_text(f'{{"version": "{ver}"}}\n', encoding="utf-8")
+        elif name == "templates/.agent/status.md":
+            (tmp / name).write_text(f"- **skill_version:** {ver}\n", encoding="utf-8")
+        elif name == "tools/init.py":
+            (tmp / name).write_text(f'status = """- **skill_version:** {ver}"""\n',
+                                    encoding="utf-8")
+
+
+def test_check_version():
+    """版本一致性守卫自身测试（arch-review 工程债：check 脚本缺测试覆盖）。"""
+    print("[unit] check-version.py 一致性")
+    with tempfile.TemporaryDirectory() as td:
+        _fake_version_repo(Path(td), "4.16.0", {})
+        env = dict(os.environ, NOVEL_REPO_ROOT=td)
+        r = run([sys.executable, str(TOOLS / "check-version.py")], env=env)
+        check("五处一致 exit 0", r.returncode == 0, (r.stdout + r.stderr)[-200:])
+        check("输出含通过文案", "版本号一致" in r.stdout, r.stdout[-200:])
+    for name, ver, expect in [
+        ("ARCHITECTURE.md", "4.13.0", "ARCHITECTURE.md"),
+        ("skill.json", "1.0.0", "skill.json"),
+        ("templates/.agent/status.md", "4.13.0", "templates/.agent/status.md"),
+        ("tools/init.py", "4.13.0", "tools/init.py"),
+    ]:
+        with tempfile.TemporaryDirectory() as td:
+            _fake_version_repo(Path(td), "4.16.0", {name: ver})
+            env = dict(os.environ, NOVEL_REPO_ROOT=td)
+            r = run([sys.executable, str(TOOLS / "check-version.py")], env=env)
+            check(f"漂移 {name} exit 1", r.returncode == 1, str(r.returncode))
+            check(f"漂移 {name} 报错含标签", expect in (r.stdout + r.stderr),
+                  (r.stdout + r.stderr)[-200:])
+    with tempfile.TemporaryDirectory() as td:
+        (Path(td) / "VERSION").write_text("abc\n", encoding="utf-8")
+        env = dict(os.environ, NOVEL_REPO_ROOT=td)
+        r = run([sys.executable, str(TOOLS / "check-version.py")], env=env)
+        check("VERSION 格式非法 exit 1", r.returncode == 1, str(r.returncode))
 
 
 def _raises(fn, *a) -> bool:
@@ -554,6 +611,36 @@ def test_install_fresh_home():
         check("fresh home agents 存在", (dest / "agents").is_dir())
 
 
+def test_install_ps1_fresh_home():
+    """E2E：install.ps1 全新 HOME 首次安装（Linux pwsh 冒烟，语义等价 Windows）。
+
+    pwsh 缺失（本地开发机）时跳过；CI ubuntu runner 自带 pwsh 会真实执行，
+    覆盖 install.ps1 的路径/拷贝/门槛流程（arch-review 工程债：ps1 无测试）。
+    """
+    pwsh = shutil.which("pwsh")
+    if not pwsh:
+        print("[e2e] install.ps1 冒烟（跳过：无 pwsh，CI ubuntu 会执行）")
+        return
+    print("[e2e] install.ps1 全新 HOME 首次安装（pwsh）")
+    with tempfile.TemporaryDirectory() as td:
+        fake_home = Path(td) / "home"
+        fake_bin = Path(td) / "bin"
+        fake_bin.mkdir()
+        os.symlink(sys.executable, fake_bin / "python")   # ps1 用 Get-Command python
+        env = dict(os.environ)
+        env["USERPROFILE"] = str(fake_home)               # ps1 用 $env:USERPROFILE
+        env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+        r = run([pwsh, "-NoProfile", "-File", str(TOOLS.parent / "install.ps1"), "claude-code"],
+                cwd=str(TOOLS.parent), env=env)
+        check("ps1 fresh home install exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("ps1 输出含安装完成", "安装完成" in r.stdout, r.stdout[-300:])
+        # install.ps1 用 Join-Path 拼接：Windows 落 $HOME\.claude\skills\awesome-novel，
+        # Linux pwsh 落 $USERPROFILE/.claude/skills/awesome-novel（真实嵌套目录）
+        dest = fake_home / ".claude" / "skills" / "awesome-novel"
+        check("ps1 fresh home SKILL.md 存在", (dest / "SKILL.md").exists())
+        check("ps1 fresh home agents 存在", (dest / "agents").is_dir())
+
+
 def test_install_no_home():
     """P2 回归：HOME 未设置时安装脚本在创建任何目录前即拒绝（报路径异常）。"""
     print("[e2e] install.sh 无 HOME 拒绝安装")
@@ -633,11 +720,13 @@ def main():
         ("test_yaml_precheck", test_yaml_precheck),
         ("test_check_python", test_check_python),
         ("test_check_yaml", test_check_yaml),
+        ("test_check_version", test_check_version),
         ("test_init_layout", test_init_layout),
         ("test_sync", test_sync),
         ("test_style_seed_guard", test_style_seed_guard),
         ("test_sync_style_missing_and_scaffold", test_sync_style_missing_and_scaffold),
         ("test_install_fresh_home", test_install_fresh_home),
+        ("test_install_ps1_fresh_home", test_install_ps1_fresh_home),
         ("test_install_no_home", test_install_no_home),
         ("test_install_python_gate", test_install_python_gate),
         ("test_install_yaml_gate", test_install_yaml_gate),
