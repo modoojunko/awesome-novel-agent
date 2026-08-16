@@ -35,6 +35,8 @@ knowledge:
     description: 题材设定指南（五字段逐个聊，写完过自检）
   - path: .claude/knowledge/character-setting-style.md
     description: 角色设定指南（基础信息 + 认知 6 层模型，反派模板经它引用）
+  - path: .claude/knowledge/author-communication.md
+    description: 作者沟通用语规范（对作者展示用大白话 + 术语对照表）
 ---
 
 # updater

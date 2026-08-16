@@ -118,7 +118,7 @@ POV 确定后进入拆场景卡（e），场景卡的三段锚点以此 POV 角�
   有什么悬念让读者想看下去 → 全文的情绪钩子+信息差
 ```
 
-拆出 key_points（条数按 §二 字数倒推法——默认 2500 字 ≈ 5 条），每条用三段锚点法（感官+动作+判断）写 2-3 句。出完整方案时让作者确认。
+拆出 key_points（条数按 §二 字数倒推法——默认 2500 字 ≈ 5 条），每条用三段锚点法（感官+动作+判断）写 2-3 句。出完整方案时让作者确认——按 `.claude/knowledge/chapter-setting-style.md` §验收第 1 步的 📋 摘要格式展示要点，完整章纲（含英文字段名）只写文件不展示原文；对作者用语遵循 `.claude/knowledge/author-communication.md`。
 
 **f. 禁止清单** — 按 §(不做什么——硬约束红线) 询问并记录 prohibitions。
 
@@ -132,7 +132,7 @@ POV 确定后进入拆场景卡（e），场景卡的三段锚点以此 POV 角�
 7. required_changes（章尾改变——与 b 冲突阶梯的"结束时什么变了"一致）
 8. scene_cards（场景卡——已在 e 拆场景卡完成三要素，此处归并进章纲）
 
-填完后展示完整 memo 供作者确认。
+填完后按 `.claude/knowledge/chapter-setting-style.md` §验收第 1 步的 📋 摘要格式展示要点供作者确认——完整 memo 含英文字段名，只写文件，不直接展示原文。
 
 **h. Emotional Design（完善）** — 按 §四(情绪设计) 填充情绪细节：mood_progression（已在 a 完成）、intensity_peak、intensity_level、emotional_hook、micro_payoffs。
 

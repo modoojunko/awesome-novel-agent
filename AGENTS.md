@@ -52,6 +52,10 @@
 
 强有力的成功标准让你能独立循环。弱标准（"让它跑起来"）需要不断澄清。
 
+## 面向作者沟通
+
+agent 与作家对话、提问、展示、确认一律用日常大白话。铁律与"内部名词 → 作者用语"对照表见 `knowledge/format-specs/author-communication.md`（部署后为 `.claude/knowledge/author-communication.md`，与作者对话的 agent 均已挂引用）：内部字段名、自创术语、流程词不得出现在作者可见文本；给作者看结构用摘要模板，不展示原文结构；网文通用词（爽点/打脸/钩子/金手指/卷纲/章纲等）保留不翻译。修改 agent 话术时先查对照表；新增内部名词同步补表。
+
 ## 项目结构与模块组织
 
 - `agents/` — 9 个写作 agent 定义（novel-agent 总指挥 + 8 个子 agent），Markdown + frontmatter。

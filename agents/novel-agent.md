@@ -31,6 +31,8 @@ knowledge:
     description: 正文验收清单
   - path: .claude/knowledge/permanent-memory.md
     description: 永久记忆（高频引用条目的沉淀）
+  - path: .claude/knowledge/author-communication.md
+    description: 作者沟通用语规范（对作者展示用大白话 + 术语对照表）
 ---
 
 # novel-agent

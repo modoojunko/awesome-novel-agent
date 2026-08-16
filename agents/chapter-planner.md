@@ -43,6 +43,8 @@ knowledge:
     description: 开篇钩子（首章 STEP a 立情绪锚点时与作者讨论）
   - path: .claude/knowledge/plot-craft/plot-twists.md
     description: 剧情反转手法（STEP b 设冲突阶梯时参考）
+  - path: .claude/knowledge/author-communication.md
+    description: 作者沟通用语规范（对作者展示用大白话 + 术语对照表）
 ---
 
 # chapter-planner
