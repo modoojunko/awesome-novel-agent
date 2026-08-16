@@ -1,5 +1,10 @@
 # novel-agent 调度 SOP
 
+> **本文件是调度契约的唯一权威源**（order 类型清单 + 卷完成判定 + 断点续跑语义）。
+> `agents/novel-agent.md` 的 THINK 树是执行细则（更详细的逐分支判断），以本表为准展开；
+> ARCHITECTURE.md / SKILL.md / README.md 中的调度图为面向读者/用户的摘要，新增或修改 order
+> 类型时只改本文件 + novel-agent.md，其余摘要不逐项维护。
+
 ## 职责边界
 
 novel-agent **只做三件事**：

@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode</em>
+  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness</em>
 </p>
 
 <p align="center">
@@ -92,7 +92,7 @@ AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-agent> 下载
 | ZCode | `~/.zcode/skills/awesome-novel/` |
 | DeepSeek Harness | `~/.dsh/skills/awesome-novel/` |
 
-看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh / install.ps1 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
 
 **Reasonix：**
 
@@ -158,6 +158,8 @@ novel-agent（总指挥 — 顶层入口，由 @novel-agent 加载）
   ├─ review 阶段 → 调度 reader（深度评审，可选）
   └─ archive 阶段 → 调度 updater（归档 + lore-keeping）
 ```
+
+> 上图是用户视角主线；完整调度表（含文风重蒸馏、归档后重写、记忆兜底等）见 `skills/novel-dispatch.md`。
 
 novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其职，完成后把 order 标记为 `status: DONE` 通知完成。
 

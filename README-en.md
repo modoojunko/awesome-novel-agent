@@ -267,6 +267,77 @@ Default config is "low AI flavor" — common machine phrases prohibited ("cannot
 
 Yes. After project creation, there's a writing style file where you can write in your preferences, and all subsequent chapters will follow this style.
 
+## OpenCode Integration
+
+This skill also supports [OpenCode](https://github.com/sglaboratory/opencode) (third-party open-source AI coding CLI).
+
+### Install
+
+Tell OpenCode **"帮我安装 awesome-novel-agent"** and it runs `./install.sh opencode` itself, installing to `~/.config/opencode/skills/awesome-novel/`.
+
+### Initialize a project
+
+Type `/awesome-novel` in the target directory — the skill calls init.py automatically. You can also run:
+
+```bash
+python ~/.config/opencode/skills/awesome-novel/tools/init.py . --genre <number>
+```
+
+### Start writing
+
+After initialization, enter the writing loop in OpenCode via `/awesome-novel` or `@novel-agent`.
+
+### Project structure differences
+
+An OpenCode project has the same structure as a Claude Code project — the only difference is that agent definitions are deployed under `.opencode/agents/` instead of `.claude/agents/`. All platforms share the same writing pipeline and knowledge base.
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform opencode`.
+
+## Reasonix Integration
+
+This skill also supports Reasonix (DeepSeek's terminal AI agent, which uses byte-level stable prefix caching to cut inference cost).
+
+Unlike Claude Code / OpenCode, Reasonix deploys skills **project-level** — every novel project generates `.reasonix/skills/` (11 SKILL.md files, agents == skills) at init time; nothing is installed globally.
+
+### Install the framework source
+
+Tell Reasonix **"帮我安装 awesome-novel-agent"** and it clones the repository locally (project-level deployment, not global).
+
+### Initialize a project
+
+Run init.py in the project directory (or a target path), specifying the Reasonix platform:
+
+```bash
+python tools/init.py <novel-project-path> --genre <number> --platform reasonix
+```
+
+### Start writing
+
+After initialization, enter the project directory and start Reasonix:
+
+```bash
+cd <novel-project-path> && reasonix code
+```
+
+Then type `@novel-agent` to enter the writing loop. In Reasonix, novel-agent dispatches sub-agents with `run_skill`; the order-file protocol is identical to the other platforms.
+
+### Project structure differences
+
+A Reasonix project deploys agent definitions as skills under `.reasonix/skills/` and produces no `.claude/`:
+
+```
+.reasonix/
+├── skills/               # 11 SKILL.md files (agents == skills)
+│   ├── novel-agent/SKILL.md
+│   ├── writer/SKILL.md
+│   ├── volume-planner/SKILL.md
+│   └── ...
+├── knowledge/            # anti-AI rules, style preferences, permanent memory, format specs
+└── memory/               # writing dynamic memory
+```
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform reasonix`.
+
 ## Codex Integration
 
 This skill also supports [Codex](https://developers.openai.com/codex) (OpenAI's coding agent). The skill itself is installed **user-level**, while agents/skills/knowledge/memory are deployed **project-level** into `.codex/` at init time.

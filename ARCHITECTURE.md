@@ -9,7 +9,7 @@
 
 ### 1.1 总体：状态驱动的 ReAct 循环
 
-核心架构是**状态驱动循环**。每个 agent（含 novel-agent 与所有子 agent）都按 ReAct 模式运行：`OBSERVE → THINK → ACT → VERIFY → LOOP`。
+核心架构是**状态驱动循环**。每个 agent（含 novel-agent 与所有子 agent）都按 ReAct 模式运行：`OBSERVE → THINK → ACT → VERIFY → LOOP`（唯一例外：`reader` 声明 `react: false`——评审是一次性阅读评价，不走状态驱动循环，见 `agents/reader.md` 的 Invocation Integration 说明）。
 
 - **OBSERVE**：从文件系统重建状态，不依赖上一次运行的上下文缓存（Context Isolation）
 - **THINK**：读 `.agent/status.md` 的 `phase` 字段，判断当前该做什么、该谁做
@@ -61,6 +61,8 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
 
 ### 1.5 调度架构
 
+> order 类型清单以 `skills/novel-dispatch.md` 为唯一权威，本图是主线摘要；逐分支判定细则见 `agents/novel-agent.md` 的 THINK 树。
+
 ```
 主 AI（加载 @novel-agent）
   │
@@ -68,14 +70,18 @@ Skill 入口（主 agent 加载 SKILL.md 后）先做项目状态检测，之后
   ├── 写 order 文件到 .agent/task/{type}-order.md（只含输入/输出路径，不含执行步骤）
   ├── 通过 Agent 工具调度子 agent
   │     ├── setup   → updater          （setting-update-order.md）
-  │     ├── setup   → style-distiller  （style-distill-order.md，作者提供风格样本时）
+  │     ├── setup   → style-distiller  （style-distill-order.md，文风设定决策流程选蒸馏时）
+  │     ├── 任意 phase → style-distiller（style-distill-order.md，作者说"修改文风设定"等触发）
   │     ├── outline → volume-planner   （volume-plan-order.md）
   │     ├── outline → chapter-planner  （chapter-plan-order.md）
   │     ├── draft   → prompt-crafter   （prompt-craft-order.md）
   │     ├── draft   → writer           （writing-order.md）
   │     ├── anti-ai → anti-ai          （anti-ai-order.md）
+  │     ├── anti-ai FAIL → writer      （writing-order.md，rewrite_of + round + violations，round<3）
   │     ├── review  → reader           （reader-review-order.md，可选）
-  │     ├── archive → updater          （archive-order.md / memory-sweep-order.md）
+  │     ├── archive → updater          （archive-order.md）
+  │     ├── 归档后重写某章 → updater    （rollback-order.md，撤销该章归档，status 回 outline）
+  │     ├── 卷完成 → updater           （memory-sweep-order.md，记忆兜底）
   │     └── # 卡冻结：归档后无风格增量更新
   ├── 子 agent 完成后将 order 覆盖为 status: DONE
   └── 检测到 order 标记 DONE → 推进下一阶段（setup 例外：setting-update-order DONE 后需作者确认设定，再推进 phase）

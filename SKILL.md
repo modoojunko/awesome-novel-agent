@@ -285,6 +285,8 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 
 ## Agent 协作架构
 
+> 下图是主线概览；完整 order 类型清单与判定细则以 `skills/novel-dispatch.md`（唯一权威）+ `agents/novel-agent.md`（执行细则）为准。
+
 ```
 novel-agent（总指挥）
   ├─ 新项目 → 调度 volume-planner（规划卷纲）
