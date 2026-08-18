@@ -275,7 +275,7 @@ ______ 不会 ______
 | 来源 | 文件 | 填入字段 |
 |------|------|---------|
 | 基础约束 | genre-example/{genre}.md#prompt_segment | 视角/描写/节奏 |
-| 通用反AI | anti-ai/common-rules.md | 疲劳词阈值 + 句式规则 + 元叙事禁止 |
+| 通用反AI | .claude/knowledge/anti-ai.md（合并文件） | 活人感正向要点（living-voice）+ T1 最毒句式简表 + 元叙事禁止；疲劳词阈值 / T2 / T3 不注入（清创归 anti-ai agent） |
 | 题材反AI | anti-ai/{genre}.md（如存在） | 题材正反例 |
 
 **场景写作方法论注入：** 根据场景原材料识别的场景类型（可选值：dialogue / fight / environment / inner-mono / transition / group-scene），从 `.claude/knowledge/scene-craft/` 读取对应文件。**必须经过上下文过滤**——结合本章的角色状态、信息差、情绪走向改写方法论，不能生搬硬套。**每个场景类型只抽取 1-2 条，不要求全部覆盖。**
