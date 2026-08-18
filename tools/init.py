@@ -183,6 +183,9 @@ def main():
     # Step 4: 按题材继承知识
     deploy_knowledge(project_path, genre, platform)
 
+    # Step 4.5: 部署正文检查脚本（anti-ai 机器初筛用，缺省降级为模型肉眼）
+    deploy_tools(project_path, platform)
+
     # Step 5.5: 按题材预填 settings 默认值
     seed_settings_from_genre(project_path, genre, platform)
 
@@ -349,6 +352,18 @@ def deploy_agents(project_path: Path, platform: Platform):
                 content = convert_agent_to_platform(content, platform)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
+
+
+def deploy_tools(project_path: Path, platform: Platform):
+    """部署正文检查脚本到 <平台>/tools/（anti-ai 机器初筛用，缺省降级为模型肉眼）"""
+    src = SKILL_HOME / "tools" / "check-prose.py"
+    if not src.exists():
+        print("  ⚠️  缺 tools/check-prose.py——anti-ai 机器初筛将降级为模型肉眼")
+        return
+    dst_dir = project_path / platform.root / "tools"
+    dst_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst_dir / "check-prose.py")
+    print(f"  ✅ 已部署正文检查脚本（{platform.root}/tools/check-prose.py）")
 
 
 def deploy_knowledge(project_path: Path, genre: str, platform: Platform):

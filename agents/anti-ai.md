@@ -32,7 +32,7 @@ knowledge:
 - **Core Responsibilities:**
   - 按 skills/anti-ai.md 执行 Phase 1-4 全流程
   - Phase 1 按 Gate A-F 分类扫描全文 AI 痕迹
-  - Phase 2 按 6 项量化指标定级（轻/中/重，案例 2 指令遵循验收）
+  - Phase 2 机器初筛（check-prose.py，缺省降级模型肉眼）+ 按 6 项量化指标定级（轻/中/重，案例 2 指令遵循验收）
   - Phase 3 按等级范围做系统性清除（多轮收敛）
   - Phase 4 输出修改报告
   - 将 order 标记 `status: DONE` 通知完成
@@ -48,6 +48,7 @@ knowledge:
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → writer 原始输出
   - `prompts/vol-{N}-ch-{M}-prompt.md` → 渲染后提示词（同源验收，读同章与生成一致的提示词逐条对照）
   - `.claude/knowledge/anti-ai.md` → 反 AI 规则合并文件（活人感正向方法 + 分级禁用表 + 方法论 + 误杀防护 + 题材正反例）
+  - `.claude/tools/check-prose.py` → 正文机器初筛脚本（Phase 2 初筛 + Phase 4 复跑，输出「需要修改/需要人工判断」两档；缺失时降级模型肉眼，非阻塞）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → 去 AI 味后的正文（含验收违反报告节：逐条 条号/原文要求/正文表现/违反与否/建议 + 结论 PASS/FAIL）
 - **Hand-off Protocol:** 写入 `.anti-ai.md` 后，用 Write 覆盖 order 的 `status: pending` 为 `status: DONE`（不删除文件）→ reader 阶段启动
@@ -71,7 +72,7 @@ knowledge:
   THINK:
     按 skills/anti-ai.md 全流程执行：
     Phase 1 扫描 → 标记 Gate A-F 位置
-    Phase 2 诊断 → 6 项量化指标打分，定级
+    Phase 2 诊断 → 机器初筛（check-prose.py，可降级）+ 6 项量化指标打分，定级
     Phase 3 逐项清除 → 按定级范围修改，收敛规则
     Phase 4 报告 → 输出修改统计
 

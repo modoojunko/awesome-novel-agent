@@ -272,6 +272,12 @@ def test_init_layout():
             for sub in subs:
                 check(f"{key} 存在 .{key}/{sub}", (tmp / f".{key}" / sub).exists())
             check(f"{key} 存在 novel-samples/（蒸馏样本目录）", (tmp / "novel-samples").exists())
+            t = tmp / f".{key}" / "tools" / "check-prose.py"
+            check(f"{key} 部署 tools/check-prose.py", t.exists())
+            if t.exists():
+                check(f"{key} check-prose.py 内容与源一致",
+                      t.read_text(encoding="utf-8") ==
+                      (TOOLS / "check-prose.py").read_text(encoding="utf-8"))
             for a in absents:
                 check(f"{key} 无 {a}", not (tmp / a).exists())
 
@@ -415,6 +421,8 @@ def test_init_layout():
                  "memory-recording", "roleplay-sandbox"]  # 与 deploy_dsh_skills 的 11 个 skill 名对应（spec 契约）
         for n in names:
             check(f"dsh skill {n}", (tmp / ".dsh/skills" / n / "SKILL.md").exists())
+        check("dsh 部署 tools/check-prose.py",
+              (tmp / ".dsh/tools/check-prose.py").exists())
         w = (tmp / ".dsh/skills/writer/SKILL.md").read_text(encoding="utf-8")
         fm = w.split("---", 2)[1]
         check("dsh writer frontmatter 只 name/description",
@@ -513,6 +521,38 @@ def test_sync():
               "allowed-tools:" not in w.split("---", 2)[1]
               and ".dsh/knowledge/" in w and ".claude/" not in w)
         check("dsh sync 无 .claude", not (tmp / ".claude").exists())
+
+    # tools/check-prose.py 同步恢复（模拟升级：脚本被删/改旧，sync 重新部署）
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "zcode")
+        f = tmp / ".zcode" / "tools" / "check-prose.py"
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("# 旧版占位\n", encoding="utf-8")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "zcode"], cwd=str(tmp))
+        check("zcode sync exit 0（脚本恢复）", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("zcode sync 恢复 check-prose.py",
+              f.exists() and f.read_text(encoding="utf-8") ==
+              (TOOLS / "check-prose.py").read_text(encoding="utf-8"))
+
+    # 指纹覆盖 tools/check-prose.py：脚本源变更后 --check 应报有更新
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "claude")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "claude"], cwd=str(tmp))
+        check("指纹基线 sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        src = TOOLS / "check-prose.py"
+        bak = src.read_text(encoding="utf-8")
+        src.write_text(bak + "\n# fingerprint probe\n", encoding="utf-8")
+        try:
+            r2 = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                      "--platform", "claude", "--check"], cwd=str(tmp))
+            check("check-prose.py 变更后 --check exit 1", r2.returncode == 1,
+                  (r2.stdout + r2.stderr)[-200:])
+        finally:
+            src.write_text(bak, encoding="utf-8")
 
     # --check：无指纹首次 → exit 1
     with tempfile.TemporaryDirectory() as td:
