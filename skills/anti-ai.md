@@ -122,13 +122,15 @@ Gate F: 命中 X 处（按 F1-F4 分类）
 python3 .claude/tools/check-prose.py archives/vol-{N}-ch-{M}-{slug}.draft.md
 ```
 
+（Windows 无 `python3` 时改用 `python` 或 `py`，下同）
+
 结果两档，用途不同：
 - **「需要修改」（硬失败，退出码 1）**：硬停词/黑话/模型路标/翻案句等命中 → 并入 Gate A/B 命中清单，进 Phase 3 修改
 - **「需要人工判断」（警告，退出码 0）**：语义枢轴句式、句长节奏、短段连击、开头重复、比喻扎堆、连词密度等 → 作为 Phase 3「先救人再清句子」的重点段候选与人工复核参考，不直接判违规
 
 边界：
 - 脚本只报告、不改正文；阈值以本文件与 `.claude/knowledge/anti-ai.md` 为准，脚本警告永不升级为硬 Gate
-- 降级：脚本缺失（`.claude/tools/check-prose.py` 不存在，其他平台在各自根目录下）/ 无 python / 无法执行 shell → 跳过机器初筛，回退 Phase 1 模型肉眼扫描，并在 Phase 4 报告标注「未跑脚本核验」（非阻塞）
+- 降级：脚本缺失（`.claude/tools/check-prose.py` 不存在，其他平台在各自根目录下）/ 无 python（`python3`/`python`/`py` 均不可用，Windows 先试 `python`/`py` 再判降级）/ 无法执行 shell → 跳过机器初筛，回退 Phase 1 模型肉眼扫描，并在 Phase 4 报告标注「未跑脚本核验」（非阻塞）
 
 ### 6 项量化指标
 
@@ -295,7 +297,7 @@ python3 .claude/tools/check-prose.py <临时文件路径>
 - 「需要修改」清零 → 脚本核验通过；仍有命中 → 回 Phase 3 处理后复跑
 - 误杀防护豁免同样适用：命中在 `.claude/knowledge/anti-ai.md` 误杀防护列表 → 标注 `[SKIP: 误杀防护]`，不强制清零
 - 「需要人工判断」照旧人工裁量，不要求清零
-- 降级：跑不了脚本（缺失/无 python/无 shell）→ 报告标注「未跑脚本核验」（非阻塞）
+- 降级：跑不了脚本（缺失/无 python，Windows 判定见 Phase 2/无 shell）→ 报告标注「未跑脚本核验」（非阻塞）
 
 ---
 

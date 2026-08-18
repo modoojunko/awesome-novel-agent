@@ -303,9 +303,9 @@ anti-ai 是独立子 agent，输入 `archives/*.draft.md`，输出 `archives/*.a
 ```
 Phase 1  扫描   按 Gate A-F 分类标记 AI 味位置
          A 禁用词 / B 句式套路 / C 心理描写 / D 节奏 / E 对话 / F 结尾
-Phase 2  诊断   6 项量化指标打分，定级（轻 / 中 / 重）
+Phase 2  诊断   机器初筛（check-prose.py，可降级）+ 6 项量化指标打分，定级（轻 / 中 / 重）
 Phase 3  清除   按定级范围逐 Gate 修改，多轮收敛（同段连续两轮无改动跳过，全文上限 3 轮）
-Phase 4  报告   字数变化 + 修改统计 + 前后对比
+Phase 4  报告   字数变化 + 修改统计 + 前后对比 + 机器复跑核验
 ```
 
 - **误杀防护**：修改前读 `knowledge/anti-ai/boundary-cases.md` 做豁免判定，命中则跳过标 `[SKIP: 误杀防护]`
@@ -318,7 +318,7 @@ Phase 4  报告   字数变化 + 修改统计 + 前后对比
 
 | 工具 | 用途 | 何时运行 |
 |------|------|---------|
-| `tools/init.py` | 项目初始化（选题材 → 建骨架 → 部署 agent/知识 → 建记忆桩 → 生成 CLAUDE.md/AGENTS.md → 写 status.md），共 9 步 | 全新项目 / 2.x 迁移后 |
+| `tools/init.py` | 项目初始化（选题材 → 建骨架 → 部署 agent/skills/知识/工具脚本 → 建记忆桩 → 生成 CLAUDE.md/AGENTS.md → 写 status.md） | 全新项目 / 2.x 迁移后 |
 | `tools/sync-project.py` | 将 skill 仓库更新同步进已有项目（`--check` 只检测） | 入口检测到指纹过期时 |
 | `install.sh` / `install.ps1` | 安装 skill 到用户级目录 | 首次安装 |
 | `.github/workflows/static.yml` | CI 静态检查 | 推送时 |
