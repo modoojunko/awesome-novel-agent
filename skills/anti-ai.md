@@ -21,7 +21,7 @@ Phase 4 报告 — 输出修改报告
 
 | 文件 | 用途 |
 |------|------|
-| `.claude/knowledge/anti-ai.md` | 反 AI 规则合并文件（分级禁用词表 + 方法论 + 误杀防护 + 题材正反例，init.py 按题材生成） |
+| `.claude/knowledge/anti-ai.md` | 反 AI 规则合并文件（活人感正向方法 + 分级禁用词表 + 方法论 + 误杀防护 + 题材正反例，init.py 按题材生成） |
 
 ---
 
