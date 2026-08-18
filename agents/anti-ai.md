@@ -47,7 +47,7 @@ knowledge:
   - `.agent/task/anti-ai-order.md` → 目标章节路径
   - `archives/vol-{N}-ch-{M}-{slug}.draft.md` → writer 原始输出
   - `prompts/vol-{N}-ch-{M}-prompt.md` → 渲染后提示词（同源验收，读同章与生成一致的提示词逐条对照）
-  - `.claude/knowledge/anti-ai.md` → 反 AI 规则合并文件（分级禁用表 + 方法论 + 误杀防护 + 题材正反例）
+  - `.claude/knowledge/anti-ai.md` → 反 AI 规则合并文件（活人感正向方法 + 分级禁用表 + 方法论 + 误杀防护 + 题材正反例）
 - **Output Artifacts:**
   - `archives/vol-{N}-ch-{M}-{slug}.anti-ai.md` → 去 AI 味后的正文（含验收违反报告节：逐条 条号/原文要求/正文表现/违反与否/建议 + 结论 PASS/FAIL）
 - **Hand-off Protocol:** 写入 `.anti-ai.md` 后，用 Write 覆盖 order 的 `status: pending` 为 `status: DONE`（不删除文件）→ reader 阶段启动
