@@ -2,7 +2,7 @@
 """
 awesome-novel-agent 项目初始化工具
 
-用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode|dsh>]
+用法: python init.py [project-path] [--genre <编号>] [--platform <claude|opencode|reasonix|codex|zcode|dsh|grok>]
 
 平台缺省：--platform > NOVEL_PLATFORM > SKILL_HOME 路径识别 > claude。
 
@@ -109,7 +109,7 @@ def main():
         a = args[i]
         if a == "--platform":
             if i + 1 >= len(args) or args[i + 1].startswith("--"):
-                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode|dsh）")
+                print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode|dsh|grok）")
                 sys.exit(1)
             platform_override = args[i + 1]
             i += 2
@@ -168,14 +168,14 @@ def main():
     # Step 2: 创建骨架
     create_skeleton(project_path, platform)
 
-    # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix/zcode agents 即 skills）
+    # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix/zcode/dsh agents 即 skills）
     if platform.key == "codex":
         deploy_codex_agents(project_path, SKILL_HOME, platform)
     else:
         deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex 只部署独立工具）
-    if platform.key == "codex":
+    # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex/grok 只部署独立工具）
+    if platform.key in ("codex", "grok"):
         deploy_codex_skills(project_path, SKILL_HOME, platform)
     else:
         deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
@@ -210,6 +210,8 @@ def main():
         print("在 ZCode 中打开项目目录，说“帮我写本小说”或调用 novel-agent skill 开始写作")
     elif platform.key == "dsh":
         print("在 DeepSeek Harness（dsh）中打开项目目录，说“帮我写本小说”或调用 novel-agent skill 开始写作")
+    elif platform.key == "grok":
+        print("在 Grok Build 中打开项目目录，输入 /awesome-novel 或说“帮我写本小说”开始写作")
     else:
         print("在 Reasonix 中运行 `reasonix code`，然后调用 @novel-agent 开始写作")
 
@@ -263,8 +265,9 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
     elif platform.key == "codex":
         text = text.replace(".claude/agents/", ".codex/agents/")
         text = text.replace(".opencode/agents/", ".codex/agents/")
-    else:  # opencode
+    else:  # opencode / grok 等独立 agents 目录
         text = text.replace(".claude/agents/", f"{platform.root}/agents/")
+        text = text.replace(".opencode/agents/", f"{platform.root}/agents/")
     return rewrite_refs(text, platform)
 
 
@@ -338,7 +341,6 @@ def deploy_agents(project_path: Path, platform: Platform):
         print(f"  ℹ️  {platform.label} 平台不部署 agent 定义（agents 即 {platform.root}/skills/）")
         return
     agent_dir.mkdir(parents=True, exist_ok=True)
-    is_opencode = platform.key == "opencode"
     for item in SOURCE_AGENTS.rglob("*"):
         if item.is_file() and item.suffix == ".md":
             rel_path = item.relative_to(SOURCE_AGENTS)
@@ -347,9 +349,8 @@ def deploy_agents(project_path: Path, platform: Platform):
             if not dest.resolve().is_relative_to(agent_dir.resolve()):
                 continue
             dest.parent.mkdir(parents=True, exist_ok=True)
-            content = item.read_text(encoding="utf-8")
-            if is_opencode:
-                content = convert_agent_to_platform(content, platform)
+            content = convert_agent_to_platform(
+                item.read_text(encoding="utf-8"), platform, SKILL_HOME)
             dest.write_text(content, encoding="utf-8")
     print(f"  ✅ 已部署 agent 定义到 {agent_dir}")
 

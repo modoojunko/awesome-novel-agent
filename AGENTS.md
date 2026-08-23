@@ -67,8 +67,8 @@ agent 与作家对话、提问、展示、确认一律用日常大白话。铁�
 
 ## 构建、测试与开发命令
 
-无构建步骤。Python 主体仅用标准库；pyyaml 例外：`--platform opencode|reasonix|codex|zcode|dsh` 的 agent 转换（platforms.py）与 style-distill 卡 frontmatter 解析/校验（style_common.py / style_render.py / check-agents.py）（见 `tools/requirements.txt`，CI 自动安装）：
-- `python tools/init.py <项目路径> [--genre N] [--platform claude|opencode|reasonix|codex|zcode|dsh]` — 初始化小说项目骨架
+无构建步骤。Python 主体仅用标准库；pyyaml 例外：`--platform opencode|reasonix|codex|zcode|dsh|grok` 的 agent 转换（platforms.py）与 style-distill 卡 frontmatter 解析/校验（style_common.py / style_render.py / check-agents.py）（见 `tools/requirements.txt`，CI 自动安装）：
+- `python tools/init.py <项目路径> [--genre N] [--platform claude|opencode|reasonix|codex|zcode|dsh|grok]` — 初始化小说项目骨架
 - `python tools/sync-project.py <项目路径> --check` — 检查项目是否需要同步（0=最新，1=有更新，2=无效）
 - `python tools/test_platforms.py` — 运行测试（退出码 0=通过）
 - `python tools/check-agents.py` — 校验 agent frontmatter 引用路径
@@ -87,7 +87,7 @@ CI：`.github/workflows/static.yml`，push main 时运行语法/agent/规则检�
 ## 测试指南
 
 - 无第三方测试框架；`tools/test_platforms.py` 自写断言，stdout 打印 `ok/FAIL`，非 0 退出码表示失败。
-- 测试函数以 `test_` 开头；E2E 用临时目录验证 init/sync 在 claude/opencode/reasonix/codex/zcode/dsh 六平台的输出。
+- 测试函数以 `test_` 开头；E2E 用临时目录验证 init/sync 在 claude/opencode/reasonix/codex/zcode/dsh/grok 七平台的输出。
 - 涉及 agent 定义跑 `check-agents.py`，涉及反 AI 规则跑 `check-conflicts.py`。
 - 行为变更遵循先红后绿：先加失败用例，再实现。
 
@@ -95,7 +95,7 @@ CI：`.github/workflows/static.yml`，push main 时运行语法/agent/规则检�
 
 - 提交信息遵循 Conventional Commits + 中文描述：`feat:` / `fix:` / `docs:` / `test:` / `refactor:` / `chore:`，如 `fix: sync-project --platform 值守卫防吞 --check`。
 - 发版时 `chore: bump version to vX.Y.Z`，同步更新 `VERSION` 与 `docs/releasenote-*`。
-- PR：从 main 新建分支，禁止直接改 main；单个 PR 聚焦一项改动并关联 issue；提交前至少在一种 AI 终端实测（claude/opencode/reasonix/codex/zcode/dsh）。
+- PR：从 main 新建分支，禁止直接改 main；单个 PR 聚焦一项改动并关联 issue；提交前至少在一种 AI 终端实测（claude/opencode/reasonix/codex/zcode/dsh/grok）。
 
 ## 安全与配置提示
 

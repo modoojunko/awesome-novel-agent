@@ -199,6 +199,7 @@ tools/           # init.py（初始化）、sync-project.py（同步更新）
 - **Codex**：init.py 部署 9 个自定义 agent 为 `.codex/agents/*.toml`（TOML 转换产物，引用改写为 `.codex/knowledge|memory`），独立工具为 `.codex/skills/<name>/SKILL.md`；novel-agent 用 `spawn_agent` 调度子 agent
 - **ZCode**：init.py 部署 9 个 agent 为 `.zcode/skills/<name>/SKILL.md`（skill 转换产物，引用改写为 `.zcode/knowledge|memory`；ZCode 无项目级 agents 目录，agents 即 skills，与 Reasonix 同构）；novel-agent 用 `Agent` 工具按 skill 名调度子 agent
 - **dsh（DeepSeek Harness）**：init.py 部署 9 个 agent 为 `.dsh/skills/<name>/SKILL.md`（skill 转换产物，frontmatter 只保留 dsh 识别的 `name`/`description`，引用改写为 `.dsh/knowledge|memory`；dsh 无项目级 agents 目录，agents 即 skills，与 ZCode 同构）；novel-agent 用 `subagent` 工具调度子 agent（prompt 要求子 agent 先 `skill(name=...)` 加载自身指令）
+- **Grok Build**：init.py 部署 9 个自定义 agent 为 `.grok/agents/*.md`（Grok 原生发现路径，frontmatter 映射为 Grok 工具名，SOP 内联，引用改写为 `.grok/knowledge|memory`），独立工具为 `.grok/skills/<name>/SKILL.md`；novel-agent 用 `spawn_subagent` 调度子 agent（必须在主会话运行，Grok 子代理深度上限为 1）
 - **安装**：`install.sh` / `install.ps1` 将 skill 装到用户级 skills 目录
 
 ---
