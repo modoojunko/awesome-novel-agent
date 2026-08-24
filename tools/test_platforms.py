@@ -19,6 +19,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 # 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
 for _s in (sys.stdout, sys.stderr):
     try:
@@ -478,10 +480,14 @@ def test_init_layout():
         check("grok agents 数量=9", n == 9, f"实际 {n}")
         w = (tmp / ".grok/agents/writer.md").read_text(encoding="utf-8")
         fm = w.split("---", 2)[1]
+        fm_data = yaml.safe_load(fm)
         check("grok writer frontmatter",
               "name: writer" in fm and "description:" in fm
               and "read_file" in fm and "write" in fm
-              and "spawn_subagent" in fm and "disallowedTools:" in fm, fm[:400])
+              and fm_data.get("disallowedTools") == ["Agent"], fm[:400])
+        check("grok 子 agent frontmatter 不使用模型调用名",
+              "spawn_subagent" not in fm_data.get("tools", [])
+              and "spawn_subagent" not in fm_data.get("disallowedTools", []), fm[:400])
         check("grok writer 引用改写",
               ".grok/knowledge/" in w and ".claude/knowledge/" not in w)
         check("grok writer SOP 内联", "执行 SOP：writing-execution.md" in w)
@@ -489,11 +495,14 @@ def test_init_layout():
               "调度权限硬约束" in w and "spawn_subagent" in w)
         nv = (tmp / ".grok/agents/novel-agent.md").read_text(encoding="utf-8")
         nfm = nv.split("---", 2)[1]
+        nfm_data = yaml.safe_load(nfm)
         check("grok novel-agent 调度适配",
               "spawn_subagent" in nv and ".grok/agents/" in nv
               and "Grok Build 调度适配" in nv)
-        check("grok novel-agent 持有 spawn_subagent",
-              "spawn_subagent" in nfm and "disallowedTools:" not in nfm, nfm[:300])
+        check("grok novel-agent frontmatter 启用 Agent 指令",
+              "Agent" in nfm_data.get("tools", [])
+              and "spawn_subagent" not in nfm_data.get("tools", [])
+              and "disallowedTools" not in nfm_data, nfm[:300])
         check("grok novel-agent 不注入禁调",
               "调度权限硬约束" not in nv, "novel-agent 是唯一调度者，不应注入禁调")
         all_md = "".join(

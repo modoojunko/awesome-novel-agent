@@ -594,7 +594,7 @@ _GROK_TOOL_MAP = {
     "Edit": "search_replace",
     "Glob": "list_dir",
     "Grep": "grep",
-    "Agent": "spawn_subagent",   # Claude Code Agent 工具 ↔ Grok spawn_subagent
+    "Agent": "Agent",            # frontmatter 指令；模型调用名仍是 spawn_subagent
     "Bash": "run_terminal_command",
 }
 
@@ -630,8 +630,8 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
     """Claude Code agent frontmatter → Grok Build 项目级 agent Markdown。
 
     - 必填字段：name / description（Grok 官方约定）
-    - tools：YAML 列表，映射为 Grok 规范名；子 agent 丢弃 spawn_subagent
-    - disallowedTools：子 agent 禁止 spawn_subagent
+    - tools：YAML 列表，Agent 保留为 Grok 的子代理授权指令
+    - disallowedTools：子 agent 用 Agent 禁止子代理工具族
     - skills：Claude 的 path 对象列表与 Grok 的 skill 名列表不兼容，SOP 内联进正文后丢弃
     - 其余 Claude 私有字段（role/react/memory/knowledge）丢弃，避免 Grok 解析失败
     - novel-agent 注入 spawn_subagent 调度适配段；子 agent 注入调度硬约束
@@ -709,7 +709,7 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
             fm_lines.append(f"  - {t}")
     if name != "novel-agent":
         fm_lines.append("disallowedTools:")
-        fm_lines.append("  - spawn_subagent")
+        fm_lines.append("  - Agent")
         fm_lines.append("agentsMd: false")
     else:
         fm_lines.append("agentsMd: true")
