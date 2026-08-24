@@ -2,7 +2,6 @@
 .claude/settings*.json
 .claude/scratchpad.md
 .vscode/
-docs/
 tools/__pycache__/
 video/
 video-script-input.md
