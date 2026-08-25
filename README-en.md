@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness</em>
+  <em>Write Novels with Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness / Grok Build</em>
 </p>
 
 <p align="center">
@@ -10,6 +10,7 @@
   <a href="#codex-integration"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
   <a href="#zcode-integration"><img src="https://img.shields.io/badge/ZCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-0EA5E9?style=flat-square" alt="ZCode"></a>
   <a href="#dsh-integration"><img src="https://img.shields.io/badge/DeepSeek%20Harness-%E2%9C%93%20%E6%94%AF%E6%8C%81-1F6FEB?style=flat-square" alt="DeepSeek Harness"></a>
+  <a href="#grok-build-integration"><img src="https://img.shields.io/badge/Grok%20Build-%E2%9C%93%20%E6%94%AF%E6%8C%81-111111?style=flat-square" alt="Grok Build"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
 </p>
@@ -49,14 +50,14 @@ Let AI be your novel writing partner, from world-building to character developme
 
 ## What You Need
 
-- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, **Codex**, **ZCode** or **DeepSeek Harness (dsh)** installed
+- A computer with [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview), [OpenCode](https://github.com/sglaboratory/opencode), Reasonix, **Codex**, **ZCode**, **DeepSeek Harness (dsh)** or **[Grok Build](https://docs.x.ai/build/overview)** installed
 - Python 3.9+ (the one bundled with macOS works; 3.11+ recommended)
-- pyyaml for OpenCode / Codex / ZCode / dsh (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
+- pyyaml for OpenCode / Codex / ZCode / dsh / Grok Build (`pip install pyyaml`; use `pip install --user pyyaml` if the system Python is permission-restricted)
 - About 1 minute to install
 
 ## Installation
 
-**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness) and tell it:
+**No copy-pasting needed.** Open the AI tool you use (Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness / Grok Build) and tell it:
 
 > **Install awesome-novel-agent for me**
 
@@ -69,8 +70,9 @@ The agent will download from <https://github.com/modoojunko/awesome-novel-agent>
 | Codex | `~/.codex/skills/awesome-novel/` |
 | ZCode | `~/.zcode/skills/awesome-novel/` |
 | DeepSeek Harness | `~/.dsh/skills/awesome-novel/` |
+| Grok Build | `~/.grok/skills/awesome-novel/` |
 
-You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex` / `zcode` / `dsh`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex / zcode / dsh only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
+You're done once you see **"安装完成"** (Installation complete). To install manually, clone the repo and run `./install.sh <platform>` (`claude-code` / `opencode` / `codex` / `zcode` / `dsh` / `grok`); on Windows (PowerShell) run `install.ps1 <platform>`. `install.sh` also supports `deepseek-tui` / `hermes` / `openclaw` (non-primary platforms). The installer checks the Python version (3.9+ required) and the pyyaml dependency (opencode / codex / zcode / dsh / grok only), and aborts with clear messages instead of failing later when `init.py` / `sync-project.py` run.
 
 **Reasonix:**
 
@@ -424,6 +426,46 @@ Open the project directory in dsh and say **"帮我写本小说"** or **"帮我�
 ```
 
 Upgrade later with `python tools/sync-project.py <novel-project-path> --platform dsh`.
+
+## Grok Build Integration
+
+This skill also supports [Grok Build](https://docs.x.ai/build/overview) (SpaceXAI's coding-agent TUI). The skill convention (directory + `SKILL.md`) is compatible with Claude Code's — **natively supported**. Custom agents are deployed to `.grok/agents/*.md` (Grok's native discovery path). The skill itself is installed **user-level**, while project contents (agents/skills/knowledge/memory) are deployed **project-level** into `.grok/`.
+
+**Hard constraint:** novel-agent must run in the main session. Grok subagents cannot spawn further subagents (depth limit 1); dispatching novel-agent as a child breaks the chain.
+
+### Install
+
+Tell Grok Build "Install awesome-novel-agent for me" and it runs `./install.sh grok` (Windows: `install.ps1 grok`), installing to `~/.grok/skills/awesome-novel/`.
+
+### Initialize a project
+
+Open the target directory in Grok Build and type `/awesome-novel` (or say "help me write a novel"). You can also run:
+
+```bash
+python ~/.grok/skills/awesome-novel/tools/init.py <novel-project-path> --genre <number> --platform grok
+```
+
+The 9 custom agents are deployed as Markdown under `.grok/agents/*.md` (`name` / `description` / `tools`), standalone tools as `.grok/skills/<name>/SKILL.md`, and anti-AI rules, style preferences, format specs, and writing memory land in `.grok/knowledge/` / `.grok/memory/`.
+
+### Start writing
+
+Open the project directory in Grok Build and type `/awesome-novel` or say **"帮我写本小说"** / **"帮我继续写"**. In Grok, novel-agent dispatches sub-agents with `spawn_subagent` (`subagent_type` = the Markdown name under `.grok/agents/`, `isolation: none`); the order-file protocol is identical to the other platforms.
+
+### Project structure differences
+
+```
+.grok/
+├── agents/               # 9 custom agents (Markdown)
+│   ├── novel-agent.md
+│   ├── writer.md
+│   ├── volume-planner.md
+│   └── ...
+├── skills/               # standalone tools (memory-recording, roleplay-sandbox)
+├── knowledge/            # anti-AI rules, style preferences, permanent memory, format specs
+└── memory/               # dynamic writing memory
+```
+
+Upgrade later with `python tools/sync-project.py <novel-project-path> --platform grok`.
 
 ## Star History
 

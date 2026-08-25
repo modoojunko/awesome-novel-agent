@@ -1,6 +1,6 @@
 <p align="center">
   <strong>awesome-novel</strong><br>
-  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness</em>
+  <em>和 AI 一起写小说 —— 支持 Claude Code / OpenCode / Reasonix / Codex / ZCode / DeepSeek Harness / Grok Build</em>
 </p>
 
 <p align="center">
@@ -11,6 +11,7 @@
   <a href="#codex-集成"><img src="https://img.shields.io/badge/Codex-%E2%9C%93%20%E6%94%AF%E6%8C%81-10A37F?style=flat-square" alt="Codex"></a>
   <a href="#zcode-集成"><img src="https://img.shields.io/badge/ZCode-%E2%9C%93%20%E6%94%AF%E6%8C%81-0EA5E9?style=flat-square" alt="ZCode"></a>
   <a href="#dsh-集成"><img src="https://img.shields.io/badge/DeepSeek%20Harness-%E2%9C%93%20%E6%94%AF%E6%8C%81-1F6FEB?style=flat-square" alt="DeepSeek Harness"></a>
+  <a href="#grok-build-集成"><img src="https://img.shields.io/badge/Grok%20Build-%E2%9C%93%20%E6%94%AF%E6%8C%81-111111?style=flat-square" alt="Grok Build"></a>
   <br>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
   <br>
@@ -70,9 +71,9 @@
 
 ## 你需要什么
 
-- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode)、**Reasonix**、**Codex**、**ZCode** 或 **DeepSeek Harness（dsh）** 的电脑
+- 安装了 [Claude Code](https://docs.anthropic.com/zh-CN/docs/claude-code/overview)、[OpenCode](https://github.com/sglaboratory/opencode)、**Reasonix**、**Codex**、**ZCode**、**DeepSeek Harness（dsh）** 或 **[Grok Build](https://docs.x.ai/build/overview)** 的电脑
 - Python 3.9+（macOS 系统自带 3.9 即可用；推荐 3.11+）
-- OpenCode / Codex / ZCode / dsh 平台还需 pyyaml（`pip install pyyaml`；系统 Python 权限受限时用 `pip install --user pyyaml`）
+- OpenCode / Codex / ZCode / dsh / Grok Build 平台还需 pyyaml（`pip install pyyaml`；系统 Python 权限受限时用 `pip install --user pyyaml`）
 - 大概 1 分钟完成安装
 
 
@@ -91,8 +92,9 @@ AI 会自动从仓库 <https://github.com/modoojunko/awesome-novel-agent> 下载
 | Codex | `~/.codex/skills/awesome-novel/` |
 | ZCode | `~/.zcode/skills/awesome-novel/` |
 | DeepSeek Harness | `~/.dsh/skills/awesome-novel/` |
+| Grok Build | `~/.grok/skills/awesome-novel/` |
 
-看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh / install.ps1 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
+看到 **"安装完成"** 就可以了。想手动安装时，克隆仓库后运行 `./install.sh <平台>`（平台：`claude-code` / `opencode` / `codex` / `zcode` / `dsh` / `grok`）；Windows 用 PowerShell 时运行 `install.ps1 <平台>`。install.sh / install.ps1 同时兼容 deepseek-tui / hermes / openclaw（非主推平台）。安装脚本会先检查 Python 版本（需要 3.9+）和 pyyaml 依赖（仅 opencode / codex / zcode / dsh / grok），不满足会直接中止并给出升级 / 安装提示，不会等到 `init.py` / `sync-project.py` 执行时才报错。
 
 **Reasonix：**
 
@@ -124,6 +126,15 @@ dsh 的 skill 约定与 Claude Code 同源（目录 + `SKILL.md`），但**无�
 python ~/.dsh/skills/awesome-novel/tools/init.py <小说项目路径> --platform dsh
 ```
 
+**Grok Build：**
+
+Grok Build 的 skill 约定（目录 + `SKILL.md`）与 Claude Code 同源，**天然兼容**；自定义 agent 走项目 `.grok/agents/*.md`（Grok 原生发现路径）。skill 本体走 install.sh 用户级安装，项目内容由 `init.py --platform grok` 项目级部署到 `.grok/`：
+
+```bash
+./install.sh grok
+python ~/.grok/skills/awesome-novel/tools/init.py <小说项目路径> --platform grok
+```
+
 > **OpenCode 用户注意：** 安装路径为 `~/.config/opencode/skills/awesome-novel/`，初始化后 agent 定义部署在项目 `.opencode/agents/` 下，OpenCode 自动发现。详情见下方 [OpenCode 集成](#opencode) 说明。
 
 > **Codex 用户注意：** skill 安装到 `~/.codex/skills/awesome-novel/`，初始化后 9 个自定义 agent 以 TOML 形式部署在项目 `.codex/agents/` 下，Codex 自动发现。详情见下方 [Codex 集成](#codex-集成) 说明。
@@ -132,12 +143,14 @@ python ~/.dsh/skills/awesome-novel/tools/init.py <小说项目路径> --platform
 
 > **DeepSeek Harness 用户注意：** skill 安装到 `~/.dsh/skills/awesome-novel/`，初始化后 9 个 agent 以 SKILL.md 形式部署在项目 `.dsh/skills/` 下（dsh 无项目级 agents 目录，agents 即 skills），dsh 自动发现。详情见下方 [dsh 集成](#dsh-集成) 说明。
 
+> **Grok Build 用户注意：** skill 安装到 `~/.grok/skills/awesome-novel/`，初始化后 9 个自定义 agent 以 Markdown 形式部署在项目 `.grok/agents/` 下（Grok 原生发现），独立工具部署为 `.grok/skills/`。novel-agent 必须在主会话运行。详情见下方 [Grok Build 集成](#grok-build-集成) 说明。
+
 > **看到这个项目觉得有用？** 顺手点个 Star，这样它会出现在你的 GitHub 首页，让更多人发现。
 > {: .prompt-info }
 
 ## 开始写小说
 
-安装好本体后，在**你想放小说项目的目录**下启动 Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness，输入：
+安装好本体后，在**你想放小说项目的目录**下启动 Claude Code / OpenCode / Codex / ZCode / DeepSeek Harness / Grok Build，输入：
 
 > **/awesome-novel**
 
@@ -145,7 +158,7 @@ python ~/.dsh/skills/awesome-novel/tools/init.py <小说项目路径> --platform
 
 skill 会自动检测目录状态：新目录会先和你确认，然后运行 `init.py` 在本地初始化小说工作空间（项目骨架、agent 定义、知识库、记忆文件），完成后进入写作流程。后续再进入该项目时，说 `@novel-agent` 或 **"帮我继续写"** 就能从中断处恢复。
 
-Reasonix 用户在项目目录运行 `reasonix code` 后，输入 `@novel-agent` 进入写作流程。ZCode 用户在项目目录说 **"帮我写本小说"** 或 **"帮我继续写"** 即可（ZCode 无 `@` 语法，agents 即 skills，novel-agent 由 ZCode 自动发现）。DeepSeek Harness 用户同样直接说 **"帮我写本小说"** 或 **"帮我继续写"** 即可（dsh 的 skill 由模型按 name/description 自动路由）。
+Reasonix 用户在项目目录运行 `reasonix code` 后，输入 `@novel-agent` 进入写作流程。ZCode 用户在项目目录说 **"帮我写本小说"** 或 **"帮我继续写"** 即可（ZCode 无 `@` 语法，agents 即 skills，novel-agent 由 ZCode 自动发现）。DeepSeek Harness 用户同样直接说 **"帮我写本小说"** 或 **"帮我继续写"** 即可（dsh 的 skill 由模型按 name/description 自动路由）。Grok Build 用户输入 `/awesome-novel` 或说 **"帮我写本小说"**。
 
 Agent 会引导你完成后续步骤。系统由 9 个 AI Agent 协作驱动，自动检测进度、调度任务，你只需确认方向和审阅内容。
 
@@ -199,11 +212,11 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 ├── .agent/               # Agent 进度 + 任务通信
 │   ├── status.md         # 进度标记（phase/volume/chapter）
 │   └── task/             # 子 agent 间 order 文件
-├── .opencode/            # OpenCode 用（六选一，由 init.py --platform 决定）
+├── .opencode/            # OpenCode 用（七选一，由 init.py --platform 决定）
 │   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆
-├── .claude/              # Claude Code 用（六选一）
+├── .claude/              # Claude Code 用（七选一）
 │   ├── agents/           # 9 个 Agent 定义（初始化时部署）
 │   ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
 │   └── memory/           # 写作动态记忆（各环节作者反馈）
@@ -211,26 +224,31 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 │       ├── chapter-memory.md
 │       ├── prompt-memory.md
 │       └── writing-memory.md
-├── .reasonix/            # Reasonix 用（六选一）
+├── .reasonix/            # Reasonix 用（七选一）
     ├── skills/           # 11 个 SKILL.md（agents 即 skills）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
-├── .codex/               # Codex 用（六选一）
+├── .codex/               # Codex 用（七选一）
     ├── agents/           # 9 个自定义 agent（TOML，初始化时部署）
     ├── skills/           # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
-├── .zcode/               # ZCode 用（六选一）
+├── .zcode/               # ZCode 用（七选一）
     ├── skills/           # 11 个 SKILL.md（agents 即 skills，初始化时部署）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
-└── .dsh/                 # DeepSeek Harness 用（六选一）
+├── .dsh/                 # DeepSeek Harness 用（七选一）
     ├── skills/           # 11 个 SKILL.md（agents 即 skills，初始化时部署）
+    ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
+    └── memory/           # 写作动态记忆
+└── .grok/                # Grok Build 用（七选一）
+    ├── agents/           # 9 个自定义 agent（Markdown，初始化时部署）
+    ├── skills/           # 独立交互工具（memory-recording、roleplay-sandbox）
     ├── knowledge/        # 格式规范、反 AI 规则、文风偏好、永久记忆
     └── memory/           # 写作动态记忆
 ```
 
-这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` / `.dsh/` 不会同时存在。
+这些全是纯文本 Markdown 文件，你可以直接用编辑器打开看或手动改。实际项目只生成一套平台目录（由 `init.py --platform` 决定），`.claude/` / `.opencode/` / `.reasonix/` / `.codex/` / `.zcode/` / `.dsh/` / `.grok/` 不会同时存在。
 
 ### 规划故事骨架
 
@@ -304,7 +322,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 
 **Q: 我不会编程，能装吗？**
 
-能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-agent，仓库在 https://github.com/modoojunko/awesome-novel-agent"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix、Codex 或 ZCode。
+能。打开你的 AI 工具，对它说"帮我安装 awesome-novel-agent，仓库在 https://github.com/modoojunko/awesome-novel-agent"，AI 会自己运行安装脚本，全程不用复制粘贴命令。唯一的前提是你的电脑上已经装好了 Claude Code、OpenCode、Reasonix、Codex、ZCode、DeepSeek Harness 或 Grok Build。
 
 **Q: 我升级了技能，之前写的小说项目怎么迁移到新格式？**
 
@@ -626,3 +644,43 @@ python ~/.dsh/skills/awesome-novel/tools/init.py <小说项目路径> --genre <�
 ```
 
 升级时用 `python tools/sync-project.py <小说项目路径> --platform dsh` 同步最新框架。
+
+## Grok Build 集成
+
+本 skill 也支持 [Grok Build](https://docs.x.ai/build/overview)（SpaceXAI 的编码 agent TUI）。skill 约定（目录 + `SKILL.md`）与 Claude Code 同源，**天然兼容**；自定义 agent 部署到项目 `.grok/agents/*.md`（Grok 原生发现路径）。skill 本体**用户级安装**，小说项目内的 agents/skills/knowledge/memory 全部**项目级部署**在 `.grok/`。
+
+**关键约束：** novel-agent 必须在主会话运行。Grok 的子代理不能再派子代理（深度上限 1），把 novel-agent 当 subagent 会让调度链断裂。
+
+### 安装
+
+在 Grok Build 里输入 **"帮我安装 awesome-novel-agent"**，它会自动运行 `./install.sh grok`（Windows 用 `install.ps1 grok`），安装到 `~/.grok/skills/awesome-novel/`。
+
+### 初始化项目
+
+在 Grok Build 中打开目标目录，输入 `/awesome-novel`（或说"帮我写本小说"），skill 会自动初始化；也可手动运行：
+
+```bash
+python ~/.grok/skills/awesome-novel/tools/init.py <小说项目路径> --genre <编号> --platform grok
+```
+
+初始化后 9 个自定义 agent 以 Markdown 部署到项目 `.grok/agents/*.md`（`name` / `description` / `tools`），独立交互工具（memory-recording、roleplay-sandbox）部署为 `.grok/skills/<name>/SKILL.md`，反 AI 规则、文风偏好、格式规范与写作记忆分别落在 `.grok/knowledge/`、`.grok/memory/`。
+
+### 开始写作
+
+初始化完成后，在 Grok Build 中打开项目目录，输入 `/awesome-novel` 或说 **"帮我写本小说"** / **"帮我继续写"** 进入写作循环。Grok 环境里 novel-agent 用 `spawn_subagent` 调度子 agent（`subagent_type` = `.grok/agents/*.md` 的 name，`isolation: none`），order 文件协议与其余平台一致。
+
+### 项目结构差异
+
+```
+.grok/
+├── agents/               # 9 个自定义 agent（Markdown）
+│   ├── novel-agent.md
+│   ├── writer.md
+│   ├── volume-planner.md
+│   └── ...
+├── skills/               # 独立交互工具（memory-recording、roleplay-sandbox）
+├── knowledge/            # 反 AI 规则、文风偏好、永久记忆、格式规范
+└── memory/               # 写作动态记忆
+```
+
+升级时用 `python tools/sync-project.py <小说项目路径> --platform grok` 同步最新框架。

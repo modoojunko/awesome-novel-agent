@@ -69,7 +69,7 @@ def main():
         if idx + 1 < len(sys.argv) and not sys.argv[idx + 1].startswith("--"):
             platform_override = sys.argv[idx + 1]
         else:
-            print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode）")
+            print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode|dsh|grok）")
             sys.exit(1)
     platform_override = platform_override or os.environ.get("NOVEL_PLATFORM")
     try:
@@ -219,7 +219,7 @@ def check_freshness(project: Path, platform: Platform):
         sys.exit(0)
     else:
         changes = find_changes(project, platform)
-        if not changes and platform.key in ("reasonix", "codex", "zcode", "dsh"):
+        if not changes and platform.key in ("reasonix", "codex", "zcode", "dsh", "grok"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
         elif not changes:
             # 指纹含风格资产（writing-style.md + style-profiles/**，line 143-149）而 find_changes 只扫
@@ -259,7 +259,7 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
             continue
         if platform.key in ("reasonix", "zcode", "dsh") and name == "skills":
             continue  # 派生产物靠源指纹检测，同步时重新生成
-        if platform.key == "codex" and name in ("agents", "skills"):
+        if platform.key in ("codex", "grok") and name in ("agents", "skills"):
             continue  # TOML/SKILL.md 是派生产物，靠源指纹检测，同步时重新生成
         for item in sorted(src_dir.rglob("*.md")):
             if item.name == ".gitkeep":
@@ -327,8 +327,8 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
         print(f"  [i] {platform.label} 平台无 agents 目录（agents 即 skills）")
         return 0
     target.mkdir(parents=True, exist_ok=True)
-    if platform.key in ("opencode", "codex"):
-        # 转换产物（opencode: permission 格式 + 引用改写；codex: TOML），
+    if platform.key in ("opencode", "codex", "grok"):
+        # 转换产物（opencode: permission 格式 + 引用改写；codex: TOML；grok: agent Markdown），
         # 转换逻辑单源见 platforms.convert_agent_to_platform（与 init.deploy_agents 一致）
         count = 0
         for item in sorted(AGENT_DIR.rglob("*.md")):
@@ -358,10 +358,10 @@ def sync_skills(project_path: Path, platform: Platform) -> int:
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
         print(f"  [OK] {platform.key} skills: {n} 个 SKILL.md 已重新生成")
         return n
-    if platform.key == "codex":
+    if platform.key in ("codex", "grok"):
         deploy_codex_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
-        print(f"  [OK] codex skills: {n} 个 SKILL.md 已重新生成")
+        print(f"  [OK] {platform.key} skills: {n} 个 SKILL.md 已重新生成")
         return n
     target = platform.skills_dir(project_path)
     target.mkdir(parents=True, exist_ok=True)

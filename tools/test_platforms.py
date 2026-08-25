@@ -19,6 +19,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 # 强制 UTF-8 输出，避免 Windows GBK 控制台报错（AGENTS.md:79）
 for _s in (sys.stdout, sys.stderr):
     try:
@@ -56,6 +58,7 @@ def test_detect():
     check("override=claude", p.detect_platform(Path("d:/x"), "claude").key == "claude")
     check("override=zcode", p.detect_platform(Path("d:/x"), "zcode").key == "zcode")
     check("override=dsh", p.detect_platform(Path("d:/x"), "dsh").key == "dsh")
+    check("override=grok", p.detect_platform(Path("d:/x"), "grok").key == "grok")
     check("path reasonix",
           p.detect_platform(Path("d:/proj/.reasonix/skills/awesome-novel")).key == "reasonix")
     check("path opencode",
@@ -64,6 +67,8 @@ def test_detect():
           p.detect_platform(Path("d:/proj/.zcode/skills/awesome-novel")).key == "zcode")
     check("path dsh",
           p.detect_platform(Path("d:/proj/.dsh/skills/awesome-novel")).key == "dsh")
+    check("path grok",
+          p.detect_platform(Path("d:/proj/.grok/skills/awesome-novel")).key == "grok")
     check("default claude",
           p.detect_platform(Path("d:/code/awesome-novel-agent")).key == "claude")
 
@@ -89,6 +94,10 @@ def test_rewrite():
     check("dsh 改写两处",
           out == "先 Read `.dsh/knowledge/anti-ai.md` 和 `.dsh/memory/volume-memory.md`",
           out)
+    out = p.rewrite_refs(text, p.PLATFORMS["grok"])
+    check("grok 改写两处",
+          out == "先 Read `.grok/knowledge/anti-ai.md` 和 `.grok/memory/volume-memory.md`",
+          out)
 
 
 def test_config():
@@ -109,6 +118,10 @@ def test_config():
     check("dsh agents=None", p.PLATFORMS["dsh"].agents_dir(Path("P")) is None)
     check("dsh skills 路径",
           p.PLATFORMS["dsh"].skills_dir(Path("P")) == Path("P") / ".dsh" / "skills")
+    check("grok agents 路径",
+          p.PLATFORMS["grok"].agents_dir(Path("P")) == Path("P") / ".grok" / "agents")
+    check("grok skills 路径",
+          p.PLATFORMS["grok"].skills_dir(Path("P")) == Path("P") / ".grok" / "skills")
     check("unknown key 抛错", _raises(p.platform_from_key, "bad-key"))
     check("检测优先显式覆盖", p.detect_platform(Path("d:/x/.reasonix/skills"), "claude").key == "claude")
     check("检测 codex 路径",
@@ -117,8 +130,12 @@ def test_config():
           p.detect_platform(Path("d:/x/.zcode/skills/awesome-novel")).key == "zcode")
     check("检测 dsh 路径",
           p.detect_platform(Path("d:/x/.dsh/skills/awesome-novel")).key == "dsh")
+    check("检测 grok 路径",
+          p.detect_platform(Path("d:/x/.grok/skills/awesome-novel")).key == "grok")
     check("检测 claude 路径含 codex 子串回落 claude",
           p.detect_platform(Path("/Users/codex-dev/.claude/skills/awesome-novel")).key == "claude")
+    check("检测 claude 路径含 grok 子串回落 claude",
+          p.detect_platform(Path("/Users/grok-dev/.claude/skills/awesome-novel")).key == "claude")
 
 
 def test_yaml_precheck():
@@ -142,6 +159,8 @@ def test_yaml_precheck():
               _raises_system_exit(p.ensure_yaml, p.PLATFORMS["reasonix"]))
         check("缺 yaml 时 zcode 报错",
               _raises_system_exit(p.ensure_yaml, p.PLATFORMS["zcode"]))
+        check("缺 yaml 时 grok 报错",
+              _raises_system_exit(p.ensure_yaml, p.PLATFORMS["grok"]))
     finally:
         builtins.__import__ = real_import
 
@@ -263,6 +282,7 @@ def test_init_layout():
         "reasonix": (["skills", "knowledge", "memory"], [".claude"]),
         "codex":    (["agents", "knowledge", "memory"], [".claude", ".opencode", ".reasonix"]),
         "zcode":    (["skills", "knowledge", "memory"], [".claude", ".opencode", ".reasonix"]),
+        "grok":     (["agents", "knowledge", "memory"], [".claude", ".opencode", ".reasonix"]),
     }
     for key, (subs, absents) in expect_map.items():
         with tempfile.TemporaryDirectory() as td:
@@ -452,6 +472,61 @@ def test_init_layout():
         check("dsh CLAUDE.md 无 .claude/agents",
               ".claude/agents" not in cl and ".dsh/skills/" in cl, cl[:200])
 
+    # grok agent Markdown + skill + 模板
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "grok")
+        n = len(list((tmp / ".grok/agents").glob("*.md")))
+        check("grok agents 数量=9", n == 9, f"实际 {n}")
+        w = (tmp / ".grok/agents/writer.md").read_text(encoding="utf-8")
+        fm = w.split("---", 2)[1]
+        fm_data = yaml.safe_load(fm)
+        check("grok writer frontmatter",
+              "name: writer" in fm and "description:" in fm
+              and "read_file" in fm and "write" in fm, fm[:400])
+        check("grok 子 agent 禁止且未授权 Agent",
+              "Agent" not in fm_data.get("tools", [])
+              and fm_data.get("disallowedTools") == ["Agent"], fm[:400])
+        check("grok 子 agent frontmatter 不使用模型调用名",
+              "spawn_subagent" not in fm_data.get("tools", [])
+              and "spawn_subagent" not in fm_data.get("disallowedTools", []), fm[:400])
+        check("grok writer 引用改写",
+              ".grok/knowledge/" in w and ".claude/knowledge/" not in w)
+        check("grok writer SOP 内联", "执行 SOP：writing-execution.md" in w)
+        check("grok 子 agent 注入调度硬约束",
+              "调度权限硬约束" in w and "spawn_subagent" in w)
+        nv = (tmp / ".grok/agents/novel-agent.md").read_text(encoding="utf-8")
+        nfm = nv.split("---", 2)[1]
+        nfm_data = yaml.safe_load(nfm)
+        check("grok novel-agent 调度适配",
+              "spawn_subagent" in nv and ".grok/agents/" in nv
+              and "Grok Build 调度适配" in nv)
+        check("grok novel-agent frontmatter 启用 Agent 指令",
+              "Agent" in nfm_data.get("tools", [])
+              and "spawn_subagent" not in nfm_data.get("tools", [])
+              and "disallowedTools" not in nfm_data, nfm[:300])
+        check("grok novel-agent 不注入禁调",
+              "调度权限硬约束" not in nv, "novel-agent 是唯一调度者，不应注入禁调")
+        all_md = "".join(
+            f.read_text(encoding="utf-8") for f in sorted((tmp / ".grok/agents").glob("*.md"))
+        )
+        check("grok 全部 agent 无 .claude 残留", ".claude" not in all_md)
+        aa = (tmp / ".grok/agents/anti-ai.md").read_text(encoding="utf-8")
+        aafm = aa.split("---", 2)[1]
+        check("grok anti-ai 保留 shell",
+              "run_terminal_command" in aafm, aafm[:300])
+        check("grok skill roleplay-sandbox",
+              (tmp / ".grok/skills/roleplay-sandbox/SKILL.md").exists())
+        check("grok skill memory-recording",
+              (tmp / ".grok/skills/memory-recording/SKILL.md").exists())
+        ag = (tmp / "AGENTS.md").read_text(encoding="utf-8")
+        check("grok AGENTS.md 指向 .grok/agents", ".grok/agents/" in ag, ag[:200])
+        cl = (tmp / "CLAUDE.md").read_text(encoding="utf-8")
+        check("grok CLAUDE.md 无 .claude/agents",
+              ".claude/agents" not in cl and ".grok/agents/" in cl, cl[:200])
+        check("grok 部署 tools/check-prose.py",
+              (tmp / ".grok/tools/check-prose.py").exists())
+
 
 # ---------------- E2E sync ----------------
 
@@ -521,6 +596,24 @@ def test_sync():
               "allowed-tools:" not in w.split("---", 2)[1]
               and ".dsh/knowledge/" in w and ".claude/" not in w)
         check("dsh sync 无 .claude", not (tmp / ".claude").exists())
+
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        init_project(tmp, "grok")
+        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                 "--platform", "grok"], cwd=str(tmp))
+        check("grok sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        w = (tmp / ".grok/agents/writer.md").read_text(encoding="utf-8")
+        fm_data = yaml.safe_load(w.split("---", 2)[1])
+        check("grok sync 保持 agent Markdown",
+              fm_data.get("name") == "writer"
+              and ".grok/knowledge/" in w and ".claude/" not in w)
+        check("grok sync 子 agent 禁止且未授权 Agent",
+              "Agent" not in fm_data.get("tools", [])
+              and fm_data.get("disallowedTools") == ["Agent"], str(fm_data))
+        check("grok sync 保持 skill",
+              (tmp / ".grok/skills/roleplay-sandbox/SKILL.md").exists())
+        check("grok sync 无 .claude", not (tmp / ".claude").exists())
 
     # tools/check-prose.py 同步恢复（模拟升级：脚本被删/改旧，sync 重新部署）
     with tempfile.TemporaryDirectory() as td:

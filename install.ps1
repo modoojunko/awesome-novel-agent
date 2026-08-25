@@ -16,7 +16,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("claude-code", "opencode", "codex", "zcode", "dsh", "hermes", "openclaw", "deepseek-tui")]
+    [ValidateSet("claude-code", "opencode", "codex", "zcode", "dsh", "grok", "hermes", "openclaw", "deepseek-tui")]
     [string]$Platform
 )
 
@@ -47,6 +47,9 @@ switch ($Platform) {
     "dsh" {
         $DEST_DIR = Join-Path $HOME_DIR ".dsh/skills/awesome-novel"
     }
+    "grok" {
+        $DEST_DIR = Join-Path $HOME_DIR ".grok/skills/awesome-novel"
+    }
 }
 
 $SCRIPT_DIR = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -63,9 +66,9 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# pyyaml 门槛：opencode / codex / zcode / dsh 的 agent/skill 转换依赖 pyyaml（与
+# pyyaml 门槛：opencode / codex / zcode / dsh / grok 的 agent/skill 转换依赖 pyyaml（与
 # tools/platforms.py ensure_yaml 的运行时规则对齐）；claude-code 纯复制不转换，不需要。
-if ($Platform -in @("opencode", "codex", "zcode", "dsh")) {
+if ($Platform -in @("opencode", "codex", "zcode", "dsh", "grok")) {
     & $PY_BIN (Join-Path $SCRIPT_DIR "tools/check-yaml.py") $Platform
     if ($LASTEXITCODE -ne 0) {
         Write-Host "安装中止：缺少 pyyaml。请先执行 pip install pyyaml 后重试。"

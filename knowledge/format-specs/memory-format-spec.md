@@ -18,7 +18,7 @@
     └── permanent-memory.md          # 永久记忆（从 memory/ 晋升的高频条目）
 ```
 
-> 平台目录由 init.py 按 `--platform` 决定：Claude Code → `.claude/`、OpenCode → `.opencode/`、Reasonix → `.reasonix/`、Codex → `.codex/`、ZCode → `.zcode/`、dsh → `.dsh/`。
+> 平台目录由 init.py 按 `--platform` 决定：Claude Code → `.claude/`、OpenCode → `.opencode/`、Reasonix → `.reasonix/`、Codex → `.codex/`、ZCode → `.zcode/`、dsh → `.dsh/`、Grok Build → `.grok/`。
 
 ## 二、文件头
 

@@ -12,11 +12,13 @@ init.py / sync-project.py 共用本模块完成平台检测、目录派发、引
   - dsh      → .dsh/      agents=None（agents 即 skills，DeepSeek Harness 无项目级
                           agents 目录，.dsh/skills 为其项目级 skill 根）, skills=skills,
                           knowledge, memory
+  - grok     → .grok/     agents=agents（Markdown 转换产物，Grok Build 原生发现路径）,
+                          skills=skills, knowledge, memory
 
 扩展新平台（除 PLATFORMS 加一行外，按目录约定二选一）：
   - agents 即 skills 型：_DISPATCH_SECTIONS 加调度适配段 + _convert_standalone_skill
     的 description 后缀，deploy_inline_skills 自动覆盖
-  - 独立 agents 目录型：仿 convert_to_opencode/convert_to_codex 写转换器，
+  - 独立 agents 目录型：仿 convert_to_opencode/convert_to_codex/convert_to_grok 写转换器，
     并在 init.main 与 sync-project.sync_agents/sync_skills 各接一行分发
 
 模块名用 platforms（复数）是刻意避开标准库 platform（单数）同名冲突。
@@ -34,7 +36,7 @@ from style_common import frontmatter_text, split_frontmatter   # 单源 frontmat
 
 @dataclass(frozen=True)
 class Platform:
-    key: str                 # "claude" | "opencode" | "reasonix"
+    key: str                 # "claude" | "opencode" | "reasonix" | "grok"
     label: str               # 显示名
     root: str                # 平台根目录，如 ".reasonix"
     agents: str | None       # agents 子目录；reasonix 为 None（agents 即 skills）
@@ -73,6 +75,8 @@ PLATFORMS = {
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".zcode",)),
     "dsh":      Platform("dsh", "DeepSeek Harness", ".dsh", agents=None,
                          skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".dsh",)),
+    "grok":     Platform("grok", "Grok Build", ".grok", agents="agents",
+                         skills="skills", knowledge="knowledge", memory="memory", detect_keywords=(".grok",)),
 }
 
 
@@ -419,6 +423,7 @@ def convert_agent_to_platform(text: str, platform: Platform,
 
     - opencode: frontmatter → permission 格式 + 引用改写
     - codex: → TOML（SOP 内联需 skill_home；convert_to_codex 内部已含引用改写）
+    - grok: → Grok Build agent Markdown（SOP 内联需 skill_home；convert_to_grok 内部已含引用改写）
     - 其余平台（claude）: 原样（纯复制）
     """
     if platform.key == "opencode":
@@ -427,6 +432,10 @@ def convert_agent_to_platform(text: str, platform: Platform,
         if skill_home is None:
             raise ValueError("codex 平台 agent 转换需要 skill_home（SOP 内联）")
         return convert_to_codex(text, skill_home)
+    if platform.key == "grok":
+        if skill_home is None:
+            raise ValueError("grok 平台 agent 转换需要 skill_home（SOP 内联）")
+        return convert_to_grok(text, skill_home)
     return text
 
 
@@ -574,6 +583,140 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------
+# Grok Build agent 转换（Claude Code agent frontmatter → Grok .grok/agents/*.md）
+# Grok 发现路径：项目 .grok/agents/*.md；调度工具：spawn_subagent（深度上限 1）
+# ---------------------------------------------------------------
+
+_GROK_TOOL_MAP = {
+    "Read": "read_file",
+    "Write": "write",
+    "Edit": "search_replace",
+    "Glob": "list_dir",
+    "Grep": "grep",
+    "Agent": "Agent",            # frontmatter 指令；模型调用名仍是 spawn_subagent
+    "Bash": "run_terminal_command",
+}
+
+_GROK_DISPATCH_BAN = """## 调度权限硬约束（最高优先级，先于本文件其余一切指令）
+
+你是执行型子 agent，没有任何调度权。**禁止使用 `spawn_subagent` 工具派生子 agent**
+（包括派发与自己同名的 agent，禁止任何形式的递归派生）。Grok Build 的子代理深度上限为 1，
+即便调用也会失败；这条禁令不因工具可见而失效。
+
+同时禁止：
+- 写 `.agent/task/` 下除本 order 以外的任何文件
+- 写 `.agent/status.md` 的 `phase` / `current_step` / `last_volume_completed` 字段
+  （这些字段只有 novel-agent 能写）
+- 代替 novel-agent 推进流水线（写新 order、更新 phase）
+
+你只做：
+1. 读取 order 文件，执行其中指定的任务
+2. 写 order 的 `outputs` 指向的文件
+3. 完成后把 order 的 `status` 覆盖为 `DONE` 并结束
+
+任务需要其他 agent 协作（如发现需要新增设定/归档/评审）时，不要自己调度——
+在回复中明确告诉 novel-agent"下一步应调度谁、为什么"，由 novel-agent 调度。
+
+工具对应：创建/覆盖文件用 `write`，局部修改用 `search_replace`，列目录用 `list_dir`，搜索用 `grep`。"""
+
+
+def _yaml_quote(s: str) -> str:
+    """YAML 双引号标量转义。"""
+    return '"' + s.replace("\\", "\\\\").replace('"', '\\"') + '"'
+
+
+def convert_to_grok(text: str, skill_home: Path) -> str:
+    """Claude Code agent frontmatter → Grok Build 项目级 agent Markdown。
+
+    - 必填字段：name / description（Grok 官方约定）
+    - tools：YAML 列表，Agent 保留为 Grok 的子代理授权指令
+    - disallowedTools：子 agent 用 Agent 禁止子代理工具族
+    - skills：Claude 的 path 对象列表与 Grok 的 skill 名列表不兼容，SOP 内联进正文后丢弃
+    - 其余 Claude 私有字段（role/react/memory/knowledge）丢弃，避免 Grok 解析失败
+    - novel-agent 注入 spawn_subagent 调度适配段；子 agent 注入调度硬约束
+    - 路径改写：.claude/knowledge、.claude/memory → .grok/ 对应目录
+    """
+    data, _body = split_frontmatter(text)
+    if not data:
+        return rewrite_refs(text, PLATFORMS["grok"])
+
+    name = str(data.get("name", "unknown")).strip()
+    desc = str(data.get("description", "") or "").strip()
+
+    tools_raw = str(data.get("tools", "") or "")
+    allowed = []
+    for t in tools_raw.split(","):
+        t = t.strip()
+        if not t:
+            continue
+        mapped = _GROK_TOOL_MAP.get(t, t)
+        if name != "novel-agent" and mapped == "Agent":
+            continue
+        if mapped not in allowed:
+            allowed.append(mapped)
+
+    body = _body.strip()
+    if name == "novel-agent":
+        body += (
+            "\n\n## Grok Build 调度适配（本环境无 Agent 工具）\n"
+            "在 Grok Build 环境调度子 agent 用 `spawn_subagent` 工具：\n"
+            f"- 子 agent 名即 `.grok/agents/` 下的 Markdown 名（{' / '.join(SUBAGENT_NAMES)}）\n"
+            "- 调用 `spawn_subagent(subagent_type=\"<子agent名>\", prompt=<order 路径与任务要求>, "
+            "isolation=\"none\")`\n"
+            "- isolation 必须是 none（共享工作区，子 agent 写回同一项目）；禁止 worktree\n"
+            "- 把 order 文件路径与任务要求写进 prompt；order 文件协议（status: DONE）不变\n"
+            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+            "- 你必须在**主会话**中运行：Grok 子代理不能再派子代理（深度上限 1），"
+            "novel-agent 若被 spawn 为子代理，调度链会断裂\n"
+            "- 工具对应：读文件 `read_file`，写/覆盖 `write`，搜索 `grep`，列目录 `list_dir`\n"
+        )
+    else:
+        body = _GROK_DISPATCH_BAN + "\n\n" + body
+
+    if allowed:
+        if name == "novel-agent":
+            body += (
+                "\n\n（自动生成）本 agent 声明的工具范围："
+                + "、".join(allowed)
+                + "。你是唯一调度者，spawn_subagent 只用于调度子 agent，禁止派生 novel-agent 自身。"
+            )
+        else:
+            body += (
+                "\n\n（自动生成）本 agent 声明的工具范围："
+                + "、".join(allowed)
+                + "。子 agent 禁止 spawn_subagent。"
+            )
+
+    sop_sections = []
+    for rel in _agent_skill_paths(data):
+        sop = skill_home / rel
+        if sop.exists():
+            sop_sections.append(
+                f"\n---\n\n## 执行 SOP：{sop.name}\n\n{sop.read_text(encoding='utf-8').strip()}"
+            )
+    instructions = body + "\n".join(sop_sections)
+    instructions = rewrite_refs(instructions, PLATFORMS["grok"])
+
+    fm_lines = [
+        "---",
+        f"name: {name}",
+        f"description: {_yaml_quote(desc)}",
+    ]
+    if allowed:
+        fm_lines.append("tools:")
+        for t in allowed:
+            fm_lines.append(f"  - {t}")
+    if name != "novel-agent":
+        fm_lines.append("disallowedTools:")
+        fm_lines.append("  - Agent")
+        fm_lines.append("agentsMd: false")
+    else:
+        fm_lines.append("agentsMd: true")
+    fm_lines.append("---")
+    return "\n".join(fm_lines) + "\n\n" + instructions + "\n"
+
+
 def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> None:
     """生成 <project>/<platform.root>/agents/<name>.toml（9 个），引用改写为平台路径。
 
@@ -617,12 +760,12 @@ def _convert_codex_inline_skill(text: str, name: str) -> str:
 
 
 def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成独立交互工具为 Codex skill（<project>/<platform.root>/skills/<name>/SKILL.md）。
+    """生成独立交互工具为 skill（<project>/<platform.root>/skills/<name>/SKILL.md）。
 
-    仅 codex 平台调用。9 个 agent 走 .codex/agents/*.toml（deploy_codex_agents），
-    此处只部署不进调度链的独立工具（memory-recording、roleplay-sandbox）。
+    codex / grok 调用。9 个 agent 走独立 agents 目录，此处只部署不进调度链的
+    独立工具（memory-recording、roleplay-sandbox）。
     """
-    if platform.key != "codex":
+    if platform.key not in ("codex", "grok"):
         return
     skills_dir = skill_home / "skills"
     target = platform.skills_dir(project)
@@ -633,8 +776,10 @@ def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform) -> 
         sf = skills_dir / f"{skill_name}.md"
         if sf.exists():
             body = _convert_codex_inline_skill(sf.read_text(encoding="utf-8"), skill_name)
+            if platform.key == "grok":
+                body = body.replace("Codex skill", "Grok Build skill")
             body = rewrite_refs(body, platform)
             skill_dir = target / skill_name
             skill_dir.mkdir(parents=True, exist_ok=True)
             (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
-    print(f"  ✅ 已部署 Codex 独立工具 skill 到 {target}")
+    print(f"  ✅ 已部署 {platform.label} 独立工具 skill 到 {target}")

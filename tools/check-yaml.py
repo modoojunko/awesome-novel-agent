@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """pyyaml 门槛检查（安装阶段 fail-fast 用）。
 
-opencode / codex 平台的 agent 转换依赖 pyyaml；install.sh / install.ps1
+opencode / codex / grok 等非 claude 平台的 agent 转换依赖 pyyaml；install.sh / install.ps1
 在任何目录创建/删除前调用本脚本，缺失时立即中止，而不是等 init.py /
 sync-project.py 执行时才报错。claude 平台纯复制不转换，无需本检查。
 
