@@ -483,7 +483,9 @@ def test_init_layout():
         fm_data = yaml.safe_load(fm)
         check("grok writer frontmatter",
               "name: writer" in fm and "description:" in fm
-              and "read_file" in fm and "write" in fm
+              and "read_file" in fm and "write" in fm, fm[:400])
+        check("grok 子 agent 禁止且未授权 Agent",
+              "Agent" not in fm_data.get("tools", [])
               and fm_data.get("disallowedTools") == ["Agent"], fm[:400])
         check("grok 子 agent frontmatter 不使用模型调用名",
               "spawn_subagent" not in fm_data.get("tools", [])
@@ -602,9 +604,13 @@ def test_sync():
                  "--platform", "grok"], cwd=str(tmp))
         check("grok sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         w = (tmp / ".grok/agents/writer.md").read_text(encoding="utf-8")
+        fm_data = yaml.safe_load(w.split("---", 2)[1])
         check("grok sync 保持 agent Markdown",
-              "name: writer" in w and "spawn_subagent" in w
+              fm_data.get("name") == "writer"
               and ".grok/knowledge/" in w and ".claude/" not in w)
+        check("grok sync 子 agent 禁止且未授权 Agent",
+              "Agent" not in fm_data.get("tools", [])
+              and fm_data.get("disallowedTools") == ["Agent"], str(fm_data))
         check("grok sync 保持 skill",
               (tmp / ".grok/skills/roleplay-sandbox/SKILL.md").exists())
         check("grok sync 无 .claude", not (tmp / ".claude").exists())

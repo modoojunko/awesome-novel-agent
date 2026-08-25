@@ -651,7 +651,7 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
         if not t:
             continue
         mapped = _GROK_TOOL_MAP.get(t, t)
-        if name != "novel-agent" and mapped == "spawn_subagent":
+        if name != "novel-agent" and mapped == "Agent":
             continue
         if mapped not in allowed:
             allowed.append(mapped)
