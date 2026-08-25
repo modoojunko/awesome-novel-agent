@@ -1,7 +1,7 @@
 # awesome-novel-agent 架构文档
 
 > 面向开发者理解实现细节。面向使用者的内容见 [README.md](./README.md)。
-> 当前版本：v4.19.0
+> 当前版本：v4.20.0
 
 ---
 
