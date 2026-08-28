@@ -33,6 +33,23 @@ novel-agent **只做三件事**：
 | finished | 无（终态） | 无——完本退出，不调度 |
 | （卷完成后触发） | updater | `memory-sweep-order.md`（记忆兜底：格式验证/查重/压缩/永久记忆升降级） |
 
+## 作者确认关卡（人铸灵魂，AI 行笔墨）
+
+设定、卷纲、章纲是故事的灵魂，AI 只负责笔墨。以下产出 order DONE 后**必须停下等作者确认**，未确认前不写下一步 order、不推进 step（与 setup 的确认语义同构）：
+
+| 产出 | 确认动作 | 作者确认后 |
+|------|---------|-----------|
+| 设定（`setting-update-order.md` DONE） | 展示设定摘要（文件清单 + 世界观/题材/角色/文风要点） | phase→outline, step→volume-planning |
+| 卷纲（`volume-plan-order.md` DONE） | 展示卷纲摘要（四幕结构/情绪走向/章数，日常语言） | step→chapter-planning |
+| 章纲（`chapter-plan-order.md` DONE） | 展示章纲摘要（本章核心剧情/情绪节奏/钩子，日常语言） | phase→draft, step→prompt-crafting |
+
+确认语义：
+
+- 作者明确确认（"可以/没问题/就这样"）→ 推进；作者要改 → 重派对应 agent（order 内嵌修改意见）→ 改完再次展示确认（受重试/断路器约束）
+- 作者回复模糊（"差不多""你看着办"）→ 一律视为未确认，追问具体哪项不确定
+- 作者说"你全权写/别等确认"（全自动模式）→ 展示摘要后视为已确认直接推进；**单次有效**，下一关卡仍停（作者再说一次即再放行）
+- **作者说"继续/推进"= 推进到下一个作者确认关卡即停**，不是推到底；正文流水线（提示词→正文→去AI味→验收→归档）属 AI 笔墨，确认章纲后可连续推进到归档后的重写/下一章询问
+
 ## 卷完成判定（novel-agent 专属，不派给子 agent）
 
 updater 归档 order 标 DONE 后，novel-agent 自己裁决（不写 order、不派发）：
@@ -82,8 +99,8 @@ outputs:
 | 阶段 | 已完成信号 | 判断 |
 |------|-----------|------|
 | setup | `setting-update-order` DONE 且 outputs 非空 | 不推进 phase——展示设定摘要等作者确认 |
-| volume-planning | `章节状态 > volume-planning` | 成立 → 跳过 |
-| chapter-planning | `章节状态 > chapter-planning` | 成立 → 跳过 |
+| volume-planning | `章节状态 > volume-planning`；等值且 `volume-plan-order` DONE | `>` 成立 → 跳过；等值 DONE → 卷纲已写完待作者确认——重新展示卷纲摘要等确认，不重派 |
+| chapter-planning | `章节状态 > chapter-planning`；等值且 `chapter-plan-order` DONE | `>` 成立 → 跳过；等值 DONE → 章纲已写完待作者确认——重新展示章纲摘要等确认，不重派 |
 | prompt-crafting | `章节状态 > prompt-crafting` | 成立 → 跳过 |
 | writing | `章节状态 > writing` | 成立 → 跳过 |
 | anti-ai | `章节状态 > anti-ai` | 成立 → 跳过 |
