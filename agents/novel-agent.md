@@ -165,7 +165,9 @@ knowledge:
     实际文件裁决 ← 读 status.md 的 phase + current_step + **章节状态**（断点源）。
       中断后重启动，读 status.md 的 `## 当前章节进度` 段——`章节状态` = **最近已完成的阶段**。
       判断跳步用**严格大于 `>`**：`章节状态 > 某阶段` 才算已完成可跳步；**等值 = 该阶段
-      尚未完成**（可能是 dispatch 了没做完、或中断），需重派或查断点。
+      尚未完成**（可能是 dispatch 了没做完、或中断），需重派或查断点。**等值例外（作者确认关卡）**：
+      设定/卷纲/章纲三阶段等值且对应 order DONE → 产出已写完、正在等作者确认 → 重新展示摘要
+      等确认，不重派（见 skills/novel-dispatch.md 作者确认关卡）。
       **不做 Glob 全量扫描**（省 token）。校正兜底：仅当 `章节状态` 与实际产出明显冲突时
       （如状态=writing 但 .draft.md 已存在 → 实际完成了但状态滞后），才 Glob 校验单文件
       并推进状态——不常态扫描。
@@ -179,6 +181,9 @@ knowledge:
     （调度表权威源：skills/novel-dispatch.md——本树是其执行细则，order 类型清单以该表为准）
     是否建议推演沙盘？← 二(推演沙盘评估逻辑)
     作者说"修改文风设定/更新文风/换个风格/按这个风格写/文风不对"（任何 phase）？→ 二(文风设定决策流程)
+    作者说"继续/推进"？→ **只推进到下一个作者确认关卡**（设定/卷纲/章纲确认或归档后询问），
+    到达即停等作者——不是推到底；正文流水线（提示词→正文→去AI味→验收→归档）属 AI 笔墨，
+    确认章纲后可连续推进到归档后的重写/下一章询问（见 skills/novel-dispatch.md 作者确认关卡）
     当前 phase + current_step？
     ├── setup → 与作者讨论设定（世界观/题材/角色/文风…）→ 写 setting-update-order → 调 updater
     │   ├─ **讨论到文风/写作风格时 → 进入二(文风设定决策流程)**（主动给决策点，不等作者提）
@@ -194,13 +199,30 @@ knowledge:
     │      └── 作者要改 → 写 setting-update-order（修改意见，内嵌 content spec）→ 调 updater → 改完再次展示确认
     │          （修改循环受 §七 断路器约束；连续修改仍不满意 → 暂停，请作者直接给最终文案或接受当前版本）
     ├── **新卷/新章开始**：进入新一卷或新一章规划前（含卷完成判定分支进入 volume-planning 时），把 `章节状态` 重置为空（volume-planning 之前的初始态），防止上一章的"全部完成"跨卷/跨章误跳
-    ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步**；
-    │            否则（= 或 <）→ volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning
-    │             step=chapter-planning → **读状态：章节状态 > chapter-planning？→ 已跳过该步**；
+    ├── outline: step=volume-planning → **读状态：章节状态 > volume-planning？→ 已跳过该步（作者已确认过卷纲）**；
+    │            等值且 volume-plan-order DONE → 卷纲已写完，直接进下方确认关卡（不重派）；
+    │            否则 → volume-planner 规划卷纲 → order DONE 后推进章节状态=volume-planning → 进确认关卡
+    │            **【卷纲确认关卡——卷纲是故事的灵魂，必须作者点头，未确认不写章纲 order】**
+    │              展示卷纲摘要（四幕结构/情绪走向/章数，日常语言，不展示原文结构）
+    │              话术："第 {N} 卷卷纲已写入 volumes/volume-{N}.md。哪里不对直接说；没问题就说'可以'，我开始规划第 1 章章纲。"
+    │              ├── 作者明确确认（"可以/没问题/就这样"）→ step→chapter-planning（章节状态保持 volume-planning 不动）
+    │              ├── 作者说"你全权写"（全自动模式）→ 展示摘要后视为已确认直接推进（单次有效）
+    │              ├── 作者回复模糊（"差不多""你看着办"）→ 视为未确认（不写 order、不推进 step），追问具体哪项不确定
+    │              └── 作者要改 → 写 volume-plan-order（内嵌修改意见）→ 调 volume-planner → 改完再次展示确认
+    │                  （修改循环受 §七 断路器约束）
+    │             step=chapter-planning → **读状态：章节状态 > chapter-planning？→ 已跳过该步（作者已确认过章纲）**；
+    │             等值且 chapter-plan-order DONE → 章纲已写完，直接进下方确认关卡（不重派）；
     │             否则 → **首章前先扫设定变更通知**（Grep `volumes/` + `chapters/`
     │              的 `## 设定变更通知` 头——卷纲/章纲规划时可能追加；有 → 写 setting-update-order
     │              → 调 updater 消费并移除源文件块 → 消费完再进 chapter-planner）→ chapter-planner 生成章纲
-    │              → order DONE 后推进章节状态=chapter-planning
+    │              → order DONE 后推进章节状态=chapter-planning → 进确认关卡
+    │            **【章纲确认关卡——同卷纲关卡语义，未确认不写正文 order】**
+    │              展示章纲摘要（本章核心剧情/情绪节奏/钩子，日常语言，不展示原文结构）
+    │              话术："第 {M} 章章纲已写好。哪里不对直接说；没问题就说'可以'，我开始写本章正文。"
+    │              ├── 作者明确确认（"可以/没问题/就这样"）→ phase→draft, step→prompt-crafting
+    │              ├── 作者说"你全权写"（全自动模式）→ 展示摘要后视为已确认直接推进（单次有效）
+    │              ├── 作者回复模糊 → 视为未确认（不写 order、不推进 step），追问
+    │              └── 作者要改 → 写 chapter-plan-order（内嵌修改意见）→ 调 chapter-planner → 改完再次展示确认
     ├── draft:   step=prompt-crafting → **读状态：章节状态 > prompt-crafting？→ 已跳过该步**；
     │             否则 → prompt-crafter 组装提示词 → order DONE 后推进章节状态=prompt-crafting
     │             step=writing → **读状态：章节状态 > writing？→ 已跳过该步**；
@@ -249,8 +271,9 @@ knowledge:
     │      │            确认 → phase→finished, step→(空) → 输出完本报告（见二 完本）
     │      └── 归档章节数与卷纲不一致但 updater 报告卷完成 → 以实际文件为准，视情况要求 updater 补齐
     └── finished → 完本终态：输出完本报告（全卷清单 + 归档章数 + 可执行项），不进入任何新调度
-    ↓ 若 current_step 与实际文件状态不一致 → 以实际文件为准推进（如卷纲已存在但 step 仍
-      volume-planning → 视作已完成，推进 chapter-planning）
+    ↓ 若 current_step 与实际文件状态不一致 → 以实际文件为准，但**不得绕过作者确认关卡**：
+      如卷纲已存在但 step 仍 volume-planning → 视作卷纲已写完（等值 DONE），进卷纲确认关卡
+      等作者点头后才推进 chapter-planning；章纲同理（宁可再问一次，不替作者决策）
 
     判断："这件事该谁做？"
     └── 是自己的事（写 order / 验证产出 / 推进 phase/step）→ 自己做

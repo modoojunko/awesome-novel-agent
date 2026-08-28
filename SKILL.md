@@ -319,6 +319,8 @@ novel-agent（总指挥）
 
 **调度规则：** novel-agent 是唯一调度者，只写 order 文件 + 调用子 agent。所有内容创作（卷纲/章纲/提示词/正文）、设定维护、归档更新均由子 agent 完成，novel-agent 不得越权代劳。子 agent 完成任务后把 order 覆盖为 `status: DONE`（不删除文件），novel-agent 检测到 DONE 即确认完成。
 
+**作者确认关卡（人铸灵魂，AI 行笔墨）：** 设定、卷纲、章纲 order DONE 后必须停下，向作者展示摘要、等作者确认后才进入下一步——未确认不写下一个 order，作者说"继续/推进"只推进到下一个确认点即停。正文流水线（提示词→正文→去AI味→验收→归档）无需逐步确认，归档后再问作者。详见 `skills/novel-dispatch.md`。
+
 **重要：novel-agent 是顶层入口，通过 `@novel-agent`（Claude Code / OpenCode / Codex）或 ZCode / Grok Build 的 skill 自动发现加载进主 agent，禁止通过 Agent / spawn_subagent 将 novel-agent 作为 subagent 调度。** 主 agent 加载 novel-agent 定义后即扮演总指挥角色，拥有完整的调度权限。如果 novel-agent 被作为 subagent 派出，它将失去再派子 agent 的能力（Grok 深度上限为 1），导致调度链断裂。
 
 ## 工具契约
