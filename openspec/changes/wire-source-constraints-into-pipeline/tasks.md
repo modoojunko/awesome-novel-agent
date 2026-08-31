@@ -24,5 +24,6 @@
 ## 5. 收尾与发版
 
 - [x] 5.1 全量检查：`check-agents.py` + `check-conflicts.py` + `py_compile` + `test_platforms.py`（验证：全绿）
-- [ ] 5.2 至少一个 AI 终端实测：初始化新项目→走一遍 writer/prompt/anti-ai 挂接点（验证：按仓库提交指南）
+- [x] 5.2 至少一个 AI 终端实测：初始化新项目→走一遍 writer/prompt/anti-ai 挂接点（验证：按仓库提交指南）
+  - 2026-08-31 claude 无头会话实测 anti-ai 挂接点：结构热源扫描命中 4 处并单列、双脚本真实执行且交叉结论正确（check-prose 全绿/check-chapter 红=热源在结构不在词句，与设计论断一致）
 - [x] 5.3 发版 `chore: bump version to v4.23.0`，更新 `VERSION` 与 `docs/releasenotes/releasenote-4.23.0.md`（验证：`check-version.py` 通过）

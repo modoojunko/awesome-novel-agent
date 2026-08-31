@@ -13,4 +13,5 @@
 
 - [x] 3.1 全量检查：`check-agents.py` + `check-conflicts.py` + `py_compile` + `test_platforms.py`（验证：全绿）
 - [ ] 3.2 真机演练一次：本地送检工具（用户自备）→ 走完 修最高窗→锁版→沉淀 全流程（验证：战役记录新增一轮、回归串入库、check-chapter 复跑 exit 0）
+  - 2026-08-31 已验证触发与降级语义：claude 无头会话正确识别"送检"意图、本地无工具时按 skill 优雅终止并给作者大白话说明、未越权写文件；真机外测全流程仍待作者自备检测途径
 - [x] 3.3 发版 `chore: bump version to v4.24.0`，更新 `VERSION` 与 `docs/releasenotes/releasenote-4.24.0.md`（验证：`check-version.py` 通过）
