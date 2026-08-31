@@ -18,6 +18,6 @@
 ## 4. 收尾与发版
 
 - [x] 4.1 全量检查：`check-agents.py` + `check-conflicts.py` + `py_compile` + 两个测试脚本（验证：全绿）
-- [ ] 4.2 在至少一个 AI 终端实测初始化项目并跑一次 check-chapter（验证：按仓库提交指南）
-  - 已完成本地机械验证（init 临时项目→部署产物可运行、警告正确、合并知识就位）；AI 终端实测待作者执行
+- [x] 4.2 在至少一个 AI 终端实测初始化项目并跑一次 check-chapter（验证：按仓库提交指南）
+  - 2026-08-31 claude 无头会话实测：init 临时项目→部署产物可运行；anti-ai 会话实际执行两个脚本，check-chapter exit 1 正确命中夹层硬伤、5 项警告逐条列出（详见 PR test/ai-terminal-verification）
 - [x] 4.3 发版 `chore: bump version to v4.22.0`，更新 `VERSION` 与 `docs/releasenotes/releasenote-4.22.0.md`（验证：`check-version.py` 通过）
