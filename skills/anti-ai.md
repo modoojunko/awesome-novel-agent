@@ -306,9 +306,10 @@ Gate F 修改：X 处
 
 ```
 python3 .claude/tools/check-prose.py <临时文件路径>
+python3 .claude/tools/check-chapter.py <临时文件路径>
 ```
 
-- 「需要修改」清零 → 脚本核验通过；仍有命中 → 回 Phase 3 处理后复跑
+- 「需要修改」清零 → 脚本核验通过；仍有命中 → 回 Phase 3 处理后复跑（两个脚本都须清零各自硬性项）
 - 误杀防护豁免同样适用：命中在 `.claude/knowledge/anti-ai.md` 误杀防护列表 → 标注 `[SKIP: 误杀防护]`，不强制清零
 - 「需要人工判断」照旧人工裁量，不要求清零
 - 降级：跑不了脚本（缺失/无 python，Windows 判定见 Phase 2/无 shell）→ 报告标注「未跑脚本核验」（非阻塞）
