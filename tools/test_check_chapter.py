@@ -149,6 +149,19 @@ def test_regression_hit_hard():
     sys.stdout.write("ok test_regression_hit_hard\n")
 
 
+def test_regression_comment_ignored():
+    # # 注释行不参与匹配（模板自带的说明行保持惰性）
+    tmp, path = write_chapter(CLEAN_LONG_TEXT)
+    sandbox = tmp / "sandbox"
+    sandbox.mkdir()
+    (sandbox / "prose-regressions.txt").write_text(
+        "# 这是注释说明，不参与匹配\n", encoding="utf-8"
+    )
+    code, out = run_tool([str(path)])
+    check("回归库注释行不命中", code == 0, out)
+    sys.stdout.write("ok test_regression_comment_ignored\n")
+
+
 def test_regression_missing_ok():
     # 无 sandbox 文件 → 正常按其余检查跑
     tmp, path = write_chapter(CLEAN_LONG_TEXT)

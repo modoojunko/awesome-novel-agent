@@ -307,6 +307,8 @@ def test_init_layout():
             aa = tmp / f".{key}" / "knowledge" / "anti-ai.md"
             check(f"{key} anti-ai.md 合并结构热源定律",
                   aa.exists() and "结构热源定律" in aa.read_text(encoding="utf-8"))
+            for sb in ("detect-battles.md", "prose-regressions.txt", "locked-lines.txt"):
+                check(f"{key} 生成 sandbox/{sb}", (tmp / "sandbox" / sb).exists())
             for a in absents:
                 check(f"{key} 无 {a}", not (tmp / a).exists())
 
