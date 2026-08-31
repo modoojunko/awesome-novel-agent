@@ -1,6 +1,6 @@
 {
   "name": "awesome-novel",
-  "version": "4.21.0",
+  "version": "4.22.0",
   "description": "和 AI 协作写小说的工作流系统。从世界观搭建到角色塑造，从章节规划到正文写作，支持 Codex、Claude Code、OpenCode、Reasonix、ZCode、DeepSeek Harness（dsh）和 Grok Build。",
   "author": {
     "name": "modoojunko",

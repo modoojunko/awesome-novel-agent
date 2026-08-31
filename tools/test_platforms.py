@@ -298,6 +298,15 @@ def test_init_layout():
                 check(f"{key} check-prose.py 内容与源一致",
                       t.read_text(encoding="utf-8") ==
                       (TOOLS / "check-prose.py").read_text(encoding="utf-8"))
+            t2 = tmp / f".{key}" / "tools" / "check-chapter.py"
+            check(f"{key} 部署 tools/check-chapter.py", t2.exists())
+            if t2.exists():
+                check(f"{key} check-chapter.py 内容与源一致",
+                      t2.read_text(encoding="utf-8") ==
+                      (TOOLS / "check-chapter.py").read_text(encoding="utf-8"))
+            aa = tmp / f".{key}" / "knowledge" / "anti-ai.md"
+            check(f"{key} anti-ai.md 合并结构热源定律",
+                  aa.exists() and "结构热源定律" in aa.read_text(encoding="utf-8"))
             for a in absents:
                 check(f"{key} 无 {a}", not (tmp / a).exists())
 
@@ -622,12 +631,17 @@ def test_sync():
         f = tmp / ".zcode" / "tools" / "check-prose.py"
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text("# 旧版占位\n", encoding="utf-8")
+        fc = tmp / ".zcode" / "tools" / "check-chapter.py"
+        fc.write_text("# 旧版占位\n", encoding="utf-8")
         r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
                  "--platform", "zcode"], cwd=str(tmp))
         check("zcode sync exit 0（脚本恢复）", r.returncode == 0, (r.stdout + r.stderr)[-400:])
         check("zcode sync 恢复 check-prose.py",
               f.exists() and f.read_text(encoding="utf-8") ==
               (TOOLS / "check-prose.py").read_text(encoding="utf-8"))
+        check("zcode sync 恢复 check-chapter.py",
+              fc.exists() and fc.read_text(encoding="utf-8") ==
+              (TOOLS / "check-chapter.py").read_text(encoding="utf-8"))
 
     # 指纹覆盖 tools/check-prose.py：脚本源变更后 --check 应报有更新
     with tempfile.TemporaryDirectory() as td:

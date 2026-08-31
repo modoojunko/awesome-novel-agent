@@ -153,9 +153,10 @@ def compute_fingerprint() -> str:
             if f.is_file() and f.name != ".gitkeep" and "migration" not in f.parts and "settings" not in f.parts:
                 files.append(f)
     # 正文检查脚本（sync_tools 部署范围；不进指纹则升级后存量项目拿不到脚本）
-    prose_check = SKILL_HOME / "tools" / "check-prose.py"
-    if prose_check.is_file():
-        files.append(prose_check)
+    for name in ("check-prose.py", "check-chapter.py"):
+        tool = SKILL_HOME / "tools" / name
+        if tool.is_file():
+            files.append(tool)
 
     h = hashlib.sha256()
     for f in files:
@@ -409,16 +410,19 @@ def sync_knowledge(project_path: Path, platform: Platform) -> int:
 
 def sync_tools(project_path: Path, platform: Platform) -> int:
     """同步正文检查脚本到 <平台>/tools/（源缺失则跳过，anti-ai 降级为模型肉眼）"""
-    src = SKILL_HOME / "tools" / "check-prose.py"
-    if not src.exists():
-        return 0
-    dst = project_path / platform.root / "tools" / "check-prose.py"
-    if dst.exists() and dst.read_bytes() == src.read_bytes():
-        return 0
-    dst.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst)
-    print(f"  [OK] 正文检查脚本: 已更新（{platform.root}/tools/check-prose.py）")
-    return 1
+    count = 0
+    for name in ("check-prose.py", "check-chapter.py"):
+        src = SKILL_HOME / "tools" / name
+        if not src.exists():
+            continue
+        dst = project_path / platform.root / "tools" / name
+        if dst.exists() and dst.read_bytes() == src.read_bytes():
+            continue
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dst)
+        print(f"  [OK] 正文检查脚本: 已更新（{platform.root}/tools/{name}）")
+        count += 1
+    return count
 
 
 def _missing_style_assets(project: Path) -> list[Path]:

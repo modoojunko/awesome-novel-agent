@@ -356,15 +356,19 @@ def deploy_agents(project_path: Path, platform: Platform):
 
 
 def deploy_tools(project_path: Path, platform: Platform):
-    """部署正文检查脚本到 <平台>/tools/（anti-ai 机器初筛用，缺省降级为模型肉眼）"""
-    src = SKILL_HOME / "tools" / "check-prose.py"
-    if not src.exists():
-        print("  ⚠️  缺 tools/check-prose.py——anti-ai 机器初筛将降级为模型肉眼")
-        return
+    """部署正文检查脚本到 <平台>/tools/（anti-ai 机器初筛与章节交付检查用，缺省降级为模型肉眼）"""
     dst_dir = project_path / platform.root / "tools"
     dst_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(src, dst_dir / "check-prose.py")
-    print(f"  ✅ 已部署正文检查脚本（{platform.root}/tools/check-prose.py）")
+    for name, missing_hint in (
+        ("check-prose.py", "anti-ai 机器初筛将降级为模型肉眼"),
+        ("check-chapter.py", "章节交付硬伤检查不可用"),
+    ):
+        src = SKILL_HOME / "tools" / name
+        if not src.exists():
+            print(f"  ⚠️  缺 tools/{name}——{missing_hint}")
+            continue
+        shutil.copy2(src, dst_dir / name)
+        print(f"  ✅ 已部署正文检查脚本（{platform.root}/tools/{name}）")
 
 
 def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
@@ -387,13 +391,15 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
         print(f"  ⚠️  缺题材档案 knowledge/genre-example/{genre}.md——"
               f"不生成 genre-example.md，settings 保留占位（请在设定阶段与作者补全）")
 
-    # 反 AI 规则：正向方法 + 通用 + 题材 + 方法论 + 误杀防护（合并为单个 anti-ai.md）
-    # 注：living-voice / common-rules / anti-ai-writing / boundary-cases 是 anti-ai agent 的必需输入，
-    #     统一合并进 .claude/knowledge/anti-ai.md，避免部署后多个失效路径。
+    # 反 AI 规则：正向方法 + 通用 + 题材 + 方法论 + 误杀防护 + 结构热源（合并为单个 anti-ai.md）
+    # 注：living-voice / common-rules / anti-ai-writing / boundary-cases / structural-heat
+    #     是 anti-ai agent 的必需输入，统一合并进 .claude/knowledge/anti-ai.md，
+    #     避免部署后多个失效路径。
     #     living-voice 排最前：正向方法论（先讲写成什么样）置顶，禁用表随后。
     anti_ai_content = []
     anti_ai_content.append("# 反 AI 规则\n\n[community-defaults]\n")
-    for fname in ("living-voice.md", "common-rules.md", "anti-ai-writing.md", "boundary-cases.md"):
+    for fname in ("living-voice.md", "common-rules.md", "anti-ai-writing.md",
+                  "boundary-cases.md", "structural-heat.md"):
         f = SOURCE_ANTI_AI / fname
         if f.exists():
             anti_ai_content.append(f"\n---\n\n{f.read_text(encoding='utf-8')}")
@@ -677,7 +683,7 @@ def write_status(project_path: Path):
     """初始化 .agent/status.md"""
     status = """# 项目状态
 
-- **skill_version:** 4.21.0
+- **skill_version:** 4.22.0
 - **phase:** setup
 - **current_step:** setting        # volume-planning / chapter-planning / prompt-crafting / writing / anti-ai / reviewing / archiving
 # phase 取值：setup / outline / draft / anti-ai / review / archive / finished
