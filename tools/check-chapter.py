@@ -88,7 +88,8 @@ def load_lines_file(start: Path, name: str) -> list[str]:
         if f.exists():
             try:
                 return [ln.strip() for ln in
-                        f.read_text(encoding="utf-8-sig").splitlines() if ln.strip()]
+                        f.read_text(encoding="utf-8-sig").splitlines()
+                        if ln.strip() and not ln.strip().startswith("#")]
             except OSError:
                 return []
         if cur.parent == cur:
