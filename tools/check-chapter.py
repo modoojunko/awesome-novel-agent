@@ -11,7 +11,7 @@
   sandbox/locked-lines.txt       锁定台词白名单（一行一条，命中行跳过裁定类检查）
 
 用法: python3 check-chapter.py <稿件路径|目录> [更多路径...]   （目录扫描其下 *.md）
-退出码: 0 = 无硬性命中（可有需人工裁定的警告）；1 = 存在硬性命中；2 = 读取失败
+退出码: 0 = 无硬性命中（可有需人工裁定的警告）；1 = 存在硬性命中；2 = 用法错误或读取失败
 """
 
 from __future__ import annotations
@@ -158,8 +158,8 @@ def check_file(path: Path, regressions: list[str], hard_hits: list[str]) -> None
         # --- 警告（需裁定）---
         if len(DASH_DENSE.findall(ln)) >= 3:
             report("破折省略密集", False)
-        if SANDWICH_BROAD.search(ln) and SANDWICH_MID_VERB.search(
-                SANDWICH_BROAD.search(ln).group(0)):
+        if any(SANDWICH_MID_VERB.search(m.group(0))
+               for m in SANDWICH_BROAD.finditer(ln)):
             report("夹层-广义式", False)
         if len(QA_DENSITY.findall(ln)) >= QA_DENSITY_LIMIT:
             report("多轮问答并段", False)
