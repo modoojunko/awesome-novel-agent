@@ -1,4 +1,4 @@
-# awesome-novel-agent - AI-assisted novel writing workflow system
+﻿# awesome-novel-agent - AI-assisted novel writing workflow system
 # Copyright (C) 2026  modoojunko
 #
 # This program is free software: you can redistribute it and/or modify
