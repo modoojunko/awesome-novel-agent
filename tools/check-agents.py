@@ -223,7 +223,7 @@ def _deployed_knowledge_files() -> set[str] | None:
         know = fake_project / ".claude" / "knowledge"
         if not know.is_dir():
             return None
-        return {str(p.relative_to(know)) for p in know.rglob("*") if p.is_file()}
+        return {p.relative_to(know).as_posix() for p in know.rglob("*") if p.is_file()}
 
 
 def check_deployed_knowledge_refs() -> list:
