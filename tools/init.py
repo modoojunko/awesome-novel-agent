@@ -25,6 +25,7 @@ from platforms import (
     deploy_codex_agents,
     deploy_codex_skills,
     deploy_inline_skills,
+    deploy_standalone_skills,
     ensure_yaml,
     rewrite_refs,
     resolve_skill_home,
@@ -230,6 +231,13 @@ def main():
         deploy_codex_skills(project_path, SKILL_HOME, platform, length)
     else:
         deploy_inline_skills(project_path, SKILL_HOME, platform, length)   # 非 inline 平台内部自跳过
+
+    # Step 3.6: 短篇独立工具（扫榜/拆文）——作者主动触发，不进调度链（inline 平台已随 3.5 部署）
+    if length == "short":
+        from platforms import SHORT_STANDALONE_SKILLS
+        n = deploy_standalone_skills(project_path, SKILL_HOME, platform, SHORT_STANDALONE_SKILLS)
+        if n:
+            print(f"  ✅ 已部署短篇独立工具（{n} 个：{'/'.join(SHORT_STANDALONE_SKILLS)}）")
 
     # Step 4: 按题材继承知识
     deploy_knowledge(project_path, genre, platform, length)

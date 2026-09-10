@@ -214,6 +214,9 @@ _READ_SKILL_AGENTS = ("volume-planner", "chapter-planner", "prompt-crafter", "up
 # 不进调度链的独立交互工具（各平台均按 inline skill 部署）
 STANDALONE_SKILLS = ("memory-recording", "roleplay-sandbox")
 
+# 短篇独立工具（扫榜/拆文）：作者主动触发，不进调度链；全平台部署为平台 skills 目录下的 SKILL.md
+SHORT_STANDALONE_SKILLS = ("short-scan", "short-analyze")
+
 # 各平台 novel-agent 调度适配段（{names} 注入 SUBAGENT_NAMES）
 _DISPATCH_SECTIONS = {
     "reasonix": (
@@ -322,7 +325,7 @@ def _convert_standalone_skill(text: str, name: str, platform_key: str) -> str:
         "reasonix": "（由 awesome-novel 自动生成的 inline skill）",
         "zcode": "（由 awesome-novel 自动生成的 ZCode skill）",
         "dsh": "（由 awesome-novel 自动生成的 dsh skill）",
-    }[platform_key]
+    }.get(platform_key, "（由 awesome-novel 自动生成的 skill）")
     fm = (
         f"---\n"
         f"name: {name}\n"
@@ -383,8 +386,11 @@ def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform,
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
 
-    if length != "short":
-        for skill_name in STANDALONE_SKILLS:
+    if length == "short":
+        deploy_standalone_skills(project, skill_home, platform, SHORT_STANDALONE_SKILLS)
+        return True
+
+    for skill_name in STANDALONE_SKILLS:
             sf = skills_dir / f"{skill_name}.md"
             if sf.exists():
                 body = _convert_standalone_skill(sf.read_text(encoding="utf-8"), skill_name,
@@ -807,6 +813,36 @@ def _convert_codex_inline_skill(text: str, name: str) -> str:
         f"---\n"
     )
     return fm + "\n" + text.strip()
+
+
+def deploy_standalone_skills(project: Path, skill_home: Path, platform: Platform,
+                             names) -> int:
+    """部署独立工具为 <platform.skills_dir>/<name>/SKILL.md（全平台统一形态）。
+
+    供短篇独立工具（扫榜/拆文）使用：claude/opencode 首次创建 skills 目录，
+    codex/grok 落在既有独立工具目录，inline 平台由 deploy_inline_skills 转调。
+    已存在且内容一致则跳过（幂等，可被 sync 重复调用）。
+    """
+    target = platform.skills_dir(project)
+    if target is None:
+        return 0
+    target.mkdir(parents=True, exist_ok=True)
+    count = 0
+    for skill_name in names:
+        sf = skill_home / "skills" / f"{skill_name}.md"
+        if not sf.exists():
+            continue
+        body = _convert_standalone_skill(sf.read_text(encoding="utf-8"), skill_name,
+                                         platform.key)
+        body = rewrite_refs(body, platform)
+        skill_dir = target / skill_name
+        skill_dir.mkdir(parents=True, exist_ok=True)
+        out = skill_dir / "SKILL.md"
+        if out.exists() and out.read_text(encoding="utf-8") == body:
+            continue
+        out.write_text(body, encoding="utf-8")
+        count += 1
+    return count
 
 
 def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform,

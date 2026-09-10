@@ -583,7 +583,8 @@ def test_short_init_layout():
                 skills = root / "skills"
                 names = {p.name for p in skills.iterdir() if (p / "SKILL.md").exists()} \
                     if skills.exists() else set()
-                check(f"short {key} 内联 skill 数量=6", len(names) == 6, f"实际 {sorted(names)}")
+                check(f"short {key} 内联 skill 数量=8（6 agent + 2 独立工具）",
+                      len(names) == 8, f"实际 {sorted(names)}")
             for a in short_names:
                 check(f"short {key} 部署 {a}", a in names)
             for a in long_only:
@@ -594,6 +595,11 @@ def test_short_init_layout():
             check(f"short {key} 不合并长篇 anti-ai.md", not (know / "anti-ai.md").exists())
             check(f"short {key} 部署 short-genres/zhuiqi.md",
                   (know / "short-genres" / "zhuiqi.md").exists())
+            sdir = root / "skills"
+            check(f"short {key} 部署独立工具 short-scan",
+                  (sdir / "short-scan" / "SKILL.md").exists())
+            check(f"short {key} 部署独立工具 short-analyze",
+                  (sdir / "short-analyze" / "SKILL.md").exists())
             check(f"short {key} 部署 short-craft 参考齐备（13 个）",
                   len(list((know / "short-craft").glob("*.md"))) == 13)
             check(f"short {key} 部署 10 个题材风格包",
