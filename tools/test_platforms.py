@@ -612,13 +612,22 @@ def test_short_init_layout():
 
 def test_sync():
     print("[e2e] sync-project.py 各平台同步")
+    # P1 回归：长篇项目 sync 后 --check 必须 exit 0（指纹匹配 + 项目侧无漂移）
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "claude")
-        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
-                 "--platform", "claude"], cwd=str(tmp))
-        check("claude sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        r1 = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                  "--platform", "claude"], cwd=str(tmp))
+        check("claude sync exit 0", r1.returncode == 0, (r1.stdout + r1.stderr)[-400:])
         check("claude sync 生成 .claude/skills", (tmp / ".claude/skills").exists())
+        r2 = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                  "--platform", "claude", "--check"], cwd=str(tmp))
+        check("claude sync 后 --check exit 0（无项目侧漂移误报）", r2.returncode == 0,
+              (r2.stdout + r2.stderr)[-400:])
+        # 升级守卫：长篇项目不得被 sync 引入 short/ 篇目目录或短篇知识
+        check("claude sync 不产 short/ 篇目目录", not (tmp / "short").exists())
+        check("claude sync 不产 short-anti-ai.md",
+              not (tmp / ".claude/knowledge/short-anti-ai.md").exists())
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)

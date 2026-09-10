@@ -153,22 +153,41 @@ def main():
     # 解析可选参数
     genre = None
     if genre_num is not None:
-        pool = SHORT_GENRES if length == "short" else GENRES
-        pool_label = f"1-{len(pool)}"
-        try:
-            genre = pool[int(genre_num) - 1]
-        except (IndexError, ValueError):
-            print(f"无效题材编号，可选 {pool_label}")
-            sys.exit(1)
+        if length == "short":
+            pool = SHORT_GENRES
+            if not genre_num.isdigit() or not (1 <= int(genre_num) <= 10):
+                print("无效题材编号，短篇可选 1-10")
+                sys.exit(1)
+            # 注册表 2-10 为规划中的题材（风格包待补），先占位以便设定阶段与作者补全
+            idx = int(genre_num) - 1
+            genre = pool[idx] if idx < len(pool) else f"short-genre-{genre_num}"
+        else:
+            try:
+                genre = GENRES[int(genre_num) - 1]
+            except (IndexError, ValueError):
+                print(f"无效题材编号，可选 1-{len(GENRES)}")
+                sys.exit(1)
     if length == "short":
         # 短篇未指定题材时按注册表第 1 号兜底（第一波仅交付 zhuiqi）
         if genre is None:
             genre = SHORT_GENRES[0]
             print(f"题材: {SHORT_GENRE_LABELS[genre]}（{genre}，短篇默认）")
+        elif genre in SHORT_GENRE_LABELS:
+            print(f"题材: {SHORT_GENRE_LABELS[genre]}（{genre}）")
         else:
-            print(f"题材: {SHORT_GENRE_LABELS.get(genre, genre)}（{genre}）")
+            print(f"题材: {genre}（⚠️ 风格包待补，设定阶段需与作者补全题材要素）")
 
     if project_path.exists():
+        # 长短混用守卫：已存在的项目类型与本次 --length 不一致时拒绝（目录与流程互斥）
+        existing_story = project_path / "story.md"
+        if existing_story.exists():
+            has_short = "**length:** short" in existing_story.read_text(encoding="utf-8")
+            if has_short != (length == "short"):
+                kind_exist = "短篇" if has_short else "长篇"
+                kind_now = "短篇" if length == "short" else "长篇"
+                print(f"错误: 该目录已是{kind_exist}项目（story.md 类型标记不符），"
+                      f"不能以{kind_now}流程重复初始化——请更换目录或保持原流程")
+                sys.exit(1)
         print(f"目录已存在，将在其中创建缺失的文件和目录")
     else:
         project_path.mkdir(parents=True)
@@ -200,11 +219,11 @@ def main():
         if platform.key != "claude":
             print(f"  ⚠️ 短篇流程第一波仅支持 claude 平台（当前 --platform {platform.key}）"
                   f"——骨架已生成，agent 与知识部署跳过，后续 build 支持")
-        elif platform.key == "claude":
-            deploy_agents(project_path, platform, length)
-    elif platform.key == "codex":
+    if length == "short" and platform.key == "claude":
+        deploy_agents(project_path, platform, length)
+    elif length != "short" and platform.key == "codex":
         deploy_codex_agents(project_path, SKILL_HOME, platform)
-    else:
+    elif length != "short":
         deploy_agents(project_path, platform)
 
     # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex/grok 只部署独立工具）
@@ -214,8 +233,9 @@ def main():
         else:
             deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
 
-    # Step 4: 按题材继承知识
-    deploy_knowledge(project_path, genre, platform, length)
+    # Step 4: 按题材继承知识（短篇非 claude 平台第一波不部署，与 agent 跳过一致）
+    if not (length == "short" and platform.key != "claude"):
+        deploy_knowledge(project_path, genre, platform, length)
 
     # Step 4.5: 部署正文检查脚本（anti-ai 机器初筛用，缺省降级为模型肉眼）
     deploy_tools(project_path, platform)
@@ -234,7 +254,10 @@ def main():
         write_status(project_path)
     else:
         # 短篇状态文件（短篇版状态机，模板自带，随骨架拷贝）
-        print("  ✅ 已写入短篇状态文件（.agent/status.md）")
+        if (project_path / ".agent" / "status.md").exists():
+            print("  ✅ 短篇状态文件已就绪（.agent/status.md）")
+        else:
+            print("  ⚠️ 缺 .agent/status.md——状态机文件未生成，请检查 templates/short/")
 
     print(f"\n初始化完成!")
     print(f"项目路径: {project_path}")
@@ -368,7 +391,7 @@ def create_skeleton(project_path: Path, platform: Platform, length=None):
                     # 模板源仅用于生成 codex 项目的 AGENTS.md，不复制进项目
                     continue
                 if platform.key == "codex" and item.name == "AGENTS.md":
-                    codex_tpl = SOURCE_TEMPLATES / "AGENTS.codex.md"
+                    codex_tpl = template_root / "AGENTS.codex.md"
                     if codex_tpl.exists():
                         content = codex_tpl.read_text(encoding="utf-8")
                         content = _rewrite_template_refs(content, platform)
@@ -438,10 +461,9 @@ def deploy_knowledge(project_path: Path, genre: str, platform: Platform, length=
         # 短篇：短篇知识库独立部署，不与长篇反 AI 产物合并
         src_root = SKILL_HOME / "knowledge" / "short"
         anti_ai_src = src_root / "anti-ai" / "short-deslop.md"
-        merged = ["# 短篇去 AI 味口径\n"]
         if anti_ai_src.exists():
-            merged.append(anti_ai_src.read_text(encoding="utf-8"))
-            (knowledge_dir / "short-anti-ai.md").write_text("\n".join(merged), encoding="utf-8")
+            # 直接以源文件内容落盘（源自带 H1 标题），与 sync._sync_short_knowledge 布局一致
+            shutil.copy2(anti_ai_src, knowledge_dir / "short-anti-ai.md")
             count += 1
             print("  ✅ 已部署短篇反 AI 口径（short-anti-ai.md）")
         else:

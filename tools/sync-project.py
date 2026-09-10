@@ -317,6 +317,13 @@ def find_changes(project: Path, platform: Platform, is_short=False) -> list[str]
             if item.name == ".gitkeep":
                 continue
             rel = item.relative_to(src_dir)
+            if name == "agents" and rel.parts[0].startswith("short-"):
+                continue  # 短篇 agent 不进长篇比对（与 sync_agents 长篇分支互斥过滤一致）
+            if name == "knowledge" and rel.parts[0] == "short":
+                continue  # knowledge/short/ 是短篇源，长篇项目不部署不比对
+            # format-specs 在项目侧是拍平部署（FLAT_SUBDIRS 约定），比对目标去掉子目录层
+            if name == "knowledge" and rel.parts[0] == "format-specs":
+                rel = Path(rel.name)
             target = dst_base / rel
             if name == "agents" and platform.key == "opencode":
                 expected = convert_agent_to_platform(item.read_text(encoding="utf-8"),
@@ -489,6 +496,8 @@ def sync_knowledge(project_path: Path, platform: Platform, is_short=False) -> in
             count += 1
     for subdir in KNOWLEDGE_DIR.iterdir():
         if subdir.is_dir() and not subdir.name.startswith("."):
+            if subdir.name == "short":
+                continue  # knowledge/short/ 是短篇源，长篇项目不部署（与 init.deploy_knowledge 一致）
             if subdir.name in FLAT_SUBDIRS:
                 for f in sorted(subdir.glob("*.md")):
                     if _sync_file(f, target / f.name):
@@ -570,8 +579,8 @@ def sync_scaffold(project: Path, platform: Platform) -> int:
         if not item.is_file() or item.name == ".gitkeep":
             continue
         rel = item.relative_to(src)
-        if rel.parts[0] in ("migration", "settings"):
-            continue
+        if rel.parts[0] in ("migration", "settings", "short"):
+            continue  # short 子树是短篇独立模板树，长篇项目脚手架不拷贝（与 init.create_skeleton 一致）
         target = project / rel
         # .agent/status.md：项目状态不覆盖，仅更新 skill_version 行
         if item.name == "status.md" and target.exists() and status_ver:

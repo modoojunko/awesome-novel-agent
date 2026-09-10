@@ -3,7 +3,7 @@ name: short-editor
 description: 短篇编辑 agent：按短篇口径去 AI 味与精修，只改表达不改剧情；产出精修后的 manuscript.md
 role: 短篇编辑
 react: true
-tools: Read, Write, Glob, Grep
+tools: Read, Write, Glob, Grep, Bash
 memory: []
 skills:
   - path: skills/short-polish.md

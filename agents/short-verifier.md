@@ -3,7 +3,7 @@ name: short-verifier
 description: 短篇验收 agent：契约独立审计 + 定稿兑现度核对；只找问题不修问题，产出审计与核对报告
 role: 短篇验收
 react: true
-tools: Read, Write, Glob, Grep
+tools: Read, Write, Glob, Grep, Bash
 memory: []
 skills:
   - path: skills/short-audit.md

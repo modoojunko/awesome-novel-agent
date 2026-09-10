@@ -19,4 +19,4 @@
 ## 用法
 
 - 题材包提供：叙述腔调、开篇范式、钩子母题、情绪烈度、对话风格、**情绪链库**、招式库、节奏骨架、收尾范式
-- 冷门题材（注册表之外）用 `knowledge/short/craft/genre-formulas.md` 的结构骨架兜底，腔调按 `knowledge/short/craft/short-craft.md` 通用底座
+- 冷门题材（注册表之外）用通用底座 `.claude/knowledge/short-craft/short-craft.md` 的结构写法兜底，腔调按其第一人称双轨与情绪直写规则

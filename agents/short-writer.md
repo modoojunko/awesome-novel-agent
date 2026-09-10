@@ -3,7 +3,7 @@ name: short-writer
 description: 短篇写手 agent：按契约分批写正文，节长与总字数硬底线，机器实测字数；产出 manuscript.md
 role: 短篇写手
 react: true
-tools: Read, Write, Glob, Grep
+tools: Read, Write, Glob, Grep, Bash
 memory: []
 skills:
   - path: skills/short-write.md
@@ -67,6 +67,7 @@ knowledge:
 |------|------|------|
 | Read | order、契约、大纲、通用底座、格式规范、去AI口径、manuscript 尾部（衔接用，300-500 字） | 不读其他篇目 |
 | Write | `stories/{slug}/manuscript.md`、对应 order | 其他任何文件 |
+| Bash | 仅字数统计（python 字符计数）、格式 grep 自查 | 其他任何命令 |
 
 ## 六、行为规范与约束
 

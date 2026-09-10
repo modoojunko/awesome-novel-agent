@@ -383,11 +383,9 @@ def check_orphan_knowledge() -> list:
         for m in re.finditer(r"(?<![.a-zA-Z0-9_/-])knowledge/((?:plot|scene|character|title)-craft/"
                              r"[A-Za-z0-9_./{}-]+)", text):
             referenced.add(m.group(1))
-        # 目录级引用（.claude/knowledge/scene-craft/）消费该目录下全部文件
-        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill|short-craft|short-genres)/", text):
-            referenced.add(m.group(1) + "/")
-        # 占位符引用（.claude/knowledge/short-genres/{题材}.md）消费该目录下全部文件
-        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill|short-craft|short-genres)/\{[^}]+\}\.md", text):
+        # 目录级引用（.claude/knowledge/scene-craft/）消费该目录下全部文件；
+        # 占位符引用（.claude/knowledge/short-genres/{题材}.md）同效——均归并为「目录级消费」
+        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill|short-craft|short-genres)/(?:\{[^}]+\}\.md)?", text):
             referenced.add(m.group(1) + "/")
     errors = []
     for rel in sorted(deployed):
