@@ -95,11 +95,15 @@ def main():
         print(f"错误: {project_path} 不是有效的小说项目（缺少 .agent/status.md）")
         sys.exit(2)
 
+    # 项目长度标记（story.md 含 length: short 为短篇项目）——决定同步与校验的对象集
+    story_file = project_path / "story.md"
+    is_short = story_file.exists() and "**length:** short" in story_file.read_text(encoding="utf-8")
+
     if check_only:
-        check_freshness(project_path, platform)
+        check_freshness(project_path, platform, is_short)
         return
 
-    do_sync(project_path, platform)
+    do_sync(project_path, platform, is_short)
 
 
 # ============================================================
@@ -196,7 +200,7 @@ def write_project_fingerprint(project: Path, fingerprint: str, version: str | No
 # 检查
 # ============================================================
 
-def check_freshness(project: Path, platform: Platform):
+def check_freshness(project: Path, platform: Platform, is_short=False):
     current = compute_fingerprint()
     stored, stored_ver = read_project_fingerprint(project)
     latest_ver, _ = get_version_info()
@@ -216,10 +220,20 @@ def check_freshness(project: Path, platform: Platform):
         if version_diff:
             print(f"文件已是最新。{version_info}")
             sys.exit(1)
+        # 指纹只覆盖仓库源；项目侧文件被改动（如作者误编辑部署产物）需 diff 兜底。
+        # 短篇项目的 sync 不覆盖已有知识产物，侧改无法靠指纹发现 → 显式 diff。
+        changes = find_changes(project, platform, is_short)
+        if changes:
+            lines = [f"检测到项目侧文件与源不一致 ({len(changes)} 个):"]
+            for f in changes:
+                lines.append(f"  - {f}")
+            print("\n".join(lines))
+            print("提示: 运行 sync-project.py（不带 --check）以源覆盖恢复。")
+            sys.exit(1)
         print("已是最新。")
         sys.exit(0)
     else:
-        changes = find_changes(project, platform)
+        changes = find_changes(project, platform, is_short)
         if not changes and platform.key in ("reasonix", "codex", "zcode", "dsh", "grok"):
             print("有更新可用（源文件变化，平台派生产物由同步时重新生成）。")
         elif not changes:
@@ -240,9 +254,46 @@ def check_freshness(project: Path, platform: Platform):
         sys.exit(1)
 
 
-def find_changes(project: Path, platform: Platform) -> list[str]:
+def find_changes(project: Path, platform: Platform, is_short=False) -> list[str]:
     """返回与源不同的文件列表（相对路径）。reasonix/zcode/dsh 的 skills 是派生产物，不枚举。"""
     changed = []
+    if is_short:
+        # 短篇项目：agents（短篇组+reader）+ short 知识产物
+        agent_names = {p.stem for p in AGENT_DIR.glob("*.md")
+                       if p.stem.startswith(SHORT_AGENT_PREFIX) or p.stem in SHORT_SHARED_AGENTS}
+        for src in sorted(AGENT_DIR.glob("*.md")):
+            if src.stem not in agent_names or platform.key not in ("claude", "opencode", "codex", "grok"):
+                continue
+            dst = platform.agents_dir(project)
+            if dst is None:
+                break
+            rel = src.stem + (".toml" if platform.key == "codex" else ".md")
+            target = dst / rel
+            if platform.key == "claude":
+                if not target.exists() or target.read_bytes() != src.read_bytes():
+                    changed.append(f"agents/{rel}")
+            else:
+                # 转换产物只查存在性（内容比对见 sync_agents 转换逻辑）
+                if not target.exists():
+                    changed.append(f"agents/{rel}")
+        src_root = SKILL_HOME / "knowledge" / "short"
+        know = platform.knowledge_dir(project)
+        if src_root.exists() and know.exists():
+            anti = know / "short-anti-ai.md"
+            anti_src = src_root / "anti-ai" / "short-deslop.md"
+            if anti_src.exists() and (not anti.exists()
+                                      or anti.read_text(encoding="utf-8") != anti_src.read_text(encoding="utf-8")):
+                changed.append("knowledge/short-anti-ai.md")
+            for sub, dst_name in (("craft", "short-craft"), ("genres", "short-genres")):
+                s = src_root / sub
+                d = know / dst_name
+                if s.exists() and d.exists():
+                    for f in sorted(s.rglob("*.md")):
+                        rel = f.relative_to(s)
+                        t = d / rel
+                        if not t.exists() or t.read_bytes() != f.read_bytes():
+                            changed.append(f"knowledge/{dst_name}/{rel}")
+        return changed
     targets = {
         "agents": platform.agents_dir(project),
         "skills": platform.skills_dir(project),
@@ -266,6 +317,13 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
             if item.name == ".gitkeep":
                 continue
             rel = item.relative_to(src_dir)
+            if name == "agents" and rel.parts[0].startswith("short-"):
+                continue  # 短篇 agent 不进长篇比对（与 sync_agents 长篇分支互斥过滤一致）
+            if name == "knowledge" and rel.parts[0] == "short":
+                continue  # knowledge/short/ 是短篇源，长篇项目不部署不比对
+            # format-specs 在项目侧是拍平部署（FLAT_SUBDIRS 约定），比对目标去掉子目录层
+            if name == "knowledge" and rel.parts[0] == "format-specs":
+                rel = Path(rel.name)
             target = dst_base / rel
             if name == "agents" and platform.key == "opencode":
                 expected = convert_agent_to_platform(item.read_text(encoding="utf-8"),
@@ -282,8 +340,9 @@ def find_changes(project: Path, platform: Platform) -> list[str]:
 # 同步
 # ============================================================
 
-def do_sync(project: Path, platform: Platform):
+def do_sync(project: Path, platform: Platform, is_short=False):
     print(f"项目: {project}")
+    print(f"类型: {'短篇' if is_short else '长篇'}")
     print(f"来源: {SKILL_HOME}")
 
     latest_ver, _ = get_version_info()
@@ -301,11 +360,13 @@ def do_sync(project: Path, platform: Platform):
         return
 
     changes = []
-    changes.append(sync_agents(project, platform))
-    changes.append(sync_skills(project, platform))
-    changes.append(sync_knowledge(project, platform))
-    changes.append(sync_scaffold(project, platform))
-    changes.append(sync_style_assets(project))
+    changes.append(sync_agents(project, platform, is_short))
+    changes.append(sync_skills(project, platform, is_short))
+    changes.append(sync_knowledge(project, platform, is_short))
+    if not is_short:
+        # 短篇项目无长篇脚手架与蒸馏资产（settings/ 卷章体系不存在）
+        changes.append(sync_scaffold(project, platform))
+        changes.append(sync_style_assets(project))
     changes.append(sync_tools(project, platform))
 
     total = sum(c for c in changes if c > 0)
@@ -318,8 +379,12 @@ def do_sync(project: Path, platform: Platform):
         print("提示: 下次写作时生效。")
 
 
-def sync_agents(project_path: Path, platform: Platform) -> int:
-    """同步 agent 定义到当前平台对应的目录"""
+SHORT_AGENT_PREFIX = "short-"
+SHORT_SHARED_AGENTS = {"reader"}
+
+
+def sync_agents(project_path: Path, platform: Platform, is_short=False) -> int:
+    """同步 agent 定义到当前平台对应的目录（短篇项目只同步短篇组 + reader）"""
     if not AGENT_DIR.exists():
         print("  [!] agents 源目录不存在，跳过")
         return 0
@@ -335,6 +400,8 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
         for item in sorted(AGENT_DIR.rglob("*.md")):
             if item.name == ".gitkeep":
                 continue
+            if is_short != (item.stem.startswith(SHORT_AGENT_PREFIX) or item.stem in SHORT_SHARED_AGENTS):
+                continue    # 长短篇 agent 组互斥：短篇项目只同步短篇组+reader，长篇项目只同步长篇组
             rel = item.relative_to(AGENT_DIR)
             dest = target / (item.stem + ".toml") if platform.key == "codex" else target / rel
             content = convert_agent_to_platform(item.read_text(encoding="utf-8"),
@@ -345,7 +412,9 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
             dest.write_text(content, encoding="utf-8")
             count += 1
     else:
-        count = _sync_dir(AGENT_DIR, target, "*.md")
+        count = _sync_dir(
+            AGENT_DIR, target, "*.md",
+            skip=lambda p: is_short != (p.stem.startswith(SHORT_AGENT_PREFIX) or p.stem in SHORT_SHARED_AGENTS))
     if count > 0:
         print(f"  [OK] agent 定义: {count} 个文件已更新（{platform.root}/agents）")
     else:
@@ -353,7 +422,11 @@ def sync_agents(project_path: Path, platform: Platform) -> int:
     return count
 
 
-def sync_skills(project_path: Path, platform: Platform) -> int:
+def sync_skills(project_path: Path, platform: Platform, is_short=False) -> int:
+    if is_short:
+        # 短篇项目：SOP 已内联进 agent（short-* frontmatter 的 skills 字段），无独立 skills 目录同步
+        print("  [i] 短篇项目无独立 skills 同步（SOP 内联于 agent 定义）")
+        return 0
     if platform.key in ("reasonix", "zcode", "dsh"):
         deploy_inline_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
@@ -377,9 +450,39 @@ def sync_skills(project_path: Path, platform: Platform) -> int:
     return count
 
 
-def sync_knowledge(project_path: Path, platform: Platform) -> int:
+def _sync_short_knowledge(project_path: Path, platform: Platform, target) -> int:
+    """短篇知识同步：与 init.deploy_knowledge(short) 同一布局。"""
+    src_root = SKILL_HOME / "knowledge" / "short"
+    if not src_root.exists():
+        print("  [!] knowledge/short 源目录不存在，跳过")
+        return 0
+    count = 0
+    anti_ai_src = src_root / "anti-ai" / "short-deslop.md"
+    if anti_ai_src.exists():
+        dst = target / "short-anti-ai.md"
+        content = anti_ai_src.read_text(encoding="utf-8")
+        if not dst.exists() or dst.read_text(encoding="utf-8") != content:
+            dst.write_text(content, encoding="utf-8")
+            print(f"  [+] short-anti-ai.md")
+        count += 1
+    for sub, dst_name in (("craft", "short-craft"), ("genres", "short-genres")):
+        src = src_root / sub
+        if src.exists() and src.is_dir():
+            dst = target / dst_name
+            dst.mkdir(parents=True, exist_ok=True)
+            for f in sorted(src.rglob("*.md")):
+                rel = f.relative_to(src)
+                if _sync_file(f, dst / rel):
+                    count += 1
+    return count
+
+
+def sync_knowledge(project_path: Path, platform: Platform, is_short=False) -> int:
     target = platform.knowledge_dir(project_path)
     target.mkdir(parents=True, exist_ok=True)
+    if is_short:
+        # 短篇项目：short/ 源 → short-anti-ai.md + short-craft/ + short-genres/（与 init.deploy_knowledge 一致）
+        return _sync_short_knowledge(project_path, platform, target)
     if not KNOWLEDGE_DIR.exists():
         print("  [!] knowledge 源目录不存在，跳过")
         return 0
@@ -393,6 +496,8 @@ def sync_knowledge(project_path: Path, platform: Platform) -> int:
             count += 1
     for subdir in KNOWLEDGE_DIR.iterdir():
         if subdir.is_dir() and not subdir.name.startswith("."):
+            if subdir.name == "short":
+                continue  # knowledge/short/ 是短篇源，长篇项目不部署（与 init.deploy_knowledge 一致）
             if subdir.name in FLAT_SUBDIRS:
                 for f in sorted(subdir.glob("*.md")):
                     if _sync_file(f, target / f.name):
@@ -474,8 +579,8 @@ def sync_scaffold(project: Path, platform: Platform) -> int:
         if not item.is_file() or item.name == ".gitkeep":
             continue
         rel = item.relative_to(src)
-        if rel.parts[0] in ("migration", "settings"):
-            continue
+        if rel.parts[0] in ("migration", "settings", "short"):
+            continue  # short 子树是短篇独立模板树，长篇项目脚手架不拷贝（与 init.create_skeleton 一致）
         target = project / rel
         # .agent/status.md：项目状态不覆盖，仅更新 skill_version 行
         if item.name == "status.md" and target.exists() and status_ver:
@@ -554,10 +659,12 @@ def sync_style_assets(project: Path) -> int:
     return count
 
 
-def _sync_dir(src: Path, dst: Path, pattern: str) -> int:
+def _sync_dir(src: Path, dst: Path, pattern: str, skip=None) -> int:
     count = 0
     for item in sorted(src.rglob(pattern)):
         if item.name == ".gitkeep":
+            continue
+        if skip is not None and skip(item):
             continue
         rel = item.relative_to(src)
         target = dst / rel

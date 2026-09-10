@@ -48,6 +48,11 @@ def init_project(tmp: Path, platform_key: str, genre: str = "1"):
                 "--genre", genre, "--platform", platform_key])
 
 
+def init_short_project(tmp: Path, platform_key: str = "claude", genre: str = "1"):
+    return run([sys.executable, str(TOOLS / "init.py"), str(tmp),
+                "--length", "short", "--genre", genre, "--platform", platform_key])
+
+
 # ---------------- 单元 ----------------
 
 def test_detect():
@@ -541,15 +546,88 @@ def test_init_layout():
 
 # ---------------- E2E sync ----------------
 
+def test_short_init_layout():
+    """短篇 E2E（design D13 第一波范围）：--length short 的 claude 产物形态与长短互斥。"""
+    print("[e2e] init.py --length short 布局（claude）")
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        r = init_short_project(tmp, "claude")
+        check("short init exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        # 骨架：短篇专属目录与标记
+        check("short 存在 stories/", (tmp / "stories").exists())
+        check("short 存在 sandbox/", (tmp / "sandbox").exists())
+        check("short story.md 含 length: short",
+              "**length:** short" in (tmp / "story.md").read_text(encoding="utf-8"))
+        check("short 状态机含 phase=setup",
+              "**phase:** setup" in (tmp / ".agent/status.md").read_text(encoding="utf-8"))
+        check("short 状态机无卷章字段",
+              "current_volume" not in (tmp / ".agent/status.md").read_text(encoding="utf-8")
+              and "current_chapter" not in (tmp / ".agent/status.md").read_text(encoding="utf-8"))
+        # 互斥：不产长篇目录
+        for d in ("volumes", "chapters", "prompts", "archives", "novel-samples"):
+            check(f"short 不产 {d}/", not (tmp / d).exists())
+        # agent 组：5 短篇 + reader，无长篇专属
+        agents_dir = tmp / ".claude" / "agents"
+        names = {p.stem for p in agents_dir.glob("*.md")}
+        for a in ("short-agent", "short-planner", "short-writer", "short-editor", "short-verifier", "reader"):
+            check(f"short 部署 {a}", a in names)
+        for a in ("novel-agent", "volume-planner", "chapter-planner", "prompt-crafter",
+                  "updater", "anti-ai", "style-distiller", "writer"):
+            check(f"short 不部署 {a}", a not in names)
+        # 知识：短篇独立产物
+        know = tmp / ".claude" / "knowledge"
+        check("short 部署 short-anti-ai.md（独立产物）", (know / "short-anti-ai.md").exists())
+        check("short 不合并长篇 anti-ai.md", not (know / "anti-ai.md").exists())
+        check("short 部署 short-craft/", (know / "short-craft").is_dir())
+        check("short 部署 short-genres/zhuiqi.md", (know / "short-genres" / "zhuiqi.md").exists())
+
+    # 编号越界：短篇注册表第一波仅 1 项
+    with tempfile.TemporaryDirectory() as td:
+        r = run([sys.executable, str(TOOLS / "init.py"), str(Path(td)),
+                 "--length", "short", "--genre", "25", "--platform", "claude"])
+        check("short 编号越界 exit 1", r.returncode == 1, (r.stdout + r.stderr)[-200:])
+
+    # 非法长度值
+    with tempfile.TemporaryDirectory() as td:
+        r = run([sys.executable, str(TOOLS / "init.py"), str(Path(td)),
+                 "--length", "medium", "--platform", "claude"])
+        check("非法 --length exit 1", r.returncode == 1, (r.stdout + r.stderr)[-200:])
+        check("非法 --length 不建目录", not (Path(td) / "proj").exists() and list(Path(td).iterdir()) == [])
+
+    # 长篇回归：不传 --length 时无短篇产物
+    with tempfile.TemporaryDirectory() as td:
+        tmp = Path(td)
+        r = init_project(tmp, "claude")
+        check("long init exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        check("long story.md 无 short 标记",
+              "**length:**" not in (tmp / "story.md").read_text(encoding="utf-8"))
+        check("long 不产 stories/", not (tmp / "stories").exists())
+        agents_dir = tmp / ".claude" / "agents"
+        names = {p.stem for p in agents_dir.glob("*.md")}
+        check("long 部署 novel-agent", "novel-agent" in names)
+        check("long 不部署 short-agent", "short-agent" not in names)
+        check("long 不产 short-anti-ai.md",
+              not ((tmp / ".claude" / "knowledge" / "short-anti-ai.md")).exists())
+
+
 def test_sync():
     print("[e2e] sync-project.py 各平台同步")
+    # P1 回归：长篇项目 sync 后 --check 必须 exit 0（指纹匹配 + 项目侧无漂移）
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
         init_project(tmp, "claude")
-        r = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
-                 "--platform", "claude"], cwd=str(tmp))
-        check("claude sync exit 0", r.returncode == 0, (r.stdout + r.stderr)[-400:])
+        r1 = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                  "--platform", "claude"], cwd=str(tmp))
+        check("claude sync exit 0", r1.returncode == 0, (r1.stdout + r1.stderr)[-400:])
         check("claude sync 生成 .claude/skills", (tmp / ".claude/skills").exists())
+        r2 = run([sys.executable, str(TOOLS / "sync-project.py"), str(tmp),
+                  "--platform", "claude", "--check"], cwd=str(tmp))
+        check("claude sync 后 --check exit 0（无项目侧漂移误报）", r2.returncode == 0,
+              (r2.stdout + r2.stderr)[-400:])
+        # 升级守卫：长篇项目不得被 sync 引入 short/ 篇目目录或短篇知识
+        check("claude sync 不产 short/ 篇目目录", not (tmp / "short").exists())
+        check("claude sync 不产 short-anti-ai.md",
+              not (tmp / ".claude/knowledge/short-anti-ai.md").exists())
 
     with tempfile.TemporaryDirectory() as td:
         tmp = Path(td)
@@ -871,6 +949,7 @@ def main():
         ("test_check_yaml", test_check_yaml),
         ("test_check_version", test_check_version),
         ("test_init_layout", test_init_layout),
+        ("test_short_init_layout", test_short_init_layout),
         ("test_sync", test_sync),
         ("test_style_seed_guard", test_style_seed_guard),
         ("test_sync_style_missing_and_scaffold", test_sync_style_missing_and_scaffold),
