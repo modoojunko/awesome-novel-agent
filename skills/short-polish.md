@@ -51,5 +51,6 @@
 - 沙箱资产：`sandbox/prose-regressions.txt` 命中即失败；`sandbox/locked-lines.txt` 命中行跳过裁定
 - 字数复测仍达标（跌破下限 → 回退本次删改，改用降 AI 重写）
 - **交付洁净**：正文末尾无自检记录、无检查标记注释、无工程词
+- 成稿逐项复查对照 `.claude/knowledge/short-craft/quality-checklist.md`（章节结构/开篇/信息传递/场景/章尾/语言）
 - **改稿模式附加**：只动作者要求的节；差异清单不越界（不改走向 / 删冲突 / 加人物 / 改人设 / 改视角）；发现剧情层问题只标记上报，不自行修
 - 剧情层问题清单（本 agent 无权修的）→ order 备注退回总指挥
