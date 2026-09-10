@@ -15,6 +15,16 @@ knowledge:
     description: 短篇正文格式规范（最高优先级，写作前必读）
   - path: .claude/knowledge/short-anti-ai.md
     description: 短篇去AI口径（写时自查 AI 腔，禁用词与所有格规则）
+  - path: .claude/knowledge/short-craft/hooks-chapter.md
+    description: 章节钩子类型库（节尾留钩设计用）
+  - path: .claude/knowledge/short-craft/hooks-paragraph.md
+    description: 段落级钩子技巧
+  - path: .claude/knowledge/short-craft/hooks-suspense.md
+    description: 悬念设计（信息差/时间压力/倒计时）
+  - path: .claude/knowledge/short-craft/dialogue-mastery.md
+    description: 对话权力博弈、潜台词、差异化声线
+  - path: .claude/knowledge/short-craft/genre-writing-techniques.md
+    description: 跨题材通用技法（震惊场景/三翻四震/感情线四阶段）
 ---
 
 # short-writer

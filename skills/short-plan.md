@@ -22,7 +22,7 @@
 1. **选定情绪链**：从题材包「情绪链库」选一条（4-6 阶段）作全篇骨架；阶段数不强制等于五段
 2. **选招式**：从题材包招式库选 2-3 个核心招式（每条是公式 + 示例，使用时必须转化）
 3. **设计反派**（如有）：身份 + 动机 + 作恶阶梯（道德→经济→生命）+ 致命弱点 + 报应
-4. **确定揭露方式**：证物 / 证人 / 偷听 / 剥洋葱，四选一
+4. **确定揭露方式**：证物 / 证人 / 偷听 / 剥洋葱，四选一（机制细节见 `.claude/knowledge/short-craft/villain-and-reveal.md`；反转类型与铺垫手法见 `.claude/knowledge/short-craft/reversal-toolkit.md`；羁绊与余韵的铺法见 `.claude/knowledge/short-craft/emotional-methods.md`；导语与付费点细节见 `.claude/knowledge/short-craft/submission-craft.md`；注册表外冷门题材用 `.claude/knowledge/short-craft/genre-writing-formulas.md` 结构骨架兜底）
 5. **编写 `outline.md`**：
    - **每节一行**，字段：`结构段/五段功能 | 主事件 | 子事件×3-5（->连接，各带功能标签：对话/冲突/伏笔/回忆/发现/递进，描述具体到谁做了什么）| 情绪 | 人物/关系变化 | 因果链 | 读者新获知 | 结尾承接/钩子 | 伏笔/物件 | 动静 | 对话密度 | 目标字数`
    - **因果链固定形状**：`承接点 → 动机与行动 → 核心事件 → 直接后果 → 结尾钩子`；承接点写明继承什么，直接后果写明导致什么，MUST NOT 省略连接位

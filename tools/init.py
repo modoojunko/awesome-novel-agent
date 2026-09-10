@@ -80,8 +80,20 @@ GENRE_LABELS = {
 }
 
 # 短篇题材（--length short 时的编号空间，与 knowledge/short/genres/index.md 注册表同源，index 为权威）。
-SHORT_GENRES = ["zhuiqi"]
-SHORT_GENRE_LABELS = {"zhuiqi": "追妻火葬场"}
+SHORT_GENRES = ["zhuiqi", "shiqing", "fuchou", "zongcai", "zhaidou",
+                "minsu", "xuanyi", "tianchong", "shuangnan", "shadiao"]
+SHORT_GENRE_LABELS = {
+    "zhuiqi": "追妻火葬场",
+    "shiqing": "世情打脸",
+    "fuchou": "复仇打脸",
+    "zongcai": "总裁豪门",
+    "zhaidou": "宅斗宫斗",
+    "minsu": "民俗怪谈",
+    "xuanyi": "悬疑",
+    "tianchong": "甜宠",
+    "shuangnan": "双男主",
+    "shadiao": "沙雕脑洞",
+}
 
 # 长篇与短篇的 agent 集合互斥（短篇第一波只交付 claude 产物链，其余平台后续 build 补）。
 SHORT_AGENTS = ("short-agent", "short-planner", "short-writer", "short-editor", "short-verifier", "reader")
@@ -158,9 +170,7 @@ def main():
             if not genre_num.isdigit() or not (1 <= int(genre_num) <= 10):
                 print("无效题材编号，短篇可选 1-10")
                 sys.exit(1)
-            # 注册表 2-10 为规划中的题材（风格包待补），先占位以便设定阶段与作者补全
-            idx = int(genre_num) - 1
-            genre = pool[idx] if idx < len(pool) else f"short-genre-{genre_num}"
+            genre = pool[int(genre_num) - 1]
         else:
             try:
                 genre = GENRES[int(genre_num) - 1]
@@ -168,14 +178,10 @@ def main():
                 print(f"无效题材编号，可选 1-{len(GENRES)}")
                 sys.exit(1)
     if length == "short":
-        # 短篇未指定题材时按注册表第 1 号兜底（第一波仅交付 zhuiqi）
         if genre is None:
-            genre = SHORT_GENRES[0]
-            print(f"题材: {SHORT_GENRE_LABELS[genre]}（{genre}，短篇默认）")
-        elif genre in SHORT_GENRE_LABELS:
-            print(f"题材: {SHORT_GENRE_LABELS[genre]}（{genre}）")
+            genre = select_genre(SHORT_GENRES, SHORT_GENRE_LABELS)
         else:
-            print(f"题材: {genre}（⚠️ 风格包待补，设定阶段需与作者补全题材要素）")
+            print(f"题材: {SHORT_GENRE_LABELS.get(genre, genre)}（{genre}）")
 
     if project_path.exists():
         # 长短混用守卫：已存在的项目类型与本次 --length 不一致时拒绝（目录与流程互斥）
@@ -250,6 +256,17 @@ def main():
         else:
             print("  ⚠️ 缺 .agent/status.md——状态机文件未生成，请检查 templates/short/")
 
+        # 跨篇作者偏好记忆（契约组装时读取，交付后追加）
+        feedback = platform.memory_dir(project_path) / "author-feedback.md"
+        if not feedback.exists():
+            feedback.write_text(
+                "# 跨篇作者偏好记忆\n\n"
+                "> 作者在短篇交付后确认的偏好，由 short-agent 在交付时追加；\n"
+                "> short-planner 组装契约的「作者偏好记忆」字段从这里取用。\n\n"
+                "---\n\n## 条目列表\n",
+                encoding="utf-8")
+            print(f"  ✅ 已初始化跨篇偏好记忆（{platform.root}/memory/author-feedback.md）")
+
     print(f"\n初始化完成!")
     print(f"项目路径: {project_path}")
     if length == "short":
@@ -284,20 +301,22 @@ def _genre_gaps(genre: str) -> list:
     return gaps
 
 
-def select_genre() -> str:
+def select_genre(pool=None, labels=None) -> str:
     """交互式选题材（知识库不完整的题材标注缺口，防止静默选到空壳）"""
+    pool = pool if pool is not None else GENRES
+    labels = labels if labels is not None else GENRE_LABELS
     print("\n可选题材:")
-    for i, g in enumerate(GENRES, 1):
-        gaps = _genre_gaps(g)
+    for i, g in enumerate(pool, 1):
+        gaps = _genre_gaps(g) if pool is GENRES else []
         mark = f"　⚠️ {'、'.join(gaps)}" if gaps else ""
-        print(f"  {i:2d}. {GENRE_LABELS[g]}（{g}）{mark}")
+        print(f"  {i:2d}. {labels[g]}（{g}）{mark}")
 
     while True:
         try:
             choice = input("\n选择题材编号: ").strip()
             idx = int(choice) - 1
-            if 0 <= idx < len(GENRES):
-                return GENRES[idx]
+            if 0 <= idx < len(pool):
+                return pool[idx]
         except ValueError:
             pass
         print("无效选择，请重试")

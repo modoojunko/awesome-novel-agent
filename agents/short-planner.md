@@ -19,6 +19,16 @@ knowledge:
     description: 短篇题材注册表（选题材风格包用）
   - path: .claude/knowledge/short-genres/{题材}.md
     description: 题材风格包（确定题材后加载对应包；注册表编号 → 包文件）
+  - path: .claude/knowledge/short-craft/reversal-toolkit.md
+    description: 反转类型库与铺垫手法（设计核心反转用）
+  - path: .claude/knowledge/short-craft/villain-and-reveal.md
+    description: 反派模板、四种揭露机制、报应设计
+  - path: .claude/knowledge/short-craft/emotional-methods.md
+    description: 情感三板斧（羁绊铺设/情感撕裂/余韵钝痛）与拉扯节奏
+  - path: .claude/knowledge/short-craft/submission-craft.md
+    description: 投稿范式（平台基调/导语四维骨架/付费点卡位）
+  - path: .claude/knowledge/short-craft/genre-writing-formulas.md
+    description: 冷门题材结构骨架兜底（注册表外题材用）
   - path: .claude/knowledge/author-communication.md
     description: 作者沟通用语规范
 ---

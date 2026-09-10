@@ -594,6 +594,12 @@ def test_short_init_layout():
             check(f"short {key} 不合并长篇 anti-ai.md", not (know / "anti-ai.md").exists())
             check(f"short {key} 部署 short-genres/zhuiqi.md",
                   (know / "short-genres" / "zhuiqi.md").exists())
+            check(f"short {key} 部署 short-craft 参考齐备（13 个）",
+                  len(list((know / "short-craft").glob("*.md"))) == 13)
+            check(f"short {key} 部署 10 个题材风格包",
+                  len(list((know / "short-genres").glob("*.md"))) == 11)  # index + 10
+            check(f"short {key} 种子跨篇偏好记忆",
+                  (root / "memory" / "author-feedback.md").exists())
 
     # 调度适配段抽查：inline 平台 short-agent 含短篇子 agent 名单与调度者本名
     with tempfile.TemporaryDirectory() as td:
@@ -620,6 +626,14 @@ def test_short_init_layout():
         r = run([sys.executable, str(TOOLS / "init.py"), str(Path(td)),
                  "--length", "short", "--genre", "25", "--platform", "claude"])
         check("short 编号越界 exit 1", r.returncode == 1, (r.stdout + r.stderr)[-200:])
+
+    # 题材池：注册表 1-10 全部可初始化（genre 2 曾是待补题材）
+    with tempfile.TemporaryDirectory() as td:
+        r = run([sys.executable, str(TOOLS / "init.py"), str(Path(td)),
+                 "--length", "short", "--genre", "2", "--platform", "claude"])
+        check("short genre 2（世情打脸）exit 0", r.returncode == 0, (r.stdout + r.stderr)[-200:])
+        check("short genre 2 部署 shiqing 风格包",
+              (Path(td) / ".claude/knowledge/short-genres/shiqing.md").exists())
 
     # 非法长度值
     with tempfile.TemporaryDirectory() as td:

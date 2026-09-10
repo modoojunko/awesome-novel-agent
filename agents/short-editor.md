@@ -17,6 +17,8 @@ knowledge:
     description: 回归模式库（本书翻过车的原句，命中即失败）
   - path: sandbox/locked-lines.txt
     description: 锁定台词白名单（作者拍板保留的原句，跳过裁定检查）
+  - path: .claude/knowledge/short-craft/quality-checklist.md
+    description: 成稿逐项质量清单（精修验收对照）
 ---
 
 # short-editor

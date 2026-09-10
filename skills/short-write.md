@@ -21,7 +21,7 @@
 - **场景晚进早出**：第一句已处于冲突或张力之中；起床 / 赶路 / 寒暄 / 布置不展开
 - **情绪直写 + 具体承接**：情绪词后接本场景特有的动作或物件；一个情绪写一次
 - **所有格清除**：不写「我的心 / 我的灵魂 / 我的眼眶」；不写「我知道 / 我感到 / 我看到自己」引导小句
-- **对话四功能**：每句至少完成推动情节 / 揭示性格 / 制造冲突 / 埋设伏笔之一
+- **对话四功能**：每句至少完成推动情节 / 揭示性格 / 制造冲突 / 埋设伏笔之一（权力博弈与潜台词手法见 `.claude/knowledge/short-craft/dialogue-mastery.md`；钩子类型库 `.claude/knowledge/short-craft/hooks-chapter.md` / `.claude/knowledge/short-craft/hooks-paragraph.md` / 悬念设计 `.claude/knowledge/short-craft/hooks-suspense.md`；跨题材技法 `.claude/knowledge/short-craft/genre-writing-techniques.md`）
 - **反转节**：一节内完成揭示；揭示时用回看 / 独白 / 物证**瞬时串线**（把前文线索一次性带回读者眼前）；冲击强度高于此前所有节
 - **贯穿道具**：第三次出现（揭真相）在反转或结尾段
 - **节尾必留钩**；节内情绪强度按大纲行推进
