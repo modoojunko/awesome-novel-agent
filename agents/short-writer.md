@@ -9,9 +9,9 @@ skills:
   - path: skills/short-write.md
     description: 正文写作 SOP（分批/重注入/三维度揉进/硬底线/完成门槛）
 knowledge:
-  - path: .claude/knowledge/short-craft.md
+  - path: .claude/knowledge/short-craft/short-craft.md
     description: 短篇写作通用底座（动笔前先读）
-  - path: .claude/knowledge/short-format.md
+  - path: .claude/knowledge/short-craft/short-format.md
     description: 短篇正文格式规范（最高优先级，写作前必读）
   - path: .claude/knowledge/short-anti-ai.md
     description: 短篇去AI口径（写时自查 AI 腔，禁用词与所有格规则）

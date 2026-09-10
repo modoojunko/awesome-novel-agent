@@ -79,6 +79,13 @@ GENRE_LABELS = {
     "male-derivative": "男频衍生",
 }
 
+# 短篇题材（--length short 时的编号空间，与 knowledge/short/genres/index.md 注册表同源，index 为权威）。
+SHORT_GENRES = ["zhuiqi"]
+SHORT_GENRE_LABELS = {"zhuiqi": "追妻火葬场"}
+
+# 长篇与短篇的 agent 集合互斥（短篇第一波只交付 claude 产物链，其余平台后续 build 补）。
+SHORT_AGENTS = ("short-agent", "short-planner", "short-writer", "short-editor", "short-verifier", "reader")
+
 # 反 AI 规则跨题材复用（对应题材文件头部「适用题材」注释声明，缺同名文件属有意设计）
 _ANTI_AI_REUSE = {
     "urban-cultivation": "urban-brained",
@@ -104,6 +111,7 @@ def main():
     project_arg = None
     platform_override = None
     genre_num = None
+    length = None
     i = 0
     while i < len(args):
         a = args[i]
@@ -112,6 +120,13 @@ def main():
                 print("错误: --platform 需要一个平台名（claude|opencode|reasonix|codex|zcode|dsh|grok）")
                 sys.exit(1)
             platform_override = args[i + 1]
+            i += 2
+            continue
+        if a == "--length":
+            if i + 1 >= len(args) or args[i + 1] not in ("short", "long"):
+                print("错误: --length 需要一个长度值（short|long）")
+                sys.exit(1)
+            length = args[i + 1]
             i += 2
             continue
         if a == "--genre":
@@ -138,11 +153,20 @@ def main():
     # 解析可选参数
     genre = None
     if genre_num is not None:
+        pool = SHORT_GENRES if length == "short" else GENRES
+        pool_label = f"1-{len(pool)}"
         try:
-            genre = GENRES[int(genre_num) - 1]
+            genre = pool[int(genre_num) - 1]
         except (IndexError, ValueError):
-            print(f"无效题材编号，可选 1-{len(GENRES)}")
+            print(f"无效题材编号，可选 {pool_label}")
             sys.exit(1)
+    if length == "short":
+        # 短篇未指定题材时按注册表第 1 号兜底（第一波仅交付 zhuiqi）
+        if genre is None:
+            genre = SHORT_GENRES[0]
+            print(f"题材: {SHORT_GENRE_LABELS[genre]}（{genre}，短篇默认）")
+        else:
+            print(f"题材: {SHORT_GENRE_LABELS.get(genre, genre)}（{genre}）")
 
     if project_path.exists():
         print(f"目录已存在，将在其中创建缺失的文件和目录")
@@ -152,55 +176,71 @@ def main():
     print(f"初始化小说项目: {project_path}")
     print(f"技能仓库: {SKILL_HOME}")
 
-    # Step 1: 选题材
-    if genre is None:
-        genre = select_genre()
-    else:
-        print(f"题材: {GENRE_LABELS.get(genre, genre)}（{genre}）")
-    gaps = _genre_gaps(genre)
-    if gaps:
-        print(f"  ⚠️ 该题材知识库不完整：{'、'.join(gaps)}"
-              f"（选题列表中标 ⚠️ 的题材同样存在缺口，设定阶段需作者补全）")
+    # Step 1: 选题材（短篇长度下不进入交互选题——短篇注册表第一波只有 1 项，已在上面解析）
+    if length != "short":
+        if genre is None:
+            genre = select_genre()
+        else:
+            print(f"题材: {GENRE_LABELS.get(genre, genre)}（{genre}）")
+        gaps = _genre_gaps(genre)
+        if gaps:
+            print(f"  ⚠️ 该题材知识库不完整：{'、'.join(gaps)}"
+                  f"（选题列表中标 ⚠️ 的题材同样存在缺口，设定阶段需作者补全）")
 
     # Step 1.5: 旧 4 字段 writing-style.md → 新格式（必须先于模板拷贝/题材预填，否则旧卡被覆盖）
-    migrate_writing_style(project_path)
+    if length != "short":
+        migrate_writing_style(project_path)
 
     # Step 2: 创建骨架
-    create_skeleton(project_path, platform)
+    create_skeleton(project_path, platform, length)
 
     # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix/zcode/dsh agents 即 skills）
-    if platform.key == "codex":
+    if length == "short":
+        # 第一波：短篇只交付 claude 平台产物链，其余平台提示暂不支持
+        if platform.key != "claude":
+            print(f"  ⚠️ 短篇流程第一波仅支持 claude 平台（当前 --platform {platform.key}）"
+                  f"——骨架已生成，agent 与知识部署跳过，后续 build 支持")
+        elif platform.key == "claude":
+            deploy_agents(project_path, platform, length)
+    elif platform.key == "codex":
         deploy_codex_agents(project_path, SKILL_HOME, platform)
     else:
         deploy_agents(project_path, platform)
 
     # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex/grok 只部署独立工具）
-    if platform.key in ("codex", "grok"):
-        deploy_codex_skills(project_path, SKILL_HOME, platform)
-    else:
-        deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
+    if length != "short":
+        if platform.key in ("codex", "grok"):
+            deploy_codex_skills(project_path, SKILL_HOME, platform)
+        else:
+            deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
 
     # Step 4: 按题材继承知识
-    deploy_knowledge(project_path, genre, platform)
+    deploy_knowledge(project_path, genre, platform, length)
 
     # Step 4.5: 部署正文检查脚本（anti-ai 机器初筛用，缺省降级为模型肉眼）
     deploy_tools(project_path, platform)
 
-    # Step 5.5: 按题材预填 settings 默认值
-    seed_settings_from_genre(project_path, genre, platform)
+    if length != "short":
+        # Step 5.5: 按题材预填 settings 默认值
+        seed_settings_from_genre(project_path, genre, platform)
 
-    # Step 6: 生成 MEMORY.md 索引
-    write_memory_index(project_path, platform)
+        # Step 6: 生成 MEMORY.md 索引
+        write_memory_index(project_path, platform)
 
-    # Step 7: 初始化写作记忆文件
-    init_memory_files(project_path, platform)
+        # Step 7: 初始化写作记忆文件
+        init_memory_files(project_path, platform)
 
-    # Step 8: 初始化状态
-    write_status(project_path)
+        # Step 8: 初始化状态
+        write_status(project_path)
+    else:
+        # 短篇状态文件（短篇版状态机，模板自带，随骨架拷贝）
+        print("  ✅ 已写入短篇状态文件（.agent/status.md）")
 
     print(f"\n初始化完成!")
     print(f"项目路径: {project_path}")
-    if platform.key == "claude":
+    if length == "short":
+        print("输入 @short-agent 开始写作，或直接说「帮我写个短篇」")
+    elif platform.key == "claude":
         print("输入 @novel-agent 开始写作（Claude Code）")
     elif platform.key == "opencode":
         print("在 OpenCode 中通过 @novel-agent 开始写作")
@@ -275,31 +315,45 @@ def _rewrite_template_refs(text: str, platform: Platform) -> str:
 _GENERATED_SCAFFOLD = {"CLAUDE.md", "AGENTS.md", "AGENTS.codex.md"}
 
 
-def create_skeleton(project_path: Path, platform: Platform):
-    """创建项目目录结构"""
-    dirs = [
-        "settings/character-setting",
-        "volumes",
-        "chapters",
-        "prompts",
-        "sandbox",
-        "novel-samples",    # 文风蒸馏样本（作者把待蒸馏文章放这里，style-distill 专用）
-        "archives",
-        ".agent/task",
-        "tools",
-        str(platform.memory_dir(project_path)),
-        str(platform.knowledge_dir(project_path)),
-    ]
+def create_skeleton(project_path: Path, platform: Platform, length=None):
+    """创建项目目录结构。length=short 时模板树根切到 templates/short/，目录集随长度切换。"""
+    short = length == "short"
+    template_root = SOURCE_TEMPLATES / "short" if short else SOURCE_TEMPLATES
+    if short:
+        dirs = [
+            "stories",
+            "sandbox",
+            ".agent/task",
+            "tools",
+            str(platform.memory_dir(project_path)),
+            str(platform.knowledge_dir(project_path)),
+        ]
+    else:
+        dirs = [
+            "settings/character-setting",
+            "volumes",
+            "chapters",
+            "prompts",
+            "sandbox",
+            "novel-samples",    # 文风蒸馏样本（作者把待蒸馏文章放这里，style-distill 专用）
+            "archives",
+            ".agent/task",
+            "tools",
+            str(platform.memory_dir(project_path)),
+            str(platform.knowledge_dir(project_path)),
+        ]
     for d in dirs:
         (project_path / d).mkdir(parents=True, exist_ok=True)
 
-    # Copy template files into project (skip migration/ — old project upgrade only)
-    if SOURCE_TEMPLATES.exists():
-        for item in SOURCE_TEMPLATES.rglob("*"):
+    # Copy template files into project (short 树无 migration/；long 树跳过 migration/)
+    if template_root.exists():
+        for item in template_root.rglob("*"):
             if item.is_file() and item.name != ".gitkeep":
-                rel_path = item.relative_to(SOURCE_TEMPLATES)
-                if rel_path.parts[0] == "migration":
+                rel_path = item.relative_to(template_root)
+                if not short and rel_path.parts[0] == "migration":
                     continue
+                if not short and rel_path.parts[0] == "short":
+                    continue          # templates/short/ 是短篇独立模板树，长篇项目不拷贝
                 # 路径穿越防御：先规范化（消解符号链接/..），再校验位于项目根内
                 target = (project_path / rel_path).resolve()
                 if not target.is_relative_to(project_path.resolve()):
@@ -330,8 +384,8 @@ def create_skeleton(project_path: Path, platform: Platform):
         print("  ✅ 已拷贝项目模板")
 
 
-def deploy_agents(project_path: Path, platform: Platform):
-    """根据当前平台复制 agent 定义到对应目录"""
+def deploy_agents(project_path: Path, platform: Platform, length=None):
+    """根据当前平台复制 agent 定义到对应目录。length=short 时只部署短篇 agent 组。"""
     if not SOURCE_AGENTS.exists():
         print("  ⚠️  agent 目录不存在，跳过")
         return
@@ -343,6 +397,10 @@ def deploy_agents(project_path: Path, platform: Platform):
     agent_dir.mkdir(parents=True, exist_ok=True)
     for item in SOURCE_AGENTS.rglob("*"):
         if item.is_file() and item.suffix == ".md":
+            if length == "short" and item.stem not in SHORT_AGENTS:
+                continue    # 短篇项目不部署长篇专属 agent
+            if length != "short" and item.stem.startswith("short-"):
+                continue    # 长篇项目不部署短篇专属 agent（长短篇 agent 组互斥）
             rel_path = item.relative_to(SOURCE_AGENTS)
             dest = agent_dir / rel_path
             # 路径穿越防御：规范化后必须仍位于 agent 目录内（防符号链接/.. 逃逸）
@@ -371,10 +429,33 @@ def deploy_tools(project_path: Path, platform: Platform):
         print(f"  ✅ 已部署正文检查脚本（{platform.root}/tools/{name}）")
 
 
-def deploy_knowledge(project_path: Path, genre: str, platform: Platform):
-    """按题材拷贝参考材料 + 反 AI/文风规则到 <平台>/knowledge/"""
+def deploy_knowledge(project_path: Path, genre: str, platform: Platform, length=None):
+    """按题材拷贝参考材料 + 反 AI/文风规则到 <平台>/knowledge/。short 长度走短篇知识库分支。"""
     knowledge_dir = platform.knowledge_dir(project_path)
     count = 0
+
+    if length == "short":
+        # 短篇：短篇知识库独立部署，不与长篇反 AI 产物合并
+        src_root = SKILL_HOME / "knowledge" / "short"
+        anti_ai_src = src_root / "anti-ai" / "short-deslop.md"
+        merged = ["# 短篇去 AI 味口径\n"]
+        if anti_ai_src.exists():
+            merged.append(anti_ai_src.read_text(encoding="utf-8"))
+            (knowledge_dir / "short-anti-ai.md").write_text("\n".join(merged), encoding="utf-8")
+            count += 1
+            print("  ✅ 已部署短篇反 AI 口径（short-anti-ai.md）")
+        else:
+            print("  ⚠️  缺 knowledge/short/anti-ai/short-deslop.md——短篇去 AI 口径缺失")
+        for sub in ("craft", "genres"):
+            src = src_root / sub
+            if src.exists() and src.is_dir():
+                dst = knowledge_dir / ("short-craft" if sub == "craft" else "short-genres")
+                shutil.copytree(src, dst, dirs_exist_ok=True)
+                n = sum(1 for _ in src.rglob("*") if _.is_file())
+                count += n
+                print(f"  ✅ 已部署 short-{sub}/ ({n} 个文件)")
+        print(f"  ✅ 短篇知识部署完成（{count} 个文件）")
+        return
 
     # 从 knowledge/format-specs/ 复制格式规范
     if SOURCE_FORMAT_SPECS.exists():

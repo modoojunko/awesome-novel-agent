@@ -13,10 +13,12 @@ skills:
 knowledge:
   - path: story.md
     description: 项目索引（题材、篇目）
-  - path: .claude/knowledge/short-craft.md
+  - path: .claude/knowledge/short-craft/short-craft.md
     description: 短篇写作通用底座（构思时选链与招式的判据来源）
   - path: .claude/knowledge/short-genres/index.md
     description: 短篇题材注册表（选题材风格包用）
+  - path: .claude/knowledge/short-genres/{题材}.md
+    description: 题材风格包（确定题材后加载对应包；注册表编号 → 包文件）
   - path: .claude/knowledge/author-communication.md
     description: 作者沟通用语规范
 ---

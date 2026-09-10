@@ -11,7 +11,7 @@ skills:
 knowledge:
   - path: .claude/knowledge/short-anti-ai.md
     description: 短篇去AI口径（唯一判定依据，含所有格与程度副词规则）
-  - path: .claude/knowledge/short-format.md
+  - path: .claude/knowledge/short-craft/short-format.md
     description: 短篇正文格式规范
   - path: sandbox/prose-regressions.txt
     description: 回归模式库（本书翻过车的原句，命中即失败）

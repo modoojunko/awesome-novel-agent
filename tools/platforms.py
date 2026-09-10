@@ -733,6 +733,8 @@ def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> 
     for item in sorted(agents_dir.rglob("*.md")):
         if item.name == ".gitkeep":
             continue
+        if item.stem.startswith("short-"):
+            continue    # 短篇专属 agent 不进长篇项目产物（长短篇 agent 组互斥）
         dest = target / (item.stem + ".toml")
         dest.write_text(
             convert_to_codex(item.read_text(encoding="utf-8"), skill_home),

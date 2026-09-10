@@ -63,6 +63,9 @@ VALID_TOOLS = {
 DEPLOYED_PATTERNS = [
     re.compile(r"^\.claude/knowledge/[a-z-]+\.md$"),          # 平铺产物（format-specs/anti-ai/genre-example/permanent-memory）
     re.compile(r"^\.claude/knowledge/(plot-craft|scene-craft|character-craft|title-craft|style-distill)/"),
+    re.compile(r"^\.claude/knowledge/(short-craft|short-genres)/"),  # 短篇知识目录（craft/genres 子目录拷贝）
+    re.compile(r"^sandbox/(prose-regressions|locked-lines)\.txt$"),  # 项目沙箱资产（长短篇共用约定）
+    re.compile(r"^stories/"),                                  # 短篇篇目目录（每篇一个子目录）
     re.compile(r"^settings/character-setting/"),               # 每角色一个文件
     re.compile(r"^settings/(world-setting|genre-setting|writing-style|timeline|foreshadowing)\.md$"),
     re.compile(r"^settings/style-profiles/"),               # 分场景风格卡（每场景一个文件）
@@ -204,6 +207,8 @@ def _deployed_knowledge_files() -> set[str] | None:
     """模拟 init.deploy_knowledge，计算部署后 <根>/knowledge/ 产物清单（相对路径集合）。
 
     直接 import init 复用其真实逻辑（含 ensure_yaml 平台检测），防止本清单与 init 漂移。
+    长短两种长度都模拟并取并集——短篇知识（short-*）与长篇产物同属合法部署产物，
+    只模拟 long 会把短篇知识误判为孤儿引用（design D7）。
     init 依赖 pyyaml；缺失时返回 None，调用方跳过本组校验（CI 已装 pyyaml）。
     """
     try:
@@ -212,18 +217,21 @@ def _deployed_knowledge_files() -> set[str] | None:
         return None
     if PLATFORM_CLAUDE is None:
         return None
-    with tempfile.TemporaryDirectory() as td:
-        tmp = Path(td)
-        fake_project = tmp / "proj"
-        fake_project.mkdir()
-        # deploy_knowledge 假定 knowledge 目录已存在（init 流程由 create_skeleton 先建）
-        PLATFORM_CLAUDE.knowledge_dir(fake_project).mkdir(parents=True, exist_ok=True)
-        with contextlib.redirect_stdout(io.StringIO()):
-            init_mod.deploy_knowledge(fake_project, "xianxia", PLATFORM_CLAUDE)
-        know = fake_project / ".claude" / "knowledge"
-        if not know.is_dir():
-            return None
-        return {p.relative_to(know).as_posix() for p in know.rglob("*") if p.is_file()}
+    files: set[str] = set()
+    for length, genre in ((None, "xianxia"), ("short", "zhuiqi")):
+        with tempfile.TemporaryDirectory() as td:
+            tmp = Path(td)
+            fake_project = tmp / "proj"
+            fake_project.mkdir()
+            # deploy_knowledge 假定 knowledge 目录已存在（init 流程由 create_skeleton 先建）
+            PLATFORM_CLAUDE.knowledge_dir(fake_project).mkdir(parents=True, exist_ok=True)
+            with contextlib.redirect_stdout(io.StringIO()):
+                init_mod.deploy_knowledge(fake_project, genre, PLATFORM_CLAUDE, length)
+            know = fake_project / ".claude" / "knowledge"
+            if not know.is_dir():
+                return None
+            files |= {p.relative_to(know).as_posix() for p in know.rglob("*") if p.is_file()}
+    return files
 
 
 def check_deployed_knowledge_refs() -> list:
@@ -376,7 +384,10 @@ def check_orphan_knowledge() -> list:
                              r"[A-Za-z0-9_./{}-]+)", text):
             referenced.add(m.group(1))
         # 目录级引用（.claude/knowledge/scene-craft/）消费该目录下全部文件
-        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill)/", text):
+        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill|short-craft|short-genres)/", text):
+            referenced.add(m.group(1) + "/")
+        # 占位符引用（.claude/knowledge/short-genres/{题材}.md）消费该目录下全部文件
+        for m in re.finditer(r"\.claude/knowledge/((?:plot|scene|character|title)-craft|style-distill|short-craft|short-genres)/\{[^}]+\}\.md", text):
             referenced.add(m.group(1) + "/")
     errors = []
     for rel in sorted(deployed):
