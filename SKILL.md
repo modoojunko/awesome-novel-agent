@@ -56,10 +56,12 @@ description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成
 
 ```
 用户输入 /awesome-novel（或"帮我写本小说"）→ 检测项目状态
+├─ 作者表达的是短篇意图（"写短篇 / 写个盐言故事 / 写个短故事"）→ 走短篇分支（见下）
 ├─ story.yaml 存在 → 旧版 2.x → 执行自动迁移（见下文）
 ├─ story.md 不存在 → 询问作者是否初始化 → 是则执行 init.py
 │   └─ python <本 skill 安装目录>/tools/init.py [project-path] [--genre <编号>] → 完成后 @novel-agent
 └─ story.md 存在 → 已有项目
+    ├─ story.md 含 length: short → 短篇项目 → @short-agent 继续写作（不进卷纲/章纲流程）
     ├─ 检查同步新鲜度
     │   ├─ python <本 skill 安装目录>/tools/sync-project.py . --check → exit 0 → 已最新，略过
     │   ├─ python <本 skill 安装目录>/tools/sync-project.py . --check → exit 1 → 有更新
@@ -70,6 +72,20 @@ description: 和 AI 协作写小说的工作流系统。9 个 agent 协作完成
     │       └─ 静默运行 python <本 skill 安装目录>/tools/sync-project.py . → 写入指纹
     └─ → @novel-agent 继续写作
 ```
+
+### 短篇分支（length: short）
+
+作者在项目目录表达短篇意图时走本分支：
+
+```
+短篇意图 + story.md 不存在 → 询问是否创建【短篇】项目 → 确认后执行
+│   python <本 skill 安装目录>/tools/init.py [project-path] --length short → 完成后 @short-agent
+└─ story.md 存在且含 length: short → @short-agent 继续写作
+```
+
+- 短篇项目与长篇项目的目录、流程、agent 组完全独立（`stories/{slug}/` 篇目制，无卷纲/章纲/提示词）
+- 短篇流程：定情绪 →（作者确认）→ 构思排纲 →（作者确认）→ 契约组装 → 契约审计 → 分批写作 → 去AI味精修 → 兑现度核对 → 验收交付 →（改稿或下一篇）
+- 长篇项目（story.md 无 length: short）里作者想写短篇 → 提示另建短篇项目目录，不混用
 
 **强制规则：**
 - `story.md` 不存在时，**先询问作者**是否要在此目录创建小说项目，确认后再运行 `init.py`
@@ -227,6 +243,9 @@ cp old/prompts/*.txt prompts/ 2>/dev/null
 
 | 场景 | 处理 |
 |------|------|
+| 作者表达短篇意图（写短篇/盐言/短故事） | 走短篇分支：`init.py --length short` → `@short-agent`（新目录），或按 `length: short` 标记路由（已有项目） |
+| 短篇项目缺题材风格包（注册表标 ⏳） | init 警告「风格包待补」，设定阶段与作者补全题材要素 |
+| 长篇项目里想写短篇 | 提示另建短篇项目目录（长短篇目录与流程互斥，不混用） |
 | `story.yaml` 存在 → `story.md` 不存在 | 旧版 2.x → 执行自动迁移流程 |
 | `story.md` 存在但 `skill_version` < 4.13.0 | 待升级 → 执行自动迁移流程 |
 | `story.md` 存在且版本匹配 | 已有项目 → @novel-agent |
