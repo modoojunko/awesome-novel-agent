@@ -314,6 +314,12 @@ def select_genre(pool=None, labels=None) -> str:
     while True:
         try:
             choice = input("\n选择题材编号: ").strip()
+        except EOFError:
+            # 非交互环境（AI 终端/管道）：回落注册表 1 号并显式提示，不裸 traceback
+            print("\n非交互环境，无法交互选题——使用 1 号题材（"
+                  f"{labels[pool[0]]}）。需要其他题材请显式传 --genre 1-{len(pool)}")
+            return pool[0]
+        try:
             idx = int(choice) - 1
             if 0 <= idx < len(pool):
                 return pool[idx]

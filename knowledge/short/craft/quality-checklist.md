@@ -200,7 +200,7 @@
 
 ### 毒点/代入感/震惊/开头/结尾/情绪/期待感速查
 
-> 详细的毒点排查见 `genre-writing-techniques.md`「毒点排查核心」；AI 腔自检见 `short-deslop.md`。
+> 详细的毒点排查见 `genre-writing-techniques.md`「毒点排查核心」；AI 腔自检见 `.claude/knowledge/short-anti-ai.md`。
 
 | 检查项 | 标准 |
 |--------|------|
