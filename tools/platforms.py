@@ -325,6 +325,8 @@ def _convert_standalone_skill(text: str, name: str, platform_key: str) -> str:
         "reasonix": "（由 awesome-novel 自动生成的 inline skill）",
         "zcode": "（由 awesome-novel 自动生成的 ZCode skill）",
         "dsh": "（由 awesome-novel 自动生成的 dsh skill）",
+        "codex": "（由 awesome-novel 自动生成的 Codex skill）",
+        "grok": "（由 awesome-novel 自动生成的 Grok Build skill）",
     }.get(platform_key, "（由 awesome-novel 自动生成的 skill）")
     fm = (
         f"---\n"
@@ -344,8 +346,9 @@ def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform,
     仅 reasonix/zcode/dsh 调用（agents=None，agents 即 skills）；其余平台返回 False。
     length=long（缺省）：产物 = 9 个 agent（EXEC_AGENT_SOPS 8 执行 + novel-agent 内联
     novel-dispatch）+ STANDALONE_SKILLS 独立工具，共 11 个。
-    length=short：产物 = 6 个（SHORT_EXEC_AGENT_SOPS 5 个，调度者 short-agent 内联
-    short-dispatch，reader 复用 reader-review）；短篇无独立工具。
+    length=short：产物 = 8 个（SHORT_EXEC_AGENT_SOPS 5 个，调度者 short-agent 内联
+    short-dispatch，reader 复用 reader-review，另含 SHORT_STANDALONE_SKILLS 独立工具
+    short-scan / short-analyze）。
     frontmatter/调度适配段差异见差异表注释。
     """
     if platform.key not in _DISPATCH_SECTIONS:
