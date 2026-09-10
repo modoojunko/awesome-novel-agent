@@ -424,7 +424,13 @@ def sync_agents(project_path: Path, platform: Platform, is_short=False) -> int:
 
 def sync_skills(project_path: Path, platform: Platform, is_short=False) -> int:
     if is_short:
-        # 短篇项目：SOP 已内联进 agent（short-* frontmatter 的 skills 字段），无独立 skills 目录同步
+        if platform.key in ("reasonix", "zcode", "dsh"):
+            # 短篇内联 skill 是派生产物：重新生成（short-agent 内联 short-dispatch 等 6 个）
+            deploy_inline_skills(project_path, SKILL_HOME, platform, "short")
+            n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
+            print(f"  [OK] {platform.key} skills: {n} 个 SKILL.md 已重新生成（短篇组）")
+            return n
+        # claude/opencode：短篇 SOP 已内联进 agent（frontmatter skills 字段）；codex/grok：无独立工具
         print("  [i] 短篇项目无独立 skills 同步（SOP 内联于 agent 定义）")
         return 0
     if platform.key in ("reasonix", "zcode", "dsh"):

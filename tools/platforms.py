@@ -169,6 +169,24 @@ SUBAGENT_NAMES = (
     "anti-ai", "reader", "updater", "style-distiller",
 )
 
+# 短篇流水线：调度者 short-agent + 短篇子 agent 组（reader 长短共用）
+SHORT_SUBAGENT_NAMES = (
+    "short-planner", "short-writer", "short-editor", "short-verifier", "reader",
+)
+
+# 调度者单源：名字 → 该调度者可派发的子 agent 名单
+# （novel-agent=长篇卷章流水线；short-agent=短篇篇目流水线）
+DISPATCHER_AGENTS = {
+    "novel-agent": SUBAGENT_NAMES,
+    "short-agent": SHORT_SUBAGENT_NAMES,
+}
+
+# 长篇专属 agent（短篇项目不部署；reader 为长短共用，不在其列）
+LONG_ONLY_AGENTS = frozenset({
+    "novel-agent", "writer", "volume-planner", "chapter-planner",
+    "prompt-crafter", "anti-ai", "updater", "style-distiller",
+})
+
 # agent → 专属 SOP 映射单源（三平台 deploy 与 Codex SOP 内联共用此契约）
 EXEC_AGENT_SOPS = {
     "writer": ["writing-execution"],
@@ -179,6 +197,15 @@ EXEC_AGENT_SOPS = {
     "reader": ["reader-review"],
     "updater": ["updater-archive", "updater-setting", "updater-rollback"],
     "style-distiller": ["style-distill"],
+}
+
+# 短篇 agent → 专属 SOP 映射（与 EXEC_AGENT_SOPS 同构；reader 复用长篇 SOP）
+SHORT_EXEC_AGENT_SOPS = {
+    "short-planner": ["short-plan", "short-craft-prompt"],
+    "short-writer": ["short-write"],
+    "short-editor": ["short-polish"],
+    "short-verifier": ["short-audit", "short-verify"],
+    "reader": ["reader-review"],
 }
 
 # reasonix 需加载共享 SOP 的 agent（frontmatter 补 read_skill 工具）
@@ -262,7 +289,7 @@ def _convert_agent_to_skill(text: str, platform_key: str, inline_sops=None) -> s
         f'description: "{desc}"',
     ]
     if platform_key == "reasonix":
-        fm_lines.append(f"runAs: {'inline' if name == 'novel-agent' else 'subagent'}")
+        fm_lines.append(f"runAs: {'inline' if name in DISPATCHER_AGENTS else 'subagent'}")
     if allowed is not None:
         joined = ", ".join(allowed)
         fm_lines.append(f"allowed-tools: [{joined}]" if platform_key == "reasonix"
@@ -270,10 +297,11 @@ def _convert_agent_to_skill(text: str, platform_key: str, inline_sops=None) -> s
     fm = "\n".join(fm_lines) + "\n---\n"
 
     agent_body = body.strip()
-    if name == "novel-agent":
-        # {names} 是唯一占位符；调度段文本含字面 `{order 内容}`，用 safe 替换防 str.format 报 KeyError
+    dispatcher_names = DISPATCHER_AGENTS.get(name)
+    if dispatcher_names:
+        # {names} 注入该调度者的子 agent 名单；调度段文案以调度者本名替换 novel-agent 字样
         agent_body += _DISPATCH_SECTIONS[platform_key].replace(
-            "{names}", " / ".join(SUBAGENT_NAMES))
+            "{names}", " / ".join(dispatcher_names)).replace("novel-agent", name)
     sop_sections = []
     for sop in (inline_sops or []):
         if sop and sop.exists():
@@ -306,12 +334,16 @@ def _convert_standalone_skill(text: str, name: str, platform_key: str) -> str:
     return fm + "\n" + text.strip()
 
 
-def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform) -> bool:
-    """生成 <project>/<platform.root>/skills/<name>/SKILL.md（11 个），引用改写为平台路径。
+def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform,
+                         length=None) -> bool:
+    """生成 <project>/<platform.root>/skills/<name>/SKILL.md，引用改写为平台路径。
 
     仅 reasonix/zcode/dsh 调用（agents=None，agents 即 skills）；其余平台返回 False。
-    产物 = 9 个 agent（EXEC_AGENT_SOPS 8 执行 + novel-agent 内联 novel-dispatch）
-    + STANDALONE_SKILLS 独立工具，frontmatter/调度适配段差异见差异表注释。
+    length=long（缺省）：产物 = 9 个 agent（EXEC_AGENT_SOPS 8 执行 + novel-agent 内联
+    novel-dispatch）+ STANDALONE_SKILLS 独立工具，共 11 个。
+    length=short：产物 = 6 个（SHORT_EXEC_AGENT_SOPS 5 个，调度者 short-agent 内联
+    short-dispatch，reader 复用 reader-review）；短篇无独立工具。
+    frontmatter/调度适配段差异见差异表注释。
     """
     if platform.key not in _DISPATCH_SECTIONS:
         return False
@@ -322,7 +354,14 @@ def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform) ->
         return False
     target.mkdir(parents=True, exist_ok=True)
 
-    for agent_name, sops in EXEC_AGENT_SOPS.items():
+    if length == "short":
+        exec_sops_map = SHORT_EXEC_AGENT_SOPS
+        dispatcher_name, dispatcher_sop = "short-agent", "short-dispatch"
+    else:
+        exec_sops_map = EXEC_AGENT_SOPS
+        dispatcher_name, dispatcher_sop = "novel-agent", "novel-dispatch"
+
+    for agent_name, sops in exec_sops_map.items():
         agent_file = agents_dir / f"{agent_name}.md"
         if not agent_file.exists():
             continue
@@ -334,25 +373,26 @@ def deploy_inline_skills(project: Path, skill_home: Path, platform: Platform) ->
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
 
-    novel_file = agents_dir / "novel-agent.md"
+    novel_file = agents_dir / f"{dispatcher_name}.md"
     if novel_file.exists():
         body = _convert_agent_to_skill(novel_file.read_text(encoding="utf-8"),
                                        platform.key,
-                                       inline_sops=[skills_dir / "novel-dispatch.md"])
+                                       inline_sops=[skills_dir / f"{dispatcher_sop}.md"])
         body = rewrite_refs(body, platform)
-        skill_dir = target / "novel-agent"
+        skill_dir = target / dispatcher_name
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
 
-    for skill_name in STANDALONE_SKILLS:
-        sf = skills_dir / f"{skill_name}.md"
-        if sf.exists():
-            body = _convert_standalone_skill(sf.read_text(encoding="utf-8"), skill_name,
-                                             platform.key)
-            body = rewrite_refs(body, platform)
-            skill_dir = target / skill_name
-            skill_dir.mkdir(parents=True, exist_ok=True)
-            (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
+    if length != "short":
+        for skill_name in STANDALONE_SKILLS:
+            sf = skills_dir / f"{skill_name}.md"
+            if sf.exists():
+                body = _convert_standalone_skill(sf.read_text(encoding="utf-8"), skill_name,
+                                                 platform.key)
+                body = rewrite_refs(body, platform)
+                skill_dir = target / skill_name
+                skill_dir.mkdir(parents=True, exist_ok=True)
+                (skill_dir / "SKILL.md").write_text(body, encoding="utf-8")
     return True
 
 
@@ -531,13 +571,14 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
             allowed.append(mapped)
 
     body = _body.strip()
-    if name == "novel-agent":
+    dispatcher_names = DISPATCHER_AGENTS.get(name)
+    if dispatcher_names:
         body += (
             "\n\n## Codex 调度适配（本环境无 Agent 工具）\n"
             "在 Codex 环境调度子 agent 用 `spawn_agent` 工具：\n"
-            f"- 子 agent 名即 `.codex/agents/` 下的 TOML 名（{' / '.join(SUBAGENT_NAMES)}）\n"
+            f"- 子 agent 名即 `.codex/agents/` 下的 TOML 名（{' / '.join(dispatcher_names)}）\n"
             "- 把 order 文件内容作为任务消息传给子 agent；order 文件协议（status: DONE）不变\n"
-            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+            f"- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 {name} 本身作为子 agent 调度\n"
             "- 你是本项目唯一调度者：spawn 后留意 agent 树，子 agent 若尝试再派生，立即 interrupt 并按规范重派\n"
         )
     else:
@@ -545,11 +586,11 @@ def convert_to_codex(text: str, skill_home: Path) -> str:
 
     tool_line = ""
     if allowed:
-        if name == "novel-agent":
+        if dispatcher_names:
             tool_line = (
                 "\n\n（自动生成）本 agent 声明的工具范围："
                 + "、".join(allowed)
-                + "。你是唯一调度者，spawn_agent 只用于调度子 agent，禁止派生 novel-agent 自身。"
+                + f"。你是唯一调度者，spawn_agent 只用于调度子 agent，禁止派生 {name} 自身。"
             )
         else:
             tool_line = (
@@ -646,40 +687,41 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
 
     tools_raw = str(data.get("tools", "") or "")
     allowed = []
+    dispatcher_names = DISPATCHER_AGENTS.get(name)
     for t in tools_raw.split(","):
         t = t.strip()
         if not t:
             continue
         mapped = _GROK_TOOL_MAP.get(t, t)
-        if name != "novel-agent" and mapped == "Agent":
+        if not dispatcher_names and mapped == "Agent":
             continue
         if mapped not in allowed:
             allowed.append(mapped)
 
     body = _body.strip()
-    if name == "novel-agent":
+    if dispatcher_names:
         body += (
             "\n\n## Grok Build 调度适配（本环境无 Agent 工具）\n"
             "在 Grok Build 环境调度子 agent 用 `spawn_subagent` 工具：\n"
-            f"- 子 agent 名即 `.grok/agents/` 下的 Markdown 名（{' / '.join(SUBAGENT_NAMES)}）\n"
+            f"- 子 agent 名即 `.grok/agents/` 下的 Markdown 名（{' / '.join(dispatcher_names)}）\n"
             "- 调用 `spawn_subagent(subagent_type=\"<子agent名>\", prompt=<order 路径与任务要求>, "
             "isolation=\"none\")`\n"
             "- isolation 必须是 none（共享工作区，子 agent 写回同一项目）；禁止 worktree\n"
             "- 把 order 文件路径与任务要求写进 prompt；order 文件协议（status: DONE）不变\n"
-            "- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 novel-agent 本身作为子 agent 调度\n"
+            f"- 一次只调度一个任务，等 DONE 后再调度下一个；禁止把 {name} 本身作为子 agent 调度\n"
             "- 你必须在**主会话**中运行：Grok 子代理不能再派子代理（深度上限 1），"
-            "novel-agent 若被 spawn 为子代理，调度链会断裂\n"
+            "调度者若被 spawn 为子代理，调度链会断裂\n"
             "- 工具对应：读文件 `read_file`，写/覆盖 `write`，搜索 `grep`，列目录 `list_dir`\n"
         )
     else:
         body = _GROK_DISPATCH_BAN + "\n\n" + body
 
     if allowed:
-        if name == "novel-agent":
+        if dispatcher_names:
             body += (
                 "\n\n（自动生成）本 agent 声明的工具范围："
                 + "、".join(allowed)
-                + "。你是唯一调度者，spawn_subagent 只用于调度子 agent，禁止派生 novel-agent 自身。"
+                + f"。你是唯一调度者，spawn_subagent 只用于调度子 agent，禁止派生 {name} 自身。"
             )
         else:
             body += (
@@ -707,7 +749,7 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
         fm_lines.append("tools:")
         for t in allowed:
             fm_lines.append(f"  - {t}")
-    if name != "novel-agent":
+    if not dispatcher_names:
         fm_lines.append("disallowedTools:")
         fm_lines.append("  - Agent")
         fm_lines.append("agentsMd: false")
@@ -717,10 +759,13 @@ def convert_to_grok(text: str, skill_home: Path) -> str:
     return "\n".join(fm_lines) + "\n\n" + instructions + "\n"
 
 
-def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> None:
-    """生成 <project>/<platform.root>/agents/<name>.toml（9 个），引用改写为平台路径。
+def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform,
+                        length=None) -> None:
+    """生成 <project>/<platform.root>/agents/<name>.toml，引用改写为平台路径。
 
     仅 codex 平台调用。Claude agent frontmatter → Codex TOML，与 sync 保持一致。
+    length=long（缺省）部署 9 个长篇 agent；length=short 部署 6 个短篇 agent
+    （SHORT_AGENTS + reader），长短互斥。
     """
     if platform.key != "codex":
         return
@@ -733,8 +778,11 @@ def deploy_codex_agents(project: Path, skill_home: Path, platform: Platform) -> 
     for item in sorted(agents_dir.rglob("*.md")):
         if item.name == ".gitkeep":
             continue
-        if item.stem.startswith("short-"):
-            continue    # 短篇专属 agent 不进长篇项目产物（长短篇 agent 组互斥）
+        if length == "short":
+            if item.stem in LONG_ONLY_AGENTS:
+                continue    # 短篇项目不部署长篇专属 agent
+        elif item.stem.startswith("short-"):
+            continue    # 长篇项目不部署短篇专属 agent（长短篇 agent 组互斥）
         dest = target / (item.stem + ".toml")
         dest.write_text(
             convert_to_codex(item.read_text(encoding="utf-8"), skill_home),
@@ -761,13 +809,18 @@ def _convert_codex_inline_skill(text: str, name: str) -> str:
     return fm + "\n" + text.strip()
 
 
-def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform) -> None:
+def deploy_codex_skills(project: Path, skill_home: Path, platform: Platform,
+                        length=None) -> None:
     """生成独立交互工具为 skill（<project>/<platform.root>/skills/<name>/SKILL.md）。
 
     codex / grok 调用。9 个 agent 走独立 agents 目录，此处只部署不进调度链的
-    独立工具（memory-recording、roleplay-sandbox）。
+    独立工具（memory-recording、roleplay-sandbox）。短篇项目无独立工具（length=short
+    时跳过——短篇 SOP 已内联进 agents，memory/沙盘工具绑定长篇卷章资产）。
     """
     if platform.key not in ("codex", "grok"):
+        return
+    if length == "short":
+        print(f"  [i] 短篇项目无独立工具（{platform.root}/skills 跳过）")
         return
     skills_dir = skill_home / "skills"
     target = platform.skills_dir(project)

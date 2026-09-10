@@ -214,28 +214,19 @@ def main():
     create_skeleton(project_path, platform, length)
 
     # Step 3: 部署 agent 定义（codex 为 TOML 转换产物，reasonix/zcode/dsh agents 即 skills）
-    if length == "short":
-        # 第一波：短篇只交付 claude 平台产物链，其余平台提示暂不支持
-        if platform.key != "claude":
-            print(f"  ⚠️ 短篇流程第一波仅支持 claude 平台（当前 --platform {platform.key}）"
-                  f"——骨架已生成，agent 与知识部署跳过，后续 build 支持")
-    if length == "short" and platform.key == "claude":
+    if platform.key == "codex":
+        deploy_codex_agents(project_path, SKILL_HOME, platform, length)
+    else:
         deploy_agents(project_path, platform, length)
-    elif length != "short" and platform.key == "codex":
-        deploy_codex_agents(project_path, SKILL_HOME, platform)
-    elif length != "short":
-        deploy_agents(project_path, platform)
 
-    # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成 11 个 SKILL.md；codex/grok 只部署独立工具）
-    if length != "short":
-        if platform.key in ("codex", "grok"):
-            deploy_codex_skills(project_path, SKILL_HOME, platform)
-        else:
-            deploy_inline_skills(project_path, SKILL_HOME, platform)   # 非 inline 平台内部自跳过
+    # Step 3.5: 部署平台 skills（reasonix/zcode/dsh 生成内联 SKILL.md；codex/grok 只部署独立工具）
+    if platform.key in ("codex", "grok"):
+        deploy_codex_skills(project_path, SKILL_HOME, platform, length)
+    else:
+        deploy_inline_skills(project_path, SKILL_HOME, platform, length)   # 非 inline 平台内部自跳过
 
-    # Step 4: 按题材继承知识（短篇非 claude 平台第一波不部署，与 agent 跳过一致）
-    if not (length == "short" and platform.key != "claude"):
-        deploy_knowledge(project_path, genre, platform, length)
+    # Step 4: 按题材继承知识
+    deploy_knowledge(project_path, genre, platform, length)
 
     # Step 4.5: 部署正文检查脚本（anti-ai 机器初筛用，缺省降级为模型肉眼）
     deploy_tools(project_path, platform)
