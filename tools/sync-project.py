@@ -35,7 +35,11 @@ from platforms import (
     detect_platform,
     deploy_codex_skills,
     deploy_inline_skills,
+    deploy_standalone_skills,
+    SHORT_STANDALONE_SKILLS,
+    _convert_standalone_skill,
     ensure_yaml,
+    rewrite_refs,
     resolve_skill_home,
 )
 
@@ -293,6 +297,19 @@ def find_changes(project: Path, platform: Platform, is_short=False) -> list[str]
                         t = d / rel
                         if not t.exists() or t.read_bytes() != f.read_bytes():
                             changed.append(f"knowledge/{dst_name}/{rel}")
+        # 独立工具（扫榜/拆文）：按部署转换算期望内容逐字比对（与 sync 同一转换）
+        sdir = platform.skills_dir(project)
+        if sdir is not None:
+            for name in SHORT_STANDALONE_SKILLS:
+                src = SKILL_HOME / "skills" / f"{name}.md"
+                dst = sdir / name / "SKILL.md"
+                if not src.exists():
+                    continue
+                expected = rewrite_refs(
+                    _convert_standalone_skill(src.read_text(encoding="utf-8"), name,
+                                              platform.key), platform)
+                if not dst.exists() or dst.read_text(encoding="utf-8") != expected:
+                    changed.append(f"skills/{name}/SKILL.md")
         return changed
     targets = {
         "agents": platform.agents_dir(project),
@@ -356,6 +373,10 @@ def do_sync(project: Path, platform: Platform, is_short=False):
     version_changed = latest_ver and stored_ver and stored_ver != latest_ver
 
     if stored_fp == current_fp and not version_changed:
+        if is_short:
+            # 短篇独立工具是运行产物：指纹未变也可能被项目侧误删/误改，幂等再部署一次
+            deploy_standalone_skills(project, SKILL_HOME, platform,
+                                     SHORT_STANDALONE_SKILLS)
         print("[i] 已是最新，无需同步。")
         return
 
@@ -424,15 +445,18 @@ def sync_agents(project_path: Path, platform: Platform, is_short=False) -> int:
 
 def sync_skills(project_path: Path, platform: Platform, is_short=False) -> int:
     if is_short:
+        n = 0
         if platform.key in ("reasonix", "zcode", "dsh"):
-            # 短篇内联 skill 是派生产物：重新生成（short-agent 内联 short-dispatch 等 6 个）
+            # 短篇内联 skill 是派生产物：重新生成（6 agent + 2 独立工具）
             deploy_inline_skills(project_path, SKILL_HOME, platform, "short")
             n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
             print(f"  [OK] {platform.key} skills: {n} 个 SKILL.md 已重新生成（短篇组）")
-            return n
-        # claude/opencode：短篇 SOP 已内联进 agent（frontmatter skills 字段）；codex/grok：无独立工具
-        print("  [i] 短篇项目无独立 skills 同步（SOP 内联于 agent 定义）")
-        return 0
+        else:
+            # 独立工具（扫榜/拆文）幂等再部署；其余短篇 SOP 内联于 agent 无需同步
+            n = deploy_standalone_skills(project_path, SKILL_HOME, platform,
+                                         SHORT_STANDALONE_SKILLS)
+            print(f"  [OK] 独立工具: {n} 个已更新" if n else "  [i] 独立工具: 已是最新")
+        return n
     if platform.key in ("reasonix", "zcode", "dsh"):
         deploy_inline_skills(project_path, SKILL_HOME, platform)
         n = len(list(platform.skills_dir(project_path).rglob("SKILL.md")))
