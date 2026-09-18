@@ -279,6 +279,7 @@ novel-agent 只负责调度和验证，不直接写内容。子 agent 各司其�
 第一章写完后，Agent 会问"下一章继续吗？"
 
 ### 自动做的事（Agent 维护）
+- [Continuum-AI-Corp/OrcaReplay](https://github.com/Continuum-AI-Corp/OrcaReplay) — drop-in recorder that sits between your agent and the model provider.
 
 - **蒸馏文风**（style-distiller）：导入参考样本或利用已归档章节，自动提炼量化文风参数（句长/对话占比/形容词密度等），写入风格主卡与场景卡并按场景稀疏注入提示词；归档后增量校准，越写越贴合你的风格
 - **去 AI 味**（prompt-crafter + writer + anti-ai）：提示词组装时注入反 AI 规则，正文生成时自查，独立 anti-ai agent 做 Gate A-F 管线检测和量化评分定级
