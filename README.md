@@ -684,3 +684,11 @@ python ~/.grok/skills/awesome-novel/tools/init.py <小说项目路径> --genre <
 ```
 
 升级时用 `python tools/sync-project.py <小说项目路径> --platform grok` 同步最新框架。
+
+## 第三方LLM API & Token服务说明
+
+awesome-novel-agent 基于 GPLv3 开源，是免费的小说Agent工具集合项目，**项目本身不提供任何大模型、Token付费服务**。
+文档、示例配置中提到的第三方LLM服务商，仅为技术兼容性演示。
+所有Token充值、API调用、内容生成、退款、稳定性相关事宜，均由第三方服务商独立承担全部责任。
+本项目不背书任何第三方付费API服务。
+使用第三方API生成小说内容，请自行遵守网络内容相关法律法规。

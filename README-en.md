@@ -476,3 +476,11 @@ Upgrade later with `python tools/sync-project.py <novel-project-path> --platform
 ## Acknowledgments
 
 Part of this project's design was inspired by [InkOS](https://github.com/Narcooo/inkos) — including AI flavor detection system, foreshadowing/hook tracking, genre configuration, and layered technique models. Thanks to [@Narcooo](https://github.com/Narcooo) for the excellent work.
+
+## Third-Party LLM API & Token Services
+
+awesome-novel-agent is open source under GPLv3 and is a free collection of novel-writing agent tools. **The project itself does not provide any LLM or paid Token services.**
+Third-party LLM providers mentioned in the documentation and example configs are for technical compatibility demonstration only.
+All matters related to Token top-ups, API calls, content generation, refunds, and stability are solely the responsibility of the third-party providers.
+This project does not endorse any third-party paid API service.
+When generating novel content with third-party APIs, please make sure you comply with applicable online content laws and regulations on your own.
