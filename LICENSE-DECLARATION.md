@@ -10,13 +10,13 @@
 
 **版权人**: Copyright (C) 2026  modoojunko
 
-**许可证**: [GNU General Public License v3.0](LICENSE)
+**许可证**: [GNU Affero General Public License v3.0](LICENSE)
 
 ---
 
 ## 覆盖文件清单
 
-以下文件受 GPL-3.0 许可证约束：
+以下文件受 AGPL-3.0 许可证约束：
 
 | 类别 | 文件 |
 |------|------|
@@ -31,6 +31,6 @@
 
 ## 使用说明
 
-- 复制、分发、修改本项目均需遵守 GPL-3.0 条款
+- 复制、分发、修改本项目均需遵守 AGPL-3.0 条款
 - 完整许可证文本见 [LICENSE](LICENSE) 文件
 - 修改版本必须明确标注为修改版
