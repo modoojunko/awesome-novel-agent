@@ -100,4 +100,4 @@ CI：`.github/workflows/static.yml`，push main 时运行语法/agent/规则检�
 ## 安全与配置提示
 
 - 平台适配逻辑集中在 `tools/platforms.py`，新增平台或修改目录约定时先改这里，再同步 init/sync。
-- 遵守 GPLv3，不提交无版权素材、侵权文案或用户小说内容。
+- 遵守 AGPL-3.0，不提交无版权素材、侵权文案或用户小说内容。

@@ -10,13 +10,13 @@
 
 **Copyright Holder**: Copyright (C) 2026  modoojunko
 
-**License**: [GNU General Public License v3.0](LICENSE)
+**License**: [GNU Affero General Public License v3.0](LICENSE)
 
 ---
 
 ## Covered Files
 
-The following files are subject to GPL-3.0 license:
+The following files are subject to AGPL-3.0 license:
 
 | Category | Files |
 |----------|-------|
@@ -31,6 +31,6 @@ The following files are subject to GPL-3.0 license:
 
 ## Usage Terms
 
-- Copying, distributing, and modifying this project must comply with GPL-3.0 terms
+- Copying, distributing, and modifying this project must comply with AGPL-3.0 terms
 - Full license text available in [LICENSE](LICENSE)
 - Modified versions must be clearly marked as such

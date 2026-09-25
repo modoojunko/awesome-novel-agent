@@ -13,7 +13,7 @@
   <a href="#dsh-集成"><img src="https://img.shields.io/badge/DeepSeek%20Harness-%E2%9C%93%20%E6%94%AF%E6%8C%81-1F6FEB?style=flat-square" alt="DeepSeek Harness"></a>
   <a href="#grok-build-集成"><img src="https://img.shields.io/badge/Grok%20Build-%E2%9C%93%20%E6%94%AF%E6%8C%81-111111?style=flat-square" alt="Grok Build"></a>
   <br>
-  <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL%203.0-blue?style=flat-square" alt="GPL 3.0"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-AGPL%203.0-blue?style=flat-square" alt="AGPL 3.0"></a>
   <br>
   <a href="#加入交流群"><img src="https://img.shields.io/badge/QQ%E4%BA%A4%E6%B5%81%E7%BE%A4-1006050538-12B7F5?style=flat-square" alt="QQ交流群 1006050538"></a>
 </p>
@@ -687,7 +687,7 @@ python ~/.grok/skills/awesome-novel/tools/init.py <小说项目路径> --genre <
 
 ## 第三方LLM API & Token服务说明
 
-awesome-novel-agent 基于 GPLv3 开源，是免费的小说Agent工具集合项目，**项目本身不提供任何大模型、Token付费服务**。
+awesome-novel-agent 基于 AGPL-3.0 开源，是免费的小说Agent工具集合项目，**项目本身不提供任何大模型、Token付费服务**。
 文档、示例配置中提到的第三方LLM服务商，仅为技术兼容性演示。
 所有Token充值、API调用、内容生成、退款、稳定性相关事宜，均由第三方服务商独立承担全部责任。
 本项目不背书任何第三方付费API服务。
